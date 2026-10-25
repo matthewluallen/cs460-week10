@@ -1,0 +1,11 @@
+component,part,bus,i2c_address,role,manufacturer,datasheet_or_nvd,known_risk_or_cve,seen_on_bus
+MCU module,M5StampS3 (ESP32-S3),-,-,main controller + Wi-Fi/BLE,Espressif,FILL IN,FILL IN,FILL IN
+GPIO expander,AW9523B,I2C,FILL IN,drives the 4 relays AND reads the 8 opto-isolated DIs,Awinic,FILL IN,FILL IN,FILL IN
+Power monitor,INA226,I2C,0x40,bus voltage / current,Texas Instruments,FILL IN,FILL IN,FILL IN
+Real-time clock,RX8130,I2C,FILL IN,timekeeping (log timestamps),Epson,FILL IN,FILL IN,FILL IN
+Temperature sensor,LM75B,I2C,0x48,board temperature,NXP,FILL IN,FILL IN,FILL IN
+Panel IO expander,PI4IOE5V,I2C,FILL IN,front-panel buttons / panel IO,Diodes Inc,FILL IN,FILL IN,FILL IN
+Serial transceiver,RS-485,UART/RS-485,-,Modbus RTU capable (not used in this lab),-,FILL IN,FILL IN,FILL IN
+Ethernet,W5500,SPI,-,PoE wired networking,WIZnet,FILL IN,FILL IN,FILL IN
+Display,ST7789 1.14in LCD,SPI,-,on-device UI,-,FILL IN,FILL IN,FILL IN
+Outputs,4x relay,via AW9523,-,switch external loads,-,-,FILL IN,FILL IN

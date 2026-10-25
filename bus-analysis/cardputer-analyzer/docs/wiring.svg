@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 600" font-family="system-ui, -apple-system, sans-serif">
+  <rect width="880" height="600" fill="#ffffff"/>
+  <text x="24" y="34" font-size="20" font-weight="700" fill="#111">Cardputer Bus Viewer — wiring (two views)</text>
+  <text x="24" y="55" font-size="12" fill="#555">Capture pins are always the Cardputer Grove port: SDA = GPIO2, SCL = GPIO1 (passive, INPUT only — never drives the bus).</text>
+
+  <!-- Panel A: SENSOR -->
+  <g transform="translate(24,76)">
+    <rect width="832" height="180" rx="10" fill="#f4f8ff" stroke="#9db8e0"/>
+    <text x="16" y="28" font-size="15" font-weight="700" fill="#1a4b8c">A · SENSOR view — no wiring (default on boot)</text>
+    <text x="16" y="48" font-size="12" fill="#444">Plug the Cardputer straight into StamPLC PORT.A. You see the sensor I²C bus (BME688 0x77). Good first demo.</text>
+    <rect x="40" y="68" width="150" height="92" rx="8" fill="#222"/>
+    <text x="115" y="98" font-size="13" fill="#fff" text-anchor="middle" font-weight="700">Cardputer</text>
+    <text x="115" y="118" font-size="10" fill="#9cf" text-anchor="middle">Grove G2 / G1</text>
+    <text x="115" y="136" font-size="10" fill="#bbb" text-anchor="middle">LCD + keys</text>
+    <line x1="190" y1="106" x2="300" y2="106" stroke="#e33" stroke-width="3"/>
+    <line x1="190" y1="120" x2="300" y2="120" stroke="#f9a825" stroke-width="3"/>
+    <text x="245" y="98" font-size="10" fill="#666" text-anchor="middle">Grove cable</text>
+    <rect x="300" y="64" width="210" height="104" rx="8" fill="#eef" stroke="#88a"/>
+    <text x="405" y="92" font-size="13" fill="#114" text-anchor="middle" font-weight="700">StamPLC</text>
+    <rect x="320" y="102" width="92" height="48" rx="5" fill="#d33"/>
+    <text x="366" y="122" font-size="11" fill="#fff" text-anchor="middle" font-weight="700">PORT.A</text>
+    <text x="366" y="138" font-size="9" fill="#fee" text-anchor="middle">Wire1 · 0x77</text>
+    <text x="560" y="112" font-size="13" fill="#1a4b8c" font-weight="600">→ real I²C capture,</text>
+    <text x="560" y="132" font-size="13" fill="#1a4b8c" font-weight="600">   zero setup</text>
+  </g>
+
+  <!-- Panel B: CONTROL -->
+  <g transform="translate(24,272)">
+    <rect width="832" height="258" rx="10" fill="#fff7f0" stroke="#e0b58a"/>
+    <text x="16" y="28" font-size="15" font-weight="700" fill="#9c4a1a">B · CONTROL view — the lab's relay / DI bus (press M)</text>
+    <text x="16" y="48" font-size="12" fill="#444">The control bus is NOT on a Grove port — it is the internal bus on the bottom expansion header.</text>
+    <text x="16" y="65" font-size="12" fill="#444">Use a Grove → breadboard adapter. Power the Cardputer from USB/battery; share GND; leave the 5 V wire unconnected.</text>
+    <rect x="40" y="92" width="150" height="128" rx="8" fill="#222"/>
+    <text x="115" y="120" font-size="13" fill="#fff" text-anchor="middle" font-weight="700">Cardputer</text>
+    <text x="58" y="152" font-size="12" fill="#e33" font-weight="700">SDA · G2</text>
+    <text x="58" y="176" font-size="12" fill="#f9a825" font-weight="700">SCL · G1</text>
+    <text x="58" y="200" font-size="12" fill="#6c6" font-weight="700">GND</text>
+    <rect x="330" y="92" width="150" height="128" rx="8" fill="#f0e9d8" stroke="#c7b48a"/>
+    <text x="405" y="158" font-size="12" fill="#887" text-anchor="middle">breadboard</text>
+    <line x1="190" y1="148" x2="330" y2="124" stroke="#e33" stroke-width="3"/>
+    <line x1="190" y1="172" x2="330" y2="156" stroke="#f9a825" stroke-width="3"/>
+    <line x1="190" y1="196" x2="330" y2="188" stroke="#4a4" stroke-width="3"/>
+    <rect x="560" y="82" width="238" height="148" rx="8" fill="#eef" stroke="#88a"/>
+    <text x="679" y="108" font-size="13" fill="#114" text-anchor="middle" font-weight="700">StamPLC expansion header</text>
+    <text x="582" y="142" font-size="13" fill="#e33" font-weight="700">SDA · GPIO13</text>
+    <text x="582" y="168" font-size="13" fill="#c87800" font-weight="700">SCL · GPIO15</text>
+    <text x="582" y="194" font-size="13" fill="#4a4" font-weight="700">GND</text>
+    <text x="582" y="216" font-size="10" fill="#666">0x59 relays/DI · 0x43 btn · 0x40/0x48/0x32</text>
+    <line x1="480" y1="124" x2="560" y2="138" stroke="#e33" stroke-width="3"/>
+    <line x1="480" y1="156" x2="560" y2="162" stroke="#f9a825" stroke-width="3"/>
+    <line x1="480" y1="188" x2="560" y2="186" stroke="#4a4" stroke-width="3"/>
+  </g>
+
+  <text x="24" y="566" font-size="11" fill="#888">Passive tap · 3.3 V logic only · confirm the exact header pads on the StamPLC schematic before clipping · press E to export JSON for parity with the twin.</text>
+</svg>

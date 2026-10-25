@@ -1,0 +1,7 @@
+# Deploy config for the remote StampLC console (web/).
+[build]
+  publish = "web/public"
+  functions = "web/netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"

@@ -1,0 +1,9 @@
+# A small stand-in for one software component you might find inside an IoT
+# product's build toolchain or companion service. The versions are pinned
+# intentionally old so the scanners have real, known CVEs to find.
+# (You are NOT installing these — the SBOM tools read the manifest only.)
+requests==2.19.1
+PyYAML==5.1
+Jinja2==2.10
+urllib3==1.24.1
+cryptography==2.3

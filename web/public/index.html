@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CS460 StampLC Console</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --edge:#273145; --ink:#e7ecf5; --dim:#90a0bd;
+    --accent:#4f8cff; --on:#2fbf71; --off:#38425a; --warn:#e0b341; --danger:#e5484d;
+    --radius:14px; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;justify-content:center;padding:22px 16px}
+  .wrap{width:100%;max-width:460px}
+  h1{font-size:17px;margin:0 0 2px;letter-spacing:.2px}
+  .sub{color:var(--dim);font-size:13px;margin:0 0 18px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:var(--radius);padding:18px;margin-bottom:14px}
+  label{display:block;font-size:12px;color:var(--dim);margin:0 0 6px;text-transform:uppercase;letter-spacing:.6px}
+  select,input{width:100%;background:#0c1220;color:var(--ink);border:1px solid var(--edge);border-radius:10px;padding:11px 12px;font-size:15px}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+  button{cursor:pointer;border:0;border-radius:10px;padding:12px 14px;font-size:15px;font-weight:600;color:#fff;background:var(--accent);width:100%}
+  button.ghost{background:#222c42;color:var(--ink);border:1px solid var(--edge)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .hidden{display:none}
+  .pill{display:inline-block;font-size:11px;padding:3px 8px;border-radius:999px;background:#222c42;color:var(--dim);margin-left:8px}
+  .io{display:flex;gap:12px;margin-top:4px}
+  .io .box{flex:1;text-align:center;border:1px solid var(--edge);border-radius:12px;padding:16px 10px;background:#0c1220}
+  .lamp{width:46px;height:46px;border-radius:50%;margin:4px auto 8px;background:#38425a;box-shadow:inset 0 0 0 2px #0008;transition:.15s}
+  .lamp.on{background:var(--on);box-shadow:0 0 18px var(--on)}
+  .lamp.input.on{background:var(--accent);box-shadow:0 0 18px var(--accent)}
+  .boxlabel{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .state{font-size:13px;font-weight:600;margin-top:4px}
+  .log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--dim);background:#0a0f1b;border:1px solid var(--edge);border-radius:10px;padding:10px;height:92px;overflow:auto;white-space:pre-wrap}
+  .err{color:var(--danger);font-size:13px;margin-top:8px;min-height:18px}
+  .mockbadge{color:var(--warn)}
+  @media (prefers-color-scheme: light){
+    :root{--bg:#eef1f7;--panel:#fff;--edge:#d7deea;--ink:#182030;--dim:#5c6b86}
+    select,input,.io .box,.log{background:#f4f7fc}
+    button.ghost{background:#eef2f9}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>StampLC Team Console <span id="mode" class="pill">locked</span></h1>
+  <p class="sub">CS460 Week 10 · drive one input → ladder logic → one output, remotely.</p>
+
+  <!-- LOCK -->
+  <div id="lock" class="card">
+    <div class="row" style="margin-bottom:12px">
+      <div>
+        <label>Team</label>
+        <select id="team">
+          <option value="1">Team 1</option><option value="2">Team 2</option>
+          <option value="3">Team 3</option><option value="4">Team 4</option>
+        </select>
+      </div>
+      <div>
+        <label>Access code</label>
+        <input id="code" type="password" autocomplete="off" placeholder="from class" />
+      </div>
+    </div>
+    <button id="unlock">Unlock console</button>
+    <div id="lockerr" class="err"></div>
+  </div>
+
+  <!-- CONSOLE -->
+  <div id="console" class="hidden">
+    <div class="card">
+      <label>Program (from Part 4)</label>
+      <div class="row">
+        <select id="program">
+          <option value="passthrough">Pass-through  (out = in)</option>
+          <option value="invert">Inverted  (out = NOT in)</option>
+          <option value="latch">Latch  (in sets; Reset clears)</option>
+        </select>
+        <button id="apply" style="flex:0 0 96px">Apply</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="io">
+        <div class="box">
+          <div class="boxlabel">Input · DI 0</div>
+          <div id="inlamp" class="lamp input"></div>
+          <button id="trigger" class="ghost">Trigger</button>
+        </div>
+        <div class="box">
+          <div class="boxlabel">Output · Relay 0</div>
+          <div id="outlamp" class="lamp"></div>
+          <div id="outstate" class="state">off</div>
+        </div>
+      </div>
+      <button id="reset" class="ghost hidden" style="margin-top:12px">Reset latch</button>
+    </div>
+
+    <div class="card">
+      <label>Device console</label>
+      <div class="row">
+        <input id="cmd" type="text" placeholder="try: help, status, io, i2cscan" autocomplete="off" />
+        <button id="run" class="ghost" style="flex:0 0 72px">Run</button>
+      </div>
+      <div id="cout" class="log" style="height:132px;margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <label>Activity</label>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const state = { team:null, code:null, program:"passthrough", input:false, latch:false, deviceOutput:null };
+
+function log(msg){ const el=$("#log"); el.textContent += (el.textContent?"\n":"") + msg; el.scrollTop = el.scrollHeight; }
+
+async function call(action, payload){
+  const r = await fetch("/.netlify/functions/device", {
+    method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ team: state.team, code: state.code, action, payload })
+  });
+  const data = await r.json().catch(()=>({error:"bad response"}));
+  if(!r.ok) throw new Error(data.error || ("HTTP "+r.status));
+  return data;
+}
+
+// local simulation of the PLC, used until a real device is wired (mock mode)
+function computeOutput(){
+  if(state.program==="passthrough") return state.input;
+  if(state.program==="invert")      return !state.input;
+  if(state.program==="latch"){ if(state.input) state.latch = true; return state.latch; }
+  return false;
+}
+
+function render(){
+  const out = (state.deviceOutput!==null) ? state.deviceOutput : computeOutput();
+  $("#inlamp").classList.toggle("on", state.input);
+  $("#outlamp").classList.toggle("on", out);
+  $("#outstate").textContent = out ? "ON" : "off";
+  $("#reset").classList.toggle("hidden", state.program!=="latch");
+}
+
+$("#unlock").onclick = async () => {
+  state.team = $("#team").value; state.code = $("#code").value;
+  $("#lockerr").textContent = "";
+  try{
+    const res = await call("status", {});
+    $("#lock").classList.add("hidden");
+    $("#console").classList.remove("hidden");
+    $("#mode").textContent = res.mock ? "mock" : ("team "+state.team);
+    $("#mode").className = "pill" + (res.mock ? " mockbadge":"");
+    log("unlocked · team "+state.team+(res.mock?" · MOCK (no device wired)":""));
+    render();
+  }catch(e){ $("#lockerr").textContent = e.message; }
+};
+
+$("#apply").onclick = async () => {
+  state.program = $("#program").value; state.latch = false; state.deviceOutput = null;
+  try{ const r = await call("apply", { program: state.program });
+       state.deviceOutput = r.device && typeof r.device.output==="boolean" ? r.device.output : null;
+       log("applied: "+state.program); }
+  catch(e){ log("apply failed: "+e.message); }
+  render();
+};
+
+$("#trigger").onclick = async () => {
+  state.input = !state.input;
+  try{ const r = await call("trigger", { on: state.input });
+       state.deviceOutput = r.device && typeof r.device.output==="boolean" ? r.device.output : null;
+       log("input "+(state.input?"ON":"off")); }
+  catch(e){ log("trigger failed: "+e.message); state.input = !state.input; }
+  render();
+};
+
+$("#reset").onclick = () => { state.latch=false; state.deviceOutput=null; log("latch reset"); render(); };
+
+async function runCmd(){
+  const c = $("#cmd").value.trim(); if(!c) return;
+  const co = $("#cout");
+  co.textContent += (co.textContent?"\n":"") + "plc> " + c;
+  try{ const r = await call("console", { command: c });
+       co.textContent += "\n" + (r.output != null ? r.output : JSON.stringify(r));
+  }catch(e){ co.textContent += "\n[error] " + e.message; }
+  co.scrollTop = co.scrollHeight; $("#cmd").value = "";
+}
+$("#run").onclick = runCmd;
+$("#cmd").addEventListener("keydown", e => { if(e.key==="Enter") runCmd(); });
+
+$("#code").addEventListener("keydown", e => { if(e.key==="Enter") $("#unlock").click(); });
+</script>
+</body>
+</html>
