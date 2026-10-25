@@ -1,0 +1,211 @@
+<title>Unauthenticated Coil Write</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: a single evidence column — five stages of one chain, each a card, joined
+     by connectors; SBOM → CWE → code → capture → outcome. Theme-aware document. */
+  :root{
+    --bg:#f6f5f2; --panel:#ffffff; --ink:#1a1d21; --muted:#5b6670; --faint:#8b949e;
+    --edge:#e3e1db; --rule:#ecebe6;
+    --sev:#c2410c;         /* weakness / severity */
+    --proof:#0f7b55;       /* captured evidence */
+    --wire:#b08900;        /* on-the-wire bytes */
+    --accent:#2f5fb3;
+    color-scheme:light;
+    --sans:"IBM Plex Sans",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    --disp:"Newsreader",Georgia,serif;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#0e1116; --panel:#161b22; --ink:#e7edf3; --muted:#9aa7b3; --faint:#6b7681;
+    --edge:#232b35; --rule:#1c232c; --sev:#fb8f5a; --proof:#49c994; --wire:#e0bb4b; --accent:#6d9bed;
+    color-scheme:dark;}}
+  :root[data-theme="dark"]{
+    --bg:#0e1116; --panel:#161b22; --ink:#e7edf3; --muted:#9aa7b3; --faint:#6b7681;
+    --edge:#232b35; --rule:#1c232c; --sev:#fb8f5a; --proof:#49c994; --wire:#e0bb4b; --accent:#6d9bed;
+    color-scheme:dark;}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;margin:0;
+    padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+    padding-block:28px;max-width:760px;margin:0 auto;-webkit-font-smoothing:antialiased}
+  .eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+  h1{font-family:var(--disp);font-weight:500;font-size:2rem;line-height:1.1;margin:.3rem 0 .1rem;text-wrap:balance;letter-spacing:-.01em}
+  .lede{color:var(--muted);font-size:.95rem;margin:.4rem 0 0;max-width:60ch}
+  .chainbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--mono);font-size:.72rem;margin-top:14px;color:var(--muted)}
+  .chainbar b{color:var(--ink)} .chainbar span{color:var(--faint)}
+  .sev{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:.72rem;color:var(--sev);
+    border:1px solid color-mix(in srgb,var(--sev) 40%,var(--edge));border-radius:999px;padding:3px 10px}
+  .sev::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--sev)}
+  .topline{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:14px}
+  .stage{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:16px 18px;margin-top:0}
+  .flow{display:flex;flex-direction:column;gap:0;margin-top:22px}
+  .connector{display:flex;align-items:center;gap:10px;padding:7px 0 7px 18px;color:var(--faint);font-family:var(--mono);font-size:.68rem}
+  .connector::before{content:"";width:1px;height:20px;background:var(--edge);margin-left:7px}
+  .connector .arrow{color:var(--accent)}
+  .stage h2{font-size:.72rem;font-family:var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:0 0 3px;display:flex;align-items:center;gap:8px}
+  .stage .num{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
+    background:var(--accent);color:#fff;font-size:.62rem;font-weight:600;flex:none}
+  .stage h3{font-family:var(--disp);font-weight:500;font-size:1.22rem;margin:.1rem 0 .5rem;letter-spacing:-.01em}
+  .stage p{margin:.3rem 0;color:var(--muted);font-size:.9rem}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-family:var(--mono);font-size:.78rem;margin:.5rem 0}
+  .kv dt{color:var(--faint)} .kv dd{margin:0;color:var(--ink);word-break:break-word}
+  .kv dd b{color:var(--sev)}
+  .tag{font-family:var(--mono);font-size:.7rem;border:1px solid var(--edge);border-radius:6px;padding:1px 7px;color:var(--muted);white-space:nowrap}
+  .code,.cap{font-family:var(--mono);font-size:.76rem;line-height:1.7;background:color-mix(in srgb,var(--ink) 4%,var(--panel));
+    border:1px solid var(--rule);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:.5rem 0 0}
+  .code .c{color:var(--faint)} .code .k{color:var(--accent)} .code .bad{color:var(--sev);font-weight:600}
+  .cap .lbl{color:var(--faint)}
+  .cap .wire{color:var(--wire);font-weight:600;letter-spacing:.06em}
+  .cap .hl{background:color-mix(in srgb,var(--sev) 20%,transparent);border-radius:3px;padding:0 2px}
+  .cap .ok{color:var(--proof);font-weight:600}
+  .stage.proof{border-color:color-mix(in srgb,var(--proof) 45%,var(--edge))}
+  .stage.proof h2{color:var(--proof)}
+  .stage.proof .num{background:var(--proof)}
+  .beforeafter{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-family:var(--mono);font-size:.76rem}
+  .ba{flex:1 1 150px;min-width:0;border:1px solid var(--rule);border-radius:8px;padding:8px 11px}
+  .ba .t{color:var(--faint);font-size:.68rem;text-transform:uppercase;letter-spacing:.1em}
+  .ba .v{font-size:.95rem;margin-top:2px}
+  .ba .v .on{color:var(--proof);font-weight:700}
+  .outcome{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .relay{font-family:var(--mono);font-size:.85rem;border:1px solid var(--rule);border-radius:8px;padding:9px 13px;display:inline-flex;gap:9px;align-items:center}
+  .relay .dot{width:11px;height:11px;border-radius:2px;background:var(--proof);box-shadow:0 0 0 3px color-mix(in srgb,var(--proof) 22%,transparent)}
+  .finding{margin-top:24px;border-left:3px solid var(--sev);padding:4px 0 4px 16px}
+  .finding .eyebrow{color:var(--sev)}
+  .finding p{font-size:1rem;color:var(--ink);margin:.35rem 0 0}
+  .foot{margin-top:22px;padding-top:14px;border-top:1px solid var(--rule);color:var(--faint);font-family:var(--mono);font-size:.68rem;line-height:1.7}
+  a{color:var(--accent)}
+</style>
+
+<div class="eyebrow">Week 10 · finding exhibit · the chain in one page</div>
+<h1>Unauthenticated Coil Write</h1>
+<p class="lede">One weakness, traced the whole way: the SBOM flags its <em>class</em> in a
+dependency, the firmware's <em>code</em> reaches it, and the bus/network analyzer
+captures the <em>outcome</em> — a relay thrown by an anonymous, cleartext write.</p>
+<div class="topline">
+  <div class="sev">High · reachable &amp; demonstrated</div>
+  <div class="chainbar"><b>analyzer</b><span>↔</span><b>SBOM</b><span>↔</span><b>CWE</b><span>↔</span><b>CVE</b></div>
+</div>
+
+<div class="flow">
+
+  <section class="stage">
+    <h2><span class="num">1</span>SBOM · the scanner finding</h2>
+    <h3>The weakness class is already in the parts list</h3>
+    <p>Before a line of the product runs, <code>syft</code> → <code>grype</code> find the
+    transport‑security and credential weakness classes sitting in the dependency stack:</p>
+    <dl class="kv">
+      <dt>library</dt><dd>urllib3 == 1.24.1</dd>
+      <dt>CVE</dt><dd>CVE‑2019‑11324</dd>
+      <dt>CWE</dt><dd><b>CWE‑295</b> · Improper Certificate / Transport Validation</dd>
+      <dt>library</dt><dd>requests == 2.19.1</dd>
+      <dt>CVE</dt><dd>CVE‑2018‑18074</dd>
+      <dt>CWE</dt><dd><b>CWE‑522</b> · Insufficiently Protected Credentials</dd>
+    </dl>
+    <p>A finding here is a <em>question</em>, not a verdict: does any code actually reach it?</p>
+  </section>
+
+  <div class="connector"><span class="arrow">↓</span> the CVE names a weakness <b>class</b></div>
+
+  <section class="stage">
+    <h2><span class="num">2</span>CWE · the weakness class</h2>
+    <h3>Cleartext control, with no one checked at the door</h3>
+    <p>The same classes, as they apply to the controller itself:</p>
+    <dl class="kv">
+      <dt><span class="tag">CWE‑319</span></dt><dd>Cleartext Transmission of Sensitive Information</dd>
+      <dt><span class="tag">CWE‑306</span></dt><dd>Missing Authentication for a Critical Function</dd>
+    </dl>
+    <p>The firmware's own <code>cwe</code> command lists both. The CWE is the join: it
+    carries the scanner's library finding onto the device's code.</p>
+  </section>
+
+  <div class="connector"><span class="arrow">↓</span> is there <b>vulnerable code</b> that reaches it?</div>
+
+  <section class="stage">
+    <h2><span class="num">3</span>Code · the path that reaches it</h2>
+    <h3>The Modbus server writes coils for anyone</h3>
+    <p>In <code>firmware/src/modbus_tcp_server.cpp</code>, the TCP server binds in the clear
+    and the write‑coil path has no identity check:</p>
+    <div class="code">
+<span class="c">// Modbus/TCP, port 502 — no TLS, no client auth (CWE-319, CWE-306)</span>
+<span class="k">case</span> FC_WRITE_SINGLE_COIL: <span class="c">// 0x05</span>
+    coil = req.ref;  value = (req.data == <span class="bad">0xFF00</span>);
+    <span class="bad">io.coil_set(coil, value);</span>   <span class="c">// drives the I/O image directly — no caller check</span>
+    reply_echo(req);
+    <span class="k">break</span>;
+    </div>
+  </section>
+
+  <div class="connector"><span class="arrow">↓</span> exercise it, and <b>capture</b> the wire</div>
+
+  <section class="stage proof">
+    <h2><span class="num">4</span>Network capture · the write arrives</h2>
+    <h3>The write, in plaintext, from nobody</h3>
+    <p>A <code>pymodbus</code> client over the emulated W5500 stack; <code>tshark</code> on
+    <code>lo</code>. The write‑single‑coil frame, exactly as captured:</p>
+    <div class="cap">
+<span class="lbl">frame 10 · 127.0.0.1 → 127.0.0.1:502 · Modbus/TCP</span>
+<span class="wire">00 03  00 00  00 06  01  <span class="hl">05  00 00  FF 00</span></span>
+ └tid─┘ └proto┘ └len─┘ └u┘  └fc┘└ref─┘└─data┘
+Transaction id : 3        Unit : 1
+Function       : <span class="hl">0x05  Write Single Coil</span>
+Reference      : 0        Data : FF00 (ON)
+<span class="lbl">no TLS handshake precedes it · no credential field exists</span>
+    </div>
+    <div class="beforeafter">
+      <div class="ba"><div class="t">coils before</div><div class="v">0 0 0 0 0 0 0 0</div></div>
+      <div class="ba"><div class="t">coils after (re‑read)</div><div class="v"><span class="on">1</span> 0 0 0 0 0 0 0</div></div>
+    </div>
+  </section>
+
+  <div class="connector"><span class="arrow">↓</span> the <b>scan</b> carries the coil onto the physical bus</div>
+
+  <section class="stage proof">
+    <h2><span class="num">5</span>Logic &amp; bus · the write reaches the wire</h2>
+    <h3>The scan carries the coil onto the I²C bus</h3>
+    <p>In <b>RUN</b> mode the scan reads that coil from the I/O image and writes the AW9523
+    relay register over I²C every cycle. The virtual tap captures it, and the <em>same</em>
+    sigrok decoder the bus lab uses reads it back:</p>
+    <div class="cap">
+<span class="lbl">esp32_i2c_observe · /machine/soc/i2c0 · AW9523 relay register (0x59)</span>
+before the write   <span class="wire">W 0x59  data=00</span>    <span class="lbl">relays off</span>
+after  the write   <span class="wire">W 0x59  data=<span class="hl">01</span></span>    <span class="ok">bit0 = relay0 ON</span>
+<span class="lbl">sigrok-cli -i bus.vcd -P i2c  →  Address write: 59 · Data write: 01</span>
+    </div>
+    <p>No ladder rung set that bit — a network coil write did, and it is now on the physical
+    bus, the same trace a bench logic analyzer would capture.</p>
+  </section>
+
+  <div class="connector"><span class="arrow">↓</span> which the bus analyzer shows as a <b>physical outcome</b></div>
+
+  <section class="stage proof">
+    <h2><span class="num">6</span>Outcome · the physical result</h2>
+    <h3>Relay 0 closes</h3>
+    <div class="outcome">
+      <span class="relay"><span class="dot"></span>AW9523 0x59 · relay0 = ON</span>
+      <p style="margin:0">The same coil the scan drives from the ladder — now thrown by an
+      anonymous network write. In <code>i2c-analyzer.html</code> it appears as a
+      <code>W 0x59</code> on the relay lane.</p>
+    </div>
+  </section>
+
+</div>
+
+<div class="finding">
+  <div class="eyebrow">Finding</div>
+  <p>The scanner proved the <b>class</b> is present (CWE‑295 / CWE‑522 in shipped
+  libraries). The code review found the <b>path</b> (an unauthenticated FC05 handler on a
+  cleartext port). The network capture proved the <b>entry</b> (a readable, anonymous coil
+  write); the I²C capture proved it <b>reached the wire</b> (the scan's <code>W 0x59</code>
+  relay‑register write, decoded by the same sigrok flow); and the analyzer proved the
+  <b>consequence</b> (relay0 actuates). What the SBOM raised as a question, the analyzer
+  answered — through the logic, down to the bus. Next observation that would change the
+  verdict: put the write behind auth or TLS and re‑capture — the frame should no longer land,
+  and <code>W 0x59</code> should stay <code>00</code>.</p>
+</div>
+
+<div class="foot">
+  Captured on the StampLC QEMU twin · pymodbus → tshark on lo:502 · reproduce with
+  bus-analysis + sbom/cwe_bridge.py. CVE/CWE from a grype scan of the dependency sample;
+  frame bytes are the live capture.
+</div>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500&display=swap">

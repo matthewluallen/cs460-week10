@@ -1,0 +1,8 @@
+point,before_trace,after_trace,unit,evidence_limit
+temp_c_x10,308,308,tenths of degC,Separate pjson replies; not independent physical observation
+vin_mv,4337,4347,mV,Separate pjson replies; not independent physical observation
+current_ma,143,143,mA,Separate pjson replies; not independent physical observation
+motor,0,0,bool,Separate pjson replies; not independent physical observation
+light_green,0,0,bool,Separate pjson replies; not independent physical observation
+light_yellow,0,0,bool,Separate pjson replies; not independent physical observation
+light_red,0,0,bool,Separate pjson replies; not independent physical observation

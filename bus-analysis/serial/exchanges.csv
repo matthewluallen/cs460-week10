@@ -1,0 +1,4 @@
+case,origin,request_hex,reply_hex,host_receipt_interval_ms,source_file,transaction_index
+physical-0,"Recorded physical serial-console bytes, September 12",01030019000155cd,0103020060b86c,13.316791038960218,docs/evidence/2026-09-12-rtu-worker/usb-bounded-physical.json,0
+physical-3,"Recorded physical serial-console bytes, September 12",01030019000155cd,0103020063f86d,13.133666012436152,docs/evidence/2026-09-12-rtu-worker/usb-bounded-physical.json,3
+timeout,Earlier physical diagnostic run; installed app identity unknown,01030019000155CD,,,docs/evidence/2026-09-12-bench-reconnected/rtu-receipt-timing.json,0

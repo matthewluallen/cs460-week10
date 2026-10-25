@@ -1,0 +1,184 @@
+
+// firmware/src/plc_core.cpp@0a9b36b63229342394a4ec3603c895699d87d2c6 lines 160-169
+160: void plc_core_scan() {
+161:     uint32_t t0 = micros();
+162:
+163:     // 1. INPUT IMAGE: latch digital inputs (with force override) and analog.
+164:     for (int i = 0; i < 8; i++) {
+165:         bool di = plc_di_live(i);
+166:         modbus_server.set_coil(100 + i, di);   // expose DI at coils 100-107
+167:         g_engine.set_input(i, di);
+168:     }
+169:     plc_bus_log(0x43, 'R', "poll DI (opto x8)", 0, false);
+
+// firmware/src/plc_core.cpp@0a9b36b63229342394a4ec3603c895699d87d2c6 lines 204-217
+204:     g_engine.set_mem(3, plc_coil_live(9));      // MX3 = cmd_run (coil 9)
+205:
+206:     // 2. SOLVE (RUN only; PROGRAM holds outputs at safe state)
+207:     if (s_mode != PLC_PROGRAM) g_engine.scan(g_prog, g_prog_n, millis());
+208:
+209:     // 3. OUTPUT IMAGE -> physical. Base relays 0-3 map to coils 1-4.
+210:     for (int k = 0; k < 4; k++) {
+211:         uint16_t coil = 1 + k;
+212:         bool commanded = (s_mode != PLC_PROGRAM) ? g_engine.relay(k) : false;   // safe state in PROGRAM
+213:         modbus_server.set_coil(coil, commanded);
+214:         bool phys = plc_coil_is_forced(coil) ? plc_coil_forced_val(coil) : commanded;
+215:         io.relay_set(k, phys);
+216:         s_relay_cmd[k] = phys;
+217:     }
+
+// firmware/src/plc_core.cpp@0a9b36b63229342394a4ec3603c895699d87d2c6 lines 234-247
+234:     // 4. STATUS registers + scan stats
+235:     uint32_t dt = micros() - t0;
+236:     s_scan_last = dt;
+237:     if (s_scan_min == 0 || dt < s_scan_min) s_scan_min = dt;
+238:     if (dt > s_scan_max) s_scan_max = dt;
+239:     s_scan_count++; s_heartbeat++;
+240:     { uint8_t mb[6]; plc_device_mac_bytes(mb);
+241:       plc_image_lock();   // publish the status group + MAC atomically (BR#13 cond 1)
+242:       modbus_server.set_register(20, (uint16_t)s_mode);
+243:       modbus_server.set_register(21, (uint16_t)(s_scan_last > 65535 ? 65535 : s_scan_last));
+244:       modbus_server.set_register(22, (uint16_t)(s_scan_max > 65535 ? 65535 : s_scan_max));
+245:       modbus_server.set_register(23, (uint16_t)plc_fault_active_count());
+246:       modbus_server.set_register(24, plc_forces_active() ? 1 : 0);
+247:       modbus_server.set_register(25, (uint16_t)s_heartbeat);
+
+// firmware/src/modbus_rtu.cpp@0a9b36b63229342394a4ec3603c895699d87d2c6 lines 38-53
+38:     ~StatsLock() { portEXIT_CRITICAL(&s_stats_mux); }
+39: };
+40: static void modbus_rtu_poll();
+41: static void reverse_link_test();
+42:
+43: // Higher priority than the network worker, on core 0. Grove/I2C/PLC scan stay
+44: // on the loop task. UART receive, DIR and every transmit have this ONE owner.
+45: static void rtu_task(void*) {
+46:     for (;;) {
+47:         modbus_rtu_poll();
+48:         if (ulTaskNotifyTake(pdTRUE, 0)) reverse_link_test();
+49:         vTaskDelay(1);
+50:     }
+51: }
+52:
+53: static uint16_t rtu_crc(const uint8_t* d, size_t n) {
+
+// firmware/src/modbus_rtu.cpp@0a9b36b63229342394a4ec3603c895699d87d2c6 lines 140-180
+140:         case 0x16: return 10;                         // mask write register
+141:         case 0x17:                                    // read/write multiple regs
+142:             if (avail < 11) return 0;
+143:             return 13 + (size_t)p[10];
+144:         default:  return 8;                           // assume shortest; CRC rejects if wrong
+145:     }
+146: }
+147:
+148: // Serve one validated request frame (addr..data, no CRC) through the shared
+149: // Modbus core, then drive the reply back onto the bus.
+150: static void handle_request(const uint8_t* frame, size_t flen) {
+151:     uint8_t addr = frame[0];
+152:     { StatsLock lock; s_stats.requests++; }
+153:     if (g_bustrace) plc_bus_log(addr, 'R', "Modbus RTU request (RS-485)", frame[1], true);
+154:     if (addr == 0x00) return;                          // broadcasts ignored by this teaching implementation
+155:
+156:     uint16_t pdu_len = (uint16_t)(flen - 3);           // strip addr + crc16
+157:     if (pdu_len < 1 || pdu_len > 253) return;
+158:
+159:     uint8_t mbap[260];
+160:     mbap[0] = 0; mbap[1] = 0; mbap[2] = 0; mbap[3] = 0;
+161:     uint16_t mlen = (uint16_t)(1 + pdu_len);
+162:     mbap[4] = (uint8_t)(mlen >> 8); mbap[5] = (uint8_t)(mlen & 0xFF);
+163:     mbap[6] = addr;
+164:     memcpy(mbap + 7, frame + 1, pdu_len);
+165:
+166:     uint8_t  resp[300];
+167:     uint16_t resp_len = 0;
+168:     if (modbus_server.handle_frame(mbap, (uint16_t)(7 + pdu_len), resp, resp_len) && resp_len > 7) {
+169:         uint16_t rpdu = (uint16_t)(resp_len - 7);
+170:         uint8_t  out[300];
+171:         out[0] = addr;
+172:         memcpy(out + 1, resp + 7, rpdu);
+173:         uint16_t cc = rtu_crc(out, (size_t)(1 + rpdu));
+174:         out[1 + rpdu] = (uint8_t)(cc & 0xFF);
+175:         out[2 + rpdu] = (uint8_t)(cc >> 8);
+176:         rs485_send(out, 3 + rpdu);
+177:         { StatsLock lock; s_stats.replies++; }
+178:     }
+179: }
+180:
+
+// firmware/src/modbus_rtu.cpp@0a9b36b63229342394a4ec3603c895699d87d2c6 lines 190-232
+190:             uint8_t addr = s_buf[start];
+191:             if (addr == s_id || addr == 0x00) handle_request(s_buf + start, flen);
+192:             start += flen;                             // consumed a whole frame
+193:         } else {
+194:             { StatsLock lock; s_stats.crc_rejects++; }
+195:             start++;                                   // resync on the next byte
+196:         }
+197:     }
+198:     if (start >= s_len)      s_len = 0;
+199:     else if (start > 0)    { memmove(s_buf, s_buf + start, s_len - start); s_len -= start; }
+200: }
+201:
+202: static void modbus_rtu_poll() {
+203:     if (!s_active) return;
+204:     uint32_t poll_us = micros();
+205:     { StatsLock lock;
+206:       uint32_t gap = poll_us - s_last_poll_us;
+207:       if (gap > s_stats.max_poll_gap_us) s_stats.max_poll_gap_us = gap;
+208:       s_stats.polls++;
+209:     }
+210:     s_last_poll_us = poll_us;
+211:     uint32_t now = millis();
+212:     // A continuously transmitting peer must not monopolize a high-priority task.
+213:     for (size_t drained = 0; drained < RTU_BUFSZ && RS485.available(); drained++) {
+214:         uint8_t b = (uint8_t)RS485.read();
+215:         { StatsLock lock; s_stats.rx_bytes++; }
+216:         if (s_len < sizeof(s_buf)) { s_buf[s_len++] = b; s_last = now; }
+217:         else { StatsLock lock; s_stats.overflow_bytes++; }
+218:     }
+219:     if (s_len && (now - s_last) >= s_gap_ms) {
+220:         if (g_bustrace) {
+221:             Serial.printf("[BUS] RS485 rx %d:", (int)s_len);
+222:             for (size_t i = 0; i < s_len && i < 16; i++) Serial.printf(" %02X", s_buf[i]);
+223:             Serial.println();
+224:         }
+225:         process_buffer();
+226:         if (s_len) {
+227:             { StatsLock lock; s_stats.partial_discards++; }
+228:             s_len = 0;
+229:         }
+230:     }
+231:     if (s_len >= sizeof(s_buf)) {
+232:         { StatsLock lock; s_stats.overflow_bytes += s_len; }
+
+// firmware/src/plc_engine.h@0a9b36b63229342394a4ec3603c895699d87d2c6 lines 11-27
+11: // ---- Bytecode opcodes (v0). Stack is int32 (bool = 0/1). --------------------
+12: enum Op : uint8_t {
+13:   OP_HALT = 0,
+14:   OP_PUSH_I,    // arg=int imm            push imm
+15:   OP_LD_IX,     // arg=bit index          push digital input %IX
+16:   OP_LD_QX,     // arg=bit index          push relay/coil %QX
+17:   OP_LD_MX,     // arg=bit index          push memory bit %MX
+18:   OP_ST_QX,     // arg=bit index          pop -> relay %QX
+19:   OP_ST_MX,     // arg=bit index          pop -> memory bit %MX
+20:   OP_LD_IW,     // arg=word index         push analog input %IW (int)
+21:   OP_AND, OP_OR, OP_XOR, OP_NOT,          // bool logic on TOS
+22:   OP_GT, OP_LT, OP_GE, OP_LE, OP_EQ,      // int compare -> bool
+23:   OP_TON,       // arg=inst, arg2=preset  pop IN, update TON, push Q
+24:   OP_RTRIG,     // arg=inst               pop CLK, push rising edge
+25:   OP_FBQ,       // arg=inst               push instance Q (last value)
+26:   OP_DROP,      // pop and discard        (toolchain: FB-call statement result)
+27: };
+
+// firmware/src/plc_engine.cpp@0a9b36b63229342394a4ec3603c895699d87d2c6 lines 35-47
+35:       case OP_FBQ: push(inst_[c.a].q ? 1:0); break;
+36:       case OP_DROP: (void)pop(); break;      // discard (FB-call statement result)
+37:       case OP_TON: {                       // IEC TON: Q after IN true for PT ms
+38:         FbInst& f = inst_[c.a];
+39:         bool in = (pop()!=0);
+40:         if (in) {
+41:           if (!f.running) { f.running=true; f.t0=now_ms; }
+42:           f.q = (now_ms - f.t0) >= (uint32_t)c.b;
+43:         } else { f.running=false; f.q=false; }
+44:         push(f.q ? 1:0);
+45:       } break;
+46:       case OP_RTRIG: {                      // rising-edge detector
+47:         FbInst& f = inst_[c.a];

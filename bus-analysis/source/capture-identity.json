@@ -1,0 +1,57 @@
+{
+  "electrical_channels_sampled": false,
+  "new_device_run": false,
+  "observations": {
+    "after_capture": {
+      "boot_id": "617fcdd15f137b5605d37a1f201cb770",
+      "captured_us": 23320241,
+      "clock": "esp_timer_boot_us",
+      "elf_sha256": "ec0245fe92672788fa14d3b22d691272c4dae457b46024072ada33cb4ed3ea2e",
+      "faults": 0,
+      "forces": 0,
+      "mode": "PROGRAM",
+      "program_hash_basis": "compact-ordered-json-magic-scan_ms-code-all-operands",
+      "program_sha256": "c73003aa56c1777b8ed2738033d770a41c3e44f6fedaa3cfd6dc621a3397a280",
+      "schema": "tbd.binding-readback/v1"
+    },
+    "after_open": {
+      "boot_id": "617fcdd15f137b5605d37a1f201cb770",
+      "captured_us": 19718951,
+      "clock": "esp_timer_boot_us",
+      "elf_sha256": "ec0245fe92672788fa14d3b22d691272c4dae457b46024072ada33cb4ed3ea2e",
+      "faults": 0,
+      "forces": 0,
+      "mode": "PROGRAM",
+      "program_hash_basis": "compact-ordered-json-magic-scan_ms-code-all-operands",
+      "program_sha256": "c73003aa56c1777b8ed2738033d770a41c3e44f6fedaa3cfd6dc621a3397a280",
+      "schema": "tbd.binding-readback/v1"
+    },
+    "before_open": {
+      "boot_id": "19182c00c159884396f744a478f0bfd0",
+      "captured_us": 378111229846,
+      "clock": "esp_timer_boot_us",
+      "elf_sha256": "ec0245fe92672788fa14d3b22d691272c4dae457b46024072ada33cb4ed3ea2e",
+      "faults": 0,
+      "forces": 0,
+      "mode": "PROGRAM",
+      "program_hash_basis": "compact-ordered-json-magic-scan_ms-code-all-operands",
+      "program_sha256": "c73003aa56c1777b8ed2738033d770a41c3e44f6fedaa3cfd6dc621a3397a280",
+      "schema": "tbd.binding-readback/v1"
+    }
+  },
+  "schema": "tbd.bus-identity-excerpt/v1",
+  "selected_fields": [
+    "schema",
+    "boot_id",
+    "elf_sha256",
+    "program_sha256",
+    "program_hash_basis",
+    "captured_us",
+    "clock",
+    "mode",
+    "faults",
+    "forces"
+  ],
+  "source_path": "docs/evidence/2026-09-19-lab8-s2/physical-source.json",
+  "source_sha256": "8f9225d7e2c2620db62104ab9204bd9c841dee7dd6e98c2b246d20e94ae9f4ea"
+}

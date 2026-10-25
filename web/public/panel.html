@@ -1,0 +1,718 @@
+<meta charset="utf-8">
+<title>StamPLC Panel</title>
+<meta name="description" content="Interactive emulation of the TBD teaching-PLC front panel — boot ceremony, 3-button navigation, modular I/O, and the live Modbus contested-register lesson.">
+<style>
+  :root{
+    /* device palette (from the panel spec) */
+    --bg:#0E1116; --surface:#1B2027; --primary:#EAECEE; --muted:#7A828C;
+    --accent:#25C7D6; --ok:#39D353; --warn:#F5A524; --fault:#F0463C; --forced:#B36BFF;
+    /* page chrome */
+    --page:#0a0c10; --panel:#12151b; --line:#242b35; --ink:#e7ecf2; --dim:#8a94a2;
+    --rail:#0e1219;
+  }
+  :root[data-theme="light"]{
+    --page:#eef1f5; --panel:#ffffff; --line:#d9dee6; --ink:#171c24; --dim:#5c6672; --rail:#f4f6f9;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --page:#eef1f5; --panel:#ffffff; --line:#d9dee6; --ink:#171c24; --dim:#5c6672; --rail:#f4f6f9;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+      radial-gradient(1100px 620px at 78% -8%, rgba(37,199,214,.10), transparent 60%),
+      radial-gradient(900px 560px at 8% 108%, rgba(179,107,255,.09), transparent 55%),
+      var(--page);
+    color:var(--ink);
+    font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  a{color:var(--accent)}
+  .wrap{max-width:1120px;margin:0 auto;padding:26px 20px 60px}
+  header.top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+  .brand{font-family:"Barlow Semi Condensed","IBM Plex Sans",sans-serif;font-weight:700;
+    letter-spacing:.02em;font-size:26px}
+  .brand .b2{color:var(--accent)}
+  .kick{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--dim)}
+  .lede{color:var(--dim);max-width:70ch;margin:8px 0 22px;font-size:15px}
+  .stage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+  @media(max-width:880px){.stage{grid-template-columns:1fr}}
+
+  /* ===== faithful StamPLC enclosure ===== */
+  .device{position:relative;background:linear-gradient(180deg,#fbfbfc,#e7e9ec);
+    border:1px solid #c4c8ce;border-radius:16px;padding:0;overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,.45), inset 0 1px 0 #fff}
+  .enc-pad{padding:14px 16px}
+  /* terminal rails (screw terminals) */
+  .trail{display:flex;gap:7px;align-items:flex-end;background:linear-gradient(180deg,#eef0f2,#e1e3e7);
+    padding:10px 16px 12px;border-bottom:1px solid #d0d3d9}
+  .trail.bottom{border-bottom:0;border-top:1px solid #d0d3d9;align-items:flex-start;flex-wrap:nowrap;gap:4px}
+  .trail.bottom .tgroup.sep{margin-right:7px;padding-right:7px}
+  .trail.bottom .term{width:23px}
+  .trail.bottom .term .scr{width:19px;height:19px}
+  .trail.bottom .term .scr::after{width:11px}
+  .tgroup{display:flex;gap:5px}
+  .tgroup.sep{margin-right:11px;padding-right:11px;border-right:1px dashed #ccd0d6}
+  .term{width:27px;text-align:center}
+  .term .scr{width:23px;height:23px;border-radius:50%;margin:0 auto;position:relative;
+    background:radial-gradient(circle at 37% 30%,#dfe1e5,#a3a7af 58%,#777b82);
+    box-shadow:inset 0 0 0 2px #bcbfc5, inset 0 2px 3px rgba(0,0,0,.35), 0 1px 0 #fff}
+  .term .scr::after{content:"";position:absolute;inset:0;margin:auto;width:13px;height:2.5px;
+    background:#595d65;border-radius:2px;transform:rotate(28deg)}
+  .term .tl{font:600 8.5px "IBM Plex Mono",monospace;color:#575e68;margin-top:3px;letter-spacing:.02em}
+  .term .tl.sub{font-weight:400;color:#8a909a;font-size:7.5px}
+  .rlylab{font:600 9px "IBM Plex Mono",monospace;color:#5a616b;align-self:center;margin-left:2px;white-space:nowrap}
+  .rlylab b{color:#d4493f;font-size:12px;margin-left:2px}
+  /* face */
+  .face{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:16px;align-items:start}
+  @media(max-width:560px){.face{grid-template-columns:1fr}}
+  .rail{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+  .tag{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:#7b818b}
+  .led{display:flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;
+    font-size:9.5px;color:#7b818b;letter-spacing:.1em;text-transform:uppercase}
+  .lamp{width:11px;height:11px;border-radius:50%;background:#c3c7cd;
+    box-shadow:0 0 0 1px #aab inset;transition:background .15s,box-shadow .15s}
+  .lcol{min-width:0}
+  .screen-shell{background:#0a0c0f;border-radius:8px;padding:9px;border:2px solid #1e2226;max-width:430px;
+    box-shadow:inset 0 2px 12px rgba(0,0,0,.85)}
+  canvas#lcd{display:block;width:100%;height:auto;border-radius:3px;image-rendering:auto;background:var(--bg)}
+  .btns{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px;max-width:340px}
+  .btn{position:relative;cursor:pointer;user-select:none;border:1px solid #2a2f36;
+    background:linear-gradient(180deg,#3a4049,#23272d);border-radius:8px;padding:11px 6px 8px;
+    text-align:center;box-shadow:0 4px 0 #15181c,0 6px 9px rgba(0,0,0,.35);transition:transform .05s,box-shadow .05s}
+  .btn:active,.btn.down{transform:translateY(3px);box-shadow:0 1px 0 #15181c}
+  .btn .k{font-family:"Barlow Semi Condensed",sans-serif;font-weight:700;font-size:17px;color:#e6e9ed}
+  .btn .fn{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.06em;color:var(--accent);
+    margin-top:2px;min-height:12px;white-space:nowrap;overflow:hidden}
+  .btn .hint{font-family:"IBM Plex Mono",monospace;font-size:7.5px;color:#8a909a;margin-top:1px}
+  /* right column: StampS3A module + Grove ports */
+  .rcol{display:flex;flex-direction:column;gap:10px}
+  .s3mod{position:relative;overflow:hidden;background:linear-gradient(135deg,#1f2430,#101319);
+    border:1px solid #333a45;border-radius:8px;padding:9px 10px;color:#cfd6e0;min-height:74px}
+  .s3mod .s3t{font:700 12px "Barlow Semi Condensed",sans-serif;letter-spacing:.03em;position:relative}
+  .s3mod .s3t b{color:#ff5a5a}
+  .s3mod .s3s{font:500 8px "IBM Plex Mono",monospace;color:#8a93a0;margin-top:1px;position:relative}
+  .s3mod .pins{position:absolute;inset:0;
+    background:repeating-linear-gradient(90deg,transparent 0 7px,rgba(255,255,255,.045) 7px 8px),
+      radial-gradient(circle at 18% 82%,rgba(37,199,214,.28),transparent 32%),
+      radial-gradient(circle at 82% 26%,rgba(245,165,36,.24),transparent 30%)}
+  .grove{display:flex;gap:8px}
+  .port{flex:1;border-radius:7px;padding:7px 8px;color:#fff;font:700 10px "IBM Plex Mono",monospace;
+    letter-spacing:.03em;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 2px 4px rgba(0,0,0,.3)}
+  .port.a{background:linear-gradient(180deg,#d4493f,#9a2e28)}
+  .port.c{background:linear-gradient(180deg,#2f6bd4,#234f9a)}
+  .port .pins{font-weight:400;font-size:7px;opacity:.9;margin-top:2px}
+  .io-hints{display:flex;justify-content:space-between;font:400 8px "IBM Plex Mono",monospace;color:#8a909a}
+  /* printed legend band */
+  .legend-band{display:flex;align-items:center;gap:11px;background:#111418;border-radius:8px;
+    padding:8px 13px;margin:13px 0 2px;flex-wrap:wrap}
+  .legend-band .plc{font:800 17px "Barlow Semi Condensed",sans-serif;color:#fff;letter-spacing:.01em}
+  .legend-band .plc b{color:var(--accent)}
+  .legend-band .lg{font:500 8.5px "IBM Plex Mono",monospace;color:#aeb6c0;letter-spacing:.03em}
+  .hold-note{text-align:center;font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--dim);
+    margin-top:10px;min-height:13px}
+
+  /* control chips under device */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .chip{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.03em;
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;
+    padding:6px 12px;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+  .chip.danger:hover{border-color:var(--fault);color:var(--fault)}
+  .chip .d{color:var(--dim);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase}
+  .chip[disabled]{opacity:.4;cursor:not-allowed}
+
+  /* narration rail */
+  .side{position:sticky;top:18px;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px}
+  .card h3{margin:0 0 4px;font-family:"Barlow Semi Condensed",sans-serif;font-weight:600;
+    font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .now-title{font-family:"Barlow Semi Condensed",sans-serif;font-weight:700;font-size:20px;margin:2px 0 4px}
+  .now-body{font-size:13.5px;color:var(--dim)}
+  .legend{display:grid;gap:7px;font-size:12.5px}
+  .legend .row{display:flex;align-items:center;gap:9px}
+  .sw{width:22px;height:14px;border-radius:4px;flex:none;border:1px solid rgba(255,255,255,.12)}
+  .sw.dash{background:transparent;border:1.5px dashed var(--forced)}
+  .sw.ring{background:transparent;border:2px solid var(--accent)}
+  .foot{color:var(--dim);font-size:12px;margin-top:6px}
+  .foot code{font-family:"IBM Plex Mono",monospace;color:var(--ink);background:var(--rail);
+    padding:1px 5px;border-radius:4px;font-size:11px}
+  .kbd{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--dim)}
+  .kbd b{color:var(--ink)}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<div class="wrap">
+  <header class="top">
+    <span class="brand">TBD <span class="b2">·</span> StamPLC Panel</span>
+    <span class="kick">TBD · on-device operator interface</span>
+  </header>
+  <p class="lede">The teaching PLC's front panel, running. Three buttons, a 240×135 screen — an operator
+    interface where you change mode, force I/O, and read every element on every module. It is built to make one
+    thing physically real: on this board the network has the same hand on the switch as your thumb, and the panel
+    is the only thing that will tell you. Press the buttons.</p>
+
+  <div class="stage">
+    <div>
+      <div class="device">
+        <!-- TOP: isolation inputs ×8 (DC 5–36V) -->
+        <div class="trail">
+          <div class="tgroup sep">
+            <div class="term"><div class="scr"></div><div class="tl">+</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">-</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">C</div></div>
+          </div>
+          <div class="tgroup">
+            <div class="term"><div class="scr"></div><div class="tl">IN1</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">IN2</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">IN3</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">IN4</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">IN5</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">IN6</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">IN7</div></div>
+            <div class="term"><div class="scr"></div><div class="tl">IN8</div></div>
+          </div>
+        </div>
+
+        <div class="enc-pad">
+          <div class="rail">
+            <span class="tag" id="idtag">SN StamPLC-A17 · MAC …3F:2A</span>
+            <span class="led"><span class="lamp" id="lamp"></span><span id="ledtxt">LED</span></span>
+          </div>
+          <div class="face">
+            <div class="lcol">
+              <div class="screen-shell">
+                <canvas id="lcd" width="960" height="540" aria-label="StamPLC LCD"></canvas>
+              </div>
+              <div class="btns">
+                <div class="btn" id="btnA" data-b="A"><div class="k">A</div><div class="fn" id="fnA">–</div><div class="hint">move · hold=prev</div></div>
+                <div class="btn" id="btnB" data-b="B"><div class="k">B</div><div class="fn" id="fnB">–</div><div class="hint">act · hold=force</div></div>
+                <div class="btn" id="btnC" data-b="C"><div class="k">C</div><div class="fn" id="fnC">–</div><div class="hint">back · hold=home</div></div>
+              </div>
+            </div>
+            <div class="rcol">
+              <div class="s3mod"><div class="pins"></div><div class="s3t">STAMP <b>S3A</b></div><div class="s3s">ESP32-S3FN8</div><div class="s3s">3D-ANT · PIN1.27</div></div>
+              <div class="grove">
+                <div class="port a">PORT.A<div class="pins">GND·5V·G2·G1</div></div>
+                <div class="port c">PORT.C<div class="pins">GND·5V·G5·G4</div></div>
+              </div>
+              <div class="io-hints"><span>▭ microSD</span><span>GPIO.EXT 2×8</span></div>
+            </div>
+          </div>
+
+          <div class="legend-band">
+            <span class="plc">STAM<b>PLC</b></span>
+            <span class="lg">INPUT×8 5–36VDC · RELAY×4 5A · PWR-CAN · PWR-485 · Grove×2 · KEY×3 · 1.14″LCD · RTC · LM75</span>
+          </div>
+          <div class="hold-note" id="holdnote">Keys: A S D = buttons · hold for long-press · A+D together = clear all forces</div>
+        </div>
+
+        <!-- BOTTOM: relay outputs ×4 (N.O / COM / N.C) -->
+        <div class="trail bottom">
+          <div class="tgroup sep"><div class="term"><div class="scr"></div><div class="tl">N.O</div></div><div class="term"><div class="scr"></div><div class="tl">COM</div></div><div class="term"><div class="scr"></div><div class="tl">N.C</div></div><div class="rlylab">RELAY<b>1</b></div></div>
+          <div class="tgroup sep"><div class="term"><div class="scr"></div><div class="tl">N.O</div></div><div class="term"><div class="scr"></div><div class="tl">COM</div></div><div class="term"><div class="scr"></div><div class="tl">N.C</div></div><div class="rlylab">RELAY<b>2</b></div></div>
+          <div class="tgroup sep"><div class="term"><div class="scr"></div><div class="tl">N.O</div></div><div class="term"><div class="scr"></div><div class="tl">COM</div></div><div class="term"><div class="scr"></div><div class="tl">N.C</div></div><div class="rlylab">RELAY<b>3</b></div></div>
+          <div class="tgroup"><div class="term"><div class="scr"></div><div class="tl">N.O</div></div><div class="term"><div class="scr"></div><div class="tl">COM</div></div><div class="term"><div class="scr"></div><div class="tl">N.C</div></div><div class="rlylab">RELAY<b>4</b></div></div>
+        </div>
+      </div>
+
+      <div class="chips">
+        <div class="chip" id="cAdd"><span class="d">module</span> + add IO-EXP #2 @0x23</div>
+        <div class="chip" id="cGrove"><span class="d">module</span> + add Grove ENV</div>
+        <div class="chip danger" id="cAttack"><span class="d">red team</span> ⚡ Modbus writes HR0=PROGRAM</div>
+        <div class="chip" id="cReboot"><span class="d">device</span> ⟳ reboot</div>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h3>What you're looking at</h3>
+        <div class="now-title" id="nowT">Boot</div>
+        <div class="now-body" id="nowB">Every beat of the power-on is a real self-test.</div>
+      </div>
+      <div class="card">
+        <h3>The visual language</h3>
+        <div class="legend">
+          <div class="row"><span class="sw" style="background:var(--ok)"></span> fill = value (energized)</div>
+          <div class="row"><span class="sw" style="background:var(--muted)"></span> empty = de-energized</div>
+          <div class="row"><span class="sw dash"></span> violet border = <b style="color:var(--forced)">&nbsp;forced</b>&nbsp; (a human is lying to the logic)</div>
+          <div class="row"><span class="sw ring"></span> cyan ring = focus</div>
+          <div class="row"><span class="sw" style="background:var(--warn)"></span> amber = REMOTE / caution</div>
+          <div class="row"><span class="sw" style="background:var(--fault)"></span> red = fault / NET-WROTE</div>
+        </div>
+        <div class="foot">Fill tells you what's true. Border tells you if someone is lying about it. The mode word is always the biggest thing on the glass.</div>
+      </div>
+      <div class="card">
+        <h3>Try this</h3>
+        <div class="foot">Open <code>I/O</code> → focus <b>RLY0</b> → press <b>B</b> for the first click. Then <b>hold B</b> to force it and watch the whole device admit it. Then run the red-team chip while you sit in <code>MODE</code>.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- canvas + scale ---------- */
+const cv=document.getElementById('lcd'), g=cv.getContext('2d');
+const W=240,H=135, S=4;               // logical 240x135, drawn at 4x
+cv.width=W*S; cv.height=H*S;
+g.scale(S,S); g.textBaseline='top';
+const C={bg:'#0E1116',surface:'#1B2027',primary:'#EAECEE',muted:'#7A828C',accent:'#25C7D6',
+  ok:'#39D353',warn:'#F5A524',fault:'#F0463C',forced:'#B36BFF',line:'#2b333d',dim:'#59626e'};
+const F={xl:'700 34px "Barlow Semi Condensed"',title:'600 17px "Barlow Semi Condensed"',
+  body:'500 12px "IBM Plex Mono"',bodys:'400 11px "IBM Plex Mono"',micro:'500 9px "IBM Plex Mono"',
+  microb:'600 9px "IBM Plex Mono"'};
+
+/* ---------- audio (relay click, buzzer) ---------- */
+let AC=null; function ac(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC;}
+function click(){const a=ac();if(!a)return;const t=a.currentTime;
+  const o=a.createOscillator(),gg=a.createGain();o.type='square';o.frequency.setValueAtTime(1500,t);
+  o.frequency.exponentialRampToValueAtTime(320,t+.03);gg.gain.setValueAtTime(.12,t);
+  gg.gain.exponentialRampToValueAtTime(.001,t+.06);o.connect(gg).connect(a.destination);o.start(t);o.stop(t+.07);
+  const n=a.createBufferSource(),b=a.createBuffer(1,600,a.sampleRate);const d=b.getChannelData(0);
+  for(let i=0;i<600;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/600,3);n.buffer=b;const ng=a.createGain();
+  ng.gain.value=.10;n.connect(ng).connect(a.destination);n.start(t);}
+function beep(f,dur,vol){const a=ac();if(!a)return;const t=a.currentTime;const o=a.createOscillator(),gg=a.createGain();
+  o.type='triangle';o.frequency.value=f;gg.gain.setValueAtTime(vol||.08,t);
+  gg.gain.exponentialRampToValueAtTime(.001,t+(dur||.08));o.connect(gg).connect(a.destination);o.start(t);o.stop(t+(dur||.08)+.02);}
+function nope(){beep(220,.14,.09);}
+
+/* ---------- LED ---------- */
+const lamp=document.getElementById('lamp'), ledtxt=document.getElementById('ledtxt');
+function setLed(color,label,glow){lamp.style.background=color;
+  lamp.style.boxShadow=glow!==false?`0 0 10px ${color}, 0 0 0 1px #000 inset`:'0 0 0 1px #000 inset';
+  ledtxt.textContent=label;}
+
+/* ---------- modular I/O registry ---------- */
+let seq=1;
+function el(o){return Object.assign({value:0,forced:false,forceSrc:null,lastSrc:'SCAN',lastIp:null,
+  lastTick:0,unit:'',writable:false,forceable:false},o);}
+function baseBoard(){return{type:'BASE',name:'StamPLC',addr:null,els:[
+  el({id:'DI0',kind:'DI',value:1}),el({id:'DI1',kind:'DI',value:0}),el({id:'DI2',kind:'DI',value:1}),
+  el({id:'DI3',kind:'DI',value:0}),el({id:'DI4',kind:'DI',value:0}),el({id:'DI5',kind:'DI',value:0}),
+  el({id:'DI6',kind:'DI',value:1}),el({id:'DI7',kind:'DI',value:0}),
+  el({id:'RLY0',kind:'RELAY',writable:true,forceable:true,value:0,mb:'coil 0'}),
+  el({id:'RLY1',kind:'RELAY',writable:true,forceable:true,value:1,mb:'coil 1'}),
+  el({id:'RLY2',kind:'RELAY',writable:true,forceable:true,value:0,mb:'coil 2'}),
+  el({id:'RLY3',kind:'RELAY',writable:true,forceable:true,value:0,mb:'coil 3'}),
+]};}
+function ioexpBoard(addr,inst){return{type:'IOEXP',name:'IO-EXP #'+inst,addr,els:[
+  el({id:'MECH',kind:'RELAY',writable:true,forceable:true,value:1,mb:'coil '+(10*inst)}),
+  el({id:'SSR0',kind:'SSR',writable:true,forceable:true,value:1,mb:'coil '+(10*inst+1)}),
+  el({id:'SSR1',kind:'SSR',writable:true,forceable:true,value:0,mb:'coil '+(10*inst+2)}),
+  el({id:'AIN0',kind:'AIN',value:241,unit:'dV',cur:83,mb:'HR '+(40*inst)}),
+  el({id:'AIN1',kind:'AIN',value:0,unit:'dV',cur:0,mb:'HR '+(40*inst+2)}),
+  el({id:'PWM0',kind:'PWM',writable:true,value:40,unit:'%',mb:'HR '+(40*inst+4)}),
+  el({id:'PWM1',kind:'PWM',writable:true,value:0,unit:'%',mb:'HR '+(40*inst+5)}),
+]};}
+function groveBoard(){return{type:'GROVE',name:'Grove ENV',addr:0x44,els:[
+  el({id:'TEMP',kind:'SENSOR',value:236,unit:'dC',mb:'HR 80'}),
+  el({id:'HUMID',kind:'SENSOR',value:47,unit:'%',mb:'HR 81'}),
+]};}
+
+let dev, ui, anim=0;
+function freshDevice(){
+  return {
+    boards:[baseBoard(), ioexpBoard(0x22,1)],
+    mode:0, modeNames:['RUN','PROGRAM','REMOTE'],
+    modeSrc:'PANEL', modeIp:null, modeTick:0, contest:0, contestTick:0,
+    authority:'LOCAL', vbus:24.1, ibus:1.2, scan:1.2, temp:23.6, up:0,
+    task:'7F3A', log:[], booted:false, iexpInst:1
+  };
+}
+function forcedCount(){let n=0;dev.boards.forEach(b=>b.els.forEach(e=>{if(e.forced)n++;}));return n;}
+function logWrite(src,reg,from,to,ip){dev.log.unshift({src,reg,from,to,ip,t:tstamp()});if(dev.log.length>40)dev.log.pop();}
+function tstamp(){const s=Math.floor(dev.up);const mm=String(Math.floor(s/60)%60).padStart(2,'0');
+  const ss=String(s%60).padStart(2,'0');return '14:0'+((dev.up/6|0)%6)+':'+ss.slice(0,2)+mm.slice(0,0)+ss;}
+
+/* ---------- UI state machine ---------- */
+const SCR={BOOT:'BOOT',HOME:'HOME',IO:'IO',ELEM:'ELEM',MODE:'MODE',FORCE:'FORCE',FORCES:'FORCES',COMMS:'COMMS',LOG:'LOG'};
+function freshUi(){return{scr:SCR.BOOT,boot:0,cursor:0,board:0,pend:null,hold:null,holdT:0,flash:null,flashT:0,banner:null,bannerT:0};}
+
+function boardEls(bi){return dev.boards[bi].els;}
+function curBoard(){return dev.boards[ui.board];}
+
+/* ---------- input handling ---------- */
+const held={A:false,B:false,C:false}, heldSince={A:0,B:0,C:0}, longFired={A:false,B:false,C:false};
+const LONG=600;
+function press(b){ if(held[b])return; ac(); held[b]=true; heldSince[b]=performance.now(); longFired[b]=false;
+  document.getElementById('btn'+b).classList.add('down'); }
+function release(b){ if(!held[b])return; const dt=performance.now()-heldSince[b];
+  held[b]=false; document.getElementById('btn'+b).classList.remove('down');
+  // chord A+C -> clear all forces
+  if(b==='A'&&held.C||b==='C'&&held.A){return;}
+  if(!longFired[b] && dt<LONG){ onShort(b); }
+  // long already handled on threshold; if released after long, ignore
+}
+function tickHold(now){
+  // chord detection
+  if(held.A&&held.C){ if(!longFired.A&&!longFired.C){ longFired.A=longFired.C=true; chordClear(); } }
+  ['A','B','C'].forEach(b=>{ if(held[b]&&!longFired[b]&&(now-heldSince[b])>=LONG){ longFired[b]=true; onLong(b); } });
+  // hold-to-confirm progress
+  if(ui.pend){ if(held.C){ ui.holdT=Math.min(1,(now-heldSince.C)/1400); if(ui.holdT>=1){ commitPend(); } }
+    else ui.holdT=0; }
+}
+function chordClear(){ let n=forcedCount(); if(!n){nope();return;} dev.boards.forEach(b=>b.els.forEach(e=>{
+  if(e.forced){e.forced=false;e.forceSrc=null;logWrite('PANEL',e.id,'F','—',null);}})); beep(880,.12,.09);
+  flash('ALL FORCES CLEARED'); ui.scr=SCR.HOME; }
+
+function onShort(b){
+  if(ui.scr===SCR.BOOT){ if(b==='C'){ui.boot=2600;} return; }
+  switch(ui.scr){
+    case SCR.HOME:
+      if(b==='A'){ homeCursorNext(); }
+      else if(b==='B'){ enterHomeSel(); }
+      else if(b==='C'){ /* home */ }
+      break;
+    case SCR.IO:
+      if(b==='A'){ ui.cursor=(ui.cursor+1)%curBoard().els.length; }
+      else if(b==='B'){ enterElem(); }
+      else if(b==='C'){ ui.scr=SCR.HOME; }
+      break;
+    case SCR.ELEM:
+      if(b==='A'){ ui.cursor=(ui.cursor+1)%curBoard().els.length; }
+      else if(b==='B'){ toggleElem(); }
+      else if(b==='C'){ ui.scr=SCR.IO; }
+      break;
+    case SCR.MODE:
+      if(b==='A'){ ui.pend={type:'mode',val:(((ui.pend?ui.pend.val:dev.mode)+1)%3)}; }
+      else if(b==='B'){ if(!ui.pend)ui.pend={type:'mode',val:dev.mode}; /* arm current shows confirm hint */ }
+      else if(b==='C'){ if(ui.pend){ui.pend=null;} else ui.scr=SCR.HOME; }
+      break;
+    case SCR.FORCE:
+      if(b==='A'){ ui.pend={type:'force',val:(ui.pend?(ui.pend.val+1)%3:0)}; } // 0=ON 1=OFF 2=REMOVE
+      else if(b==='C'){ ui.pend=null; ui.scr=SCR.ELEM; }
+      break;
+    case SCR.FORCES:
+      if(b==='A'){ chordClear(); }
+      else if(b==='C'){ ui.scr=SCR.HOME; }
+      break;
+    case SCR.COMMS: if(b==='C')ui.scr=SCR.HOME; break;
+    case SCR.LOG: if(b==='C')ui.scr=SCR.HOME; break;
+  }
+}
+function onLong(b){
+  if(ui.scr===SCR.HOME && b==='B'){ ui.scr=SCR.LOG; return; }
+  if(b==='C'){ ui.scr=SCR.HOME; ui.pend=null; return; }         // long-C = home
+  if(b==='A'){ /* prev — treat as reverse move */ if(ui.scr===SCR.IO||ui.scr===SCR.ELEM){ const n=curBoard().els.length; ui.cursor=(ui.cursor-1+n)%n; } return; }
+  if(b==='B'){ // context verb = FORCE on an output
+    if(ui.scr===SCR.ELEM||ui.scr===SCR.IO){ const e=curBoard().els[ui.cursor]; if(e&&e.forceable){ ui.scr=SCR.FORCE; ui.pend={type:'force',val: e.value?1:0}; } else nope(); }
+  }
+}
+/* home cursor: 0=MODE, 1=IO summary, 2=forces(if any) */
+function homeCursorNext(){ const max = forcedCount()>0?3:2; ui.cursor=(ui.cursor+1)%max; }
+function enterHomeSel(){ if(ui.cursor===0){ ui.scr=SCR.MODE; ui.pend=null; }
+  else if(ui.cursor===1){ ui.scr=SCR.IO; ui.board=0; ui.cursor=0; }
+  else { ui.scr=SCR.FORCES; } }
+function enterElem(){ ui.scr=SCR.ELEM; }
+function toggleElem(){ const e=curBoard().els[ui.cursor];
+  if(!e.writable){ nope(); flash('READ-ONLY'); return; }
+  if(e.forced){ flash('FORCED — clear first'); nope(); return; }
+  e.value=e.value?0:1; e.lastSrc='PANEL'; e.lastTick=dev.up; dev.authority='LOCAL';
+  logWrite('PANEL',e.id,e.value?'0':'1',e.value?'1':'0',null);
+  if(e.kind==='RELAY'||e.kind==='SSR'){ click(); dev.ibus += e.value?0.2:-0.2; dev.ibus=Math.max(0.4,dev.ibus);
+    setLed(C.ok,'RUN'); }
+}
+function commitPend(){
+  if(!ui.pend)return;
+  if(ui.pend.type==='mode'){ const old=dev.mode; dev.mode=ui.pend.val; dev.modeSrc='PANEL'; dev.modeIp=null; dev.modeTick=dev.up;
+    dev.authority= dev.mode===2?'REMOTE':'LOCAL'; logWrite('PANEL','HR0',dev.modeNames[old],dev.modeNames[dev.mode],null);
+    beep(1200,.12,.09); flash('MODE → '+dev.modeNames[dev.mode]); setLed(dev.mode===0?C.ok:dev.mode===2?C.warn:C.fault, dev.modeNames[dev.mode]); }
+  else if(ui.pend.type==='force'){ const e=curBoard().els[ui.cursor];
+    if(ui.pend.val===2){ e.forced=false;e.forceSrc=null; logWrite('PANEL',e.id,'F','—',null); flash('FORCE REMOVED'); }
+    else { e.forced=true; e.forceSrc='PANEL'; e.value=ui.pend.val===0?1:0; logWrite('PANEL',e.id,'—','F='+e.value,null);
+      beep(700,.14,.08); flash('FORCED '+e.id+' → '+(e.value?'ON':'OFF')); setLed(C.forced,'FORCE'); }
+    ui.scr=SCR.ELEM;
+  }
+  ui.pend=null; ui.holdT=0; held.C=false;
+}
+function flash(t){ ui.flash=t; ui.flashT=performance.now(); }
+
+/* ---------- red-team: Modbus writes HR0 ---------- */
+function attack(){ if(!dev.booted)return; ac();
+  const ip='192.168.0.66'; const old=dev.mode; dev.mode=1; dev.modeSrc='NET'; dev.modeIp=ip; dev.modeTick=dev.up;
+  dev.authority='NET-WROTE'; dev.contest++; dev.contestTick=dev.up;
+  logWrite('NET','HR0',dev.modeNames[old],'PROGRAM',ip);
+  setLed(C.fault,'NET'); nope(); ui.banner='MODE ← NET '+ip; ui.bannerT=performance.now();
+  if(ui.scr===SCR.BOOT) ui.scr=SCR.HOME;
+}
+
+/* ---------- draw helpers ---------- */
+function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+function txt(s,x,y,font,col,align){g.font=font;g.fillStyle=col;g.textAlign=align||'left';g.fillText(s,x,y);}
+function dashRect(x,y,w,h,col){g.save();g.setLineDash([2.5,2]);g.lineWidth=1.4;g.strokeStyle=col;g.strokeRect(x+.7,y+.7,w-1.4,h-1.4);g.restore();}
+
+/* ---------- chin (persistent status strip) ---------- */
+function chin(a,b,c){
+  g.fillStyle=C.surface; g.fillRect(0,H-15,W,15);
+  g.fillStyle=C.line; g.fillRect(0,H-15,W,0.6);
+  const mc=dev.mode===0?C.ok:dev.mode===2?C.warn:C.fault;
+  g.beginPath();g.arc(7,H-7.5,3,0,7);g.fillStyle=mc;g.fill();
+  txt(dev.modeNames[dev.mode],13,H-11.5,F.micro,C.primary);
+  txt(dev.vbus.toFixed(1)+'V '+dev.ibus.toFixed(1)+'A',58,H-11.5,F.micro,C.muted);
+  const fc=forcedCount(); if(fc>0){ txt(fc+' FORCED',108,H-11.5,F.microb,C.forced); }
+  txt(dev.authority==='LOCAL'?'':dev.authority, 150,H-11.5,F.microb, dev.authority==='NET-WROTE'?C.fault:C.warn);
+  // button glyph hints
+  const gl=[a,b,c]; const xs=[196,214,232];
+  for(let i=0;i<3;i++){ txt(gl[i]||'·',xs[i],H-11.5,F.microb,C.accent,'center'); }
+  document.getElementById('fnA').textContent=hintWord(a);
+  document.getElementById('fnB').textContent=hintWord(b);
+  document.getElementById('fnC').textContent=hintWord(c);
+}
+function hintWord(gl){return ({'▶':'NEXT','✓':'ENTER','↩':'BACK','+':'CHANGE','✕':'CANCEL','⑂':'FORCE','⌫':'CLEAR','≡':'LOG','·':'—'})[gl]||'—';}
+
+/* ---------- screens ---------- */
+function drawBoot(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H);
+  const t=ui.boot;
+  if(t<150){return;}
+  // logo stroke-on
+  const p=Math.min(1,(t-150)/500);
+  g.save();g.translate(W/2,52);
+  g.strokeStyle=C.accent;g.lineWidth=2;g.lineCap='round';
+  // stylized "S3" sphere mark
+  g.beginPath();g.arc(0,0,17,-Math.PI/2, -Math.PI/2+p*2*Math.PI);g.stroke();
+  if(p>.5){g.strokeStyle='rgba(37,199,214,'+((p-.5)*2)+')';g.beginPath();g.moveTo(-7,-4);g.lineTo(6,-4);g.lineTo(-6,3);g.lineTo(7,3);g.stroke();}
+  g.restore();
+  txt('TBD',W/2,78,F.title,p>=1?C.primary:'rgba(234,236,238,'+p+')','center');
+  txt('TBD teaching PLC',W/2,96,F.micro,C.muted,'center');
+  txt('fw teaching-v2 · a1c3',W-4,H-9,F.micro,C.dim,'right');
+  // vital signs
+  if(t>800){ const chk=[['CPU',true],['PSU '+dev.vbus.toFixed(1)+'V',true],['NET',t>1400],['I/O +'+(dev.boards.length-1)+'m',t>1200]];
+    const bx=(t-800)/600;
+    txt('SELF-TEST',6,H-30,F.micro,C.dim);
+    let x=6; chk.forEach((c,i)=>{ const on=c[1]&&bx>i*0.22; txt((on?'✓ ':'· ')+c[0],x,H-21,F.micro,on?C.ok:C.dim); x+= g.measureText((on?'✓ ':'· ')+c[0]).width+8; });
+  }
+  document.getElementById('nowT').textContent='Boot ceremony';
+  document.getElementById('nowB').textContent='The mark strokes on, then four real checks bloom green — framebuffer, live rail voltage, link, and the I/O bus with its modules. One buzzer blip when the machine is healthy.';
+}
+
+function drawHome(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
+  // authority chip top-left
+  const auth=dev.authority; const acol=auth==='LOCAL'?C.ok:auth==='REMOTE'?C.warn:C.fault;
+  g.fillStyle=acol;g.globalAlpha=.16;rr(4,4,44,13,3);g.fill();g.globalAlpha=1;
+  txt('['+auth+']',7,6.5,F.micro,acol);
+  txt('StamPLC-A17',W-4,6.5,F.micro,C.dim,'right');
+  // hero MODE word
+  const mc=dev.mode===0?C.ok:dev.mode===2?C.warn:C.fault;
+  const sel0=ui.cursor===0;
+  if(sel0){g.strokeStyle=C.accent;g.lineWidth=1.5;rr(4,24,96,58,6);g.stroke();}
+  txt((['RUN','PROG','REM'][dev.mode]||dev.modeNames[dev.mode]),8,34,F.xl,mc);
+  txt('mode',9,72,F.micro,C.muted);
+  if(dev.modeSrc==='NET'){txt('← NET '+dev.modeIp,9,26,F.micro,C.fault);}
+  // I/O summary right
+  const sel1=ui.cursor===1;
+  const ix=108,iy=26,iw=W-108-6,ih=54;
+  if(sel1){g.strokeStyle=C.accent;g.lineWidth=1.5;rr(ix-3,iy-4,iw+6,ih+6,5);g.stroke();}
+  txt('INPUTS',ix,iy,F.micro,C.muted);
+  const base=dev.boards[0].els;
+  for(let i=0;i<8;i++){const e=base[i];const cx=ix+i*15.5,cy=iy+11;
+    g.fillStyle=e.value?C.ok:C.surface;rr(cx,cy,11,11,2);g.fill();
+    if(e.forced)dashRect(cx,cy,11,11,C.forced);
+    txt(i,cx+5.5,cy+13,F.micro,C.dim,'center');}
+  txt('OUTPUTS',ix,iy+30,F.micro,C.muted);
+  for(let i=0;i<4;i++){const e=base[8+i];const cx=ix+i*15.5,cy=iy+41;
+    g.fillStyle=e.value?C.ok:C.surface;rr(cx,cy,11,11,2);g.fill();
+    if(e.value){g.fillStyle=C.bg;g.beginPath();g.arc(cx+5.5,cy+5.5,2,0,7);g.fill();}
+    if(e.forced)dashRect(cx,cy,11,11,C.forced);
+    txt(i,cx+5.5,cy+13,F.micro,C.dim,'center');}
+  // modules chip
+  const nmod=dev.boards.length-1;
+  txt('+'+nmod+' module'+(nmod===1?'':'s'),W-6,iy+42,F.micro,C.accent,'right');
+  // forced tally selectable
+  const fc=forcedCount();
+  if(fc>0){ const sel2=ui.cursor===2; txt((sel2?'▸ ':'')+'⚠ '+fc+' POINT'+(fc>1?'S':'')+' FORCED',8,92,F.body,C.forced); }
+  else { txt('scan '+dev.scan.toFixed(1)+'ms · up '+Math.floor(dev.up)+'s',8,92,F.micro,C.dim); }
+  chin('▶','✓', fc>0?'≡':'≡');
+  document.getElementById('nowT').textContent='Home';
+  document.getElementById('nowB').textContent='Mode is the biggest thing on the glass; the base I/O reads as a bar of light. A cyan ring shows focus — A moves it, B enters. Long-B opens the write-provenance event log.';
+}
+
+function drawIO(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
+  const b=curBoard();
+  txt('I/O · '+b.name+(b.addr!=null?'  @0x'+b.addr.toString(16):''),6,6,F.title,C.primary);
+  txt('board '+(ui.board+1)+'/'+dev.boards.length,W-6,8,F.micro,C.muted,'right');
+  const els=b.els; const cols=4, cw=54, ch=26, x0=8, y0=24, gap=3;
+  els.forEach((e,i)=>{ const cx=x0+(i%cols)*(cw+gap), cy=y0+Math.floor(i/cols)*(ch+gap);
+    const sel=i===ui.cursor;
+    g.fillStyle=C.surface;rr(cx,cy,cw,ch,3);g.fill();
+    txt(e.id,cx+4,cy+3,F.micro,C.muted);
+    if(e.kind==='DI'||e.kind==='RELAY'||e.kind==='SSR'){
+      g.fillStyle=e.value?C.ok:C.dim;g.beginPath();g.arc(cx+8,cy+18,4,0,7);g.fill();
+      if(e.value&&(e.kind!=='DI')){g.fillStyle=C.surface;g.beginPath();g.arc(cx+8,cy+18,1.6,0,7);g.fill();}
+      txt(e.value?'ON':'off',cx+16,cy+13,F.micro,e.value?C.ok:C.dim);
+    } else if(e.kind==='AIN'){ txt((e.value/10).toFixed(1)+'V',cx+4,cy+12,F.body,C.primary); txt((e.cur/100).toFixed(2)+'A',cx+4,cy+21,F.micro,C.muted);
+    } else if(e.kind==='PWM'){ txt(e.value?e.value+'%':'off',cx+4,cy+13,F.body,e.value?C.accent:C.dim);
+    } else if(e.kind==='SENSOR'){ txt((e.value/10).toFixed(1)+(e.unit==='dC'?'°':''),cx+4,cy+13,F.body,C.primary); }
+    if(e.forced){dashRect(cx,cy,cw,ch,C.forced); txt('F',cx+cw-8,cy+3,F.microb,C.forced);}
+    if(sel){g.strokeStyle=C.accent;g.lineWidth=1.6;rr(cx-1,cy-1,cw+2,ch+2,4);g.stroke();}
+  });
+  chin('▶','✓','↩');
+  document.getElementById('nowT').textContent='I/O browser — '+b.name;
+  document.getElementById('nowB').textContent='Every board is here: the base, and each expansion module by type, instance, and I2C address so two identical modules are never confused. Fill = value, violet dashed = forced. Long-B forces the focused point.';
+}
+
+function drawElem(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
+  const e=curBoard().els[ui.cursor], b=curBoard();
+  txt(b.name+' · '+e.id,6,6,F.title,C.primary);
+  const big = e.kind==='AIN'?((e.value/10).toFixed(1)+'V'): e.kind==='PWM'?(e.value+'%'): e.kind==='SENSOR'?((e.value/10).toFixed(1)):(e.value?'ON':'OFF');
+  const bc = e.forced?C.forced : (e.value?C.ok:C.muted);
+  txt(big,8,30,F.xl,bc);
+  let y=76;
+  txt('kind    '+e.kind,8,y,F.body,C.muted); y+=13;
+  txt('state   '+(e.forced?('FORCED  src:'+e.forceSrc):'real'),8,y,F.body,e.forced?C.forced:C.muted); y+=13;
+  if(e.mb) txt('modbus  '+e.mb+'   last:'+e.lastSrc,8,y,F.body,C.muted);
+  if(e.kind==='AIN') txt('I '+(e.cur/100).toFixed(2)+'A',150,30,F.body,C.muted);
+  chin('▶', e.writable?'✓':'·','↩');
+  document.getElementById('nowT').textContent='Element detail';
+  document.getElementById('nowB').textContent='One point, in full: its live value, whether it is forced and by whom, and the exact Modbus register an attacker would write to reach it. This is where the physical element and the network target meet.';
+}
+
+function drawMode(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
+  txt('PROCESSOR MODE',6,6,F.title,C.primary);
+  const tgt = ui.pend?ui.pend.val:dev.mode;
+  const names=dev.modeNames;
+  for(let i=0;i<3;i++){ const y=28+i*22; const on=i===tgt; const cur=i===dev.mode;
+    const col=i===0?C.ok:i===2?C.warn:C.fault;
+    if(on){g.strokeStyle=C.accent;g.lineWidth=1.5;rr(6,y-2,150,20,4);g.stroke();}
+    txt((cur?'●':'○')+' '+names[i],12,y+2,F.title,on?col:C.muted);
+  }
+  // provenance / contested
+  if(dev.modeSrc==='NET'){ g.fillStyle=C.fault;g.globalAlpha=.15;rr(160,26,74,60,4);g.fill();g.globalAlpha=1;
+    txt('CONTESTED',164,30,F.microb,C.fault); txt('last write:',164,42,F.micro,C.muted);
+    txt('NET',164,52,F.body,C.fault); txt(dev.modeIp,164,62,F.micro,C.fault); txt('your button',164,74,F.micro,C.muted); }
+  else { txt('last write: PANEL',164,30,F.micro,C.muted); }
+  if(ui.pend){ // hold-to-confirm bar
+    if(ui.pend.val===2 && names[2]) {}
+    const warn = ui.pend.val===2;
+    if(ui.pend.val===2){}
+    if(names[ui.pend.val]==='REMOTE'){ txt('Network gets final say.',6,96,F.micro,C.warn); }
+    else txt('Hold C to commit',6,96,F.micro,C.muted);
+    // progress
+    g.fillStyle=C.surface;rr(90,95,120,7,3);g.fill();
+    g.fillStyle=C.accent;rr(90,95,120*(ui.holdT||0),7,3);g.fill();
+  }
+  chin('+', ui.pend?'·':'·', ui.pend?'✕':'↩');
+  document.getElementById('fnB').textContent=ui.pend?'HOLD C':'—';
+  document.getElementById('fnC').textContent=ui.pend?'CANCEL':'BACK';
+  document.getElementById('nowT').textContent='Mode — the soft keyswitch';
+  document.getElementById('nowB').textContent='A cycles the target; hold C to commit. On this board HR0 is also writable over Modbus — run the red-team chip and watch PROGRAM appear under your thumb, with the only clue being the [NET-WROTE] tag.';
+}
+
+function drawForce(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
+  const e=curBoard().els[ui.cursor];
+  txt('FORCE · '+curBoard().name+' '+e.id,6,6,F.title,C.forced);
+  const opts=['FORCE ON','FORCE OFF','REMOVE FORCE']; const v=ui.pend?ui.pend.val:0;
+  for(let i=0;i<3;i++){const y=30+i*20;const on=i===v;
+    if(on){g.strokeStyle=C.accent;g.lineWidth=1.5;rr(6,y-2,150,18,4);g.stroke();}
+    txt((on?'▸ ':'  ')+opts[i],12,y+1,F.body,on?C.forced:C.muted);}
+  txt('A forced point severs logic from reality.',6,94,F.micro,C.muted);
+  txt('You own the consequence.',6,103,F.micro,C.dim);
+  g.fillStyle=C.surface;rr(160,30,74,7,3);g.fill();
+  g.fillStyle=C.forced;rr(160,30,74*(ui.holdT||0),7,3);g.fill();
+  txt('hold C',160,42,F.micro,C.muted);
+  chin('+','·','✕');
+  document.getElementById('fnB').textContent='HOLD C';document.getElementById('fnC').textContent='CANCEL';
+  document.getElementById('nowT').textContent='Force — override reality';
+  document.getElementById('nowB').textContent='Hold C to commit. The forced point then breathes violet on every screen and nags in the chin until you clear it — because a force left lying around is how people get hurt.';
+}
+
+function drawForces(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
+  txt('ACTIVE FORCES',6,6,F.title,C.forced);
+  let y=26,n=0,shown=0;
+  dev.boards.forEach(b=>b.els.forEach(e=>{ if(e.forced){ n++; if(shown<6){ txt(b.name+' '+e.id+' = '+(e.value?'ON':'OFF')+'  src:'+e.forceSrc,8,y,F.body,C.forced); y+=14; shown++; } }}));
+  if(n>6) txt('+'+(n-6)+' more',8,y,F.micro,C.muted);
+  if(!n) txt('none',8,26,F.body,C.muted);
+  txt('A = REMOVE ALL   (or chord A+D)',6,H-30,F.micro,C.dim);
+  chin('⌫','·','↩');
+  document.getElementById('nowT').textContent='Forces summary';
+  document.getElementById('nowB').textContent='Every override in one place, with its source, and a one-gesture Remove-All. Danger is never more than a press away from being audited and undone.';
+}
+
+function drawComms(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
+  txt('COMMS · IDENTITY',6,6,F.title,C.primary);
+  const rows=[['IP','192.168.0.9 / 24'],['GW','192.168.0.1'],['MAC','02:53:F7:39:42:FF'],
+    ['SN','StamPLC-A17'],['Modbus','TCP :502'],['TASK', dev.task+'  (grading nonce)']];
+  let y=26; rows.forEach(r=>{ txt(r[0],8,y,F.body,C.muted); txt(r[1],70,y,F.body,r[0]==='TASK'?C.accent:C.primary); y+=13; });
+  txt('last write: '+(dev.log[0]?dev.log[0].src+' '+(dev.log[0].reg):'—'),8,y+2,F.micro,C.dim);
+  chin('·','·','↩');
+  document.getElementById('nowT').textContent='Comms & identity';
+  document.getElementById('nowB').textContent='The MAC that also seeds the weak service password, the per-student grading nonce, and the Modbus map — the panel is the proctor: a photo of this screen self-identifies the board it was taken on.';
+}
+
+function drawLog(){
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
+  txt('EVENT LOG · write provenance',6,6,F.title,C.primary);
+  let y=24; dev.log.slice(0,7).forEach(L=>{ const col=L.src==='NET'?C.fault:C.ok;
+    txt(L.src,8,y,F.microb,col); txt(L.reg+' '+L.from+'→'+L.to,42,y,F.micro,C.primary);
+    txt(L.ip||'panel',W-6,y,F.micro,C.muted,'right'); y+=13.5; });
+  if(!dev.log.length) txt('no writes yet',8,24,F.body,C.muted);
+  chin('·','·','↩');
+  document.getElementById('nowT').textContent='Event log';
+  document.getElementById('nowB').textContent='Every write, attributed to PANEL or a NET source IP. After the contested-register drill this is where the class reconstructs exactly how an operator lost control without anyone touching the plant.';
+}
+
+/* ---------- main loop ---------- */
+function frame(now){
+  requestAnimationFrame(frame);
+  // boot timing
+  if(ui.scr===SCR.BOOT){ ui.boot+=16; if(ui.boot>800&&!dev._blip){dev._blip=true;beep(1400,.09,.08);}
+    if(ui.boot>=2600){ ui.scr=SCR.HOME; dev.booted=true; setLed(C.ok,'RUN'); } }
+  else { dev.up+=0.016; dev.scan=1.1+Math.sin(now/900)*0.25; }
+  tickHold(now);
+  // draw
+  g.save();
+  switch(ui.scr){ case SCR.BOOT:drawBoot();break; case SCR.HOME:drawHome();break; case SCR.IO:drawIO();break;
+    case SCR.ELEM:drawElem();break; case SCR.MODE:drawMode();break; case SCR.FORCE:drawForce();break;
+    case SCR.FORCES:drawForces();break; case SCR.COMMS:drawComms();break; case SCR.LOG:drawLog();break; }
+  g.restore();
+  // flash toast
+  if(ui.flash && now-ui.flashT<1400){
+    g.fillStyle=C.accent; rr(W/2-66,H-34,132,16,4); g.fill();
+    txt(ui.flash,W/2,H-31,F.microb,'#04141a','center'); g.textAlign='left'; }
+  // net banner
+  if(ui.banner && now-ui.bannerT<2600){ const a=Math.min(1,(2600-(now-ui.bannerT))/600);
+    g.globalAlpha=a;g.fillStyle=C.fault;rr(6,20,150,14,3);g.fill();
+    g.globalAlpha=1;txt('⚡ '+ui.banner,10,23,F.microb,'#fff'); }
+}
+
+/* ---------- wire up ---------- */
+function bind(id,b){const el=document.getElementById(id);
+  el.addEventListener('mousedown',e=>{e.preventDefault();press(b);});
+  el.addEventListener('mouseup',e=>{e.preventDefault();release(b);});
+  el.addEventListener('mouseleave',e=>{if(held[b])release(b);});
+  el.addEventListener('touchstart',e=>{e.preventDefault();press(b);},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();release(b);},{passive:false});}
+bind('btnA','A');bind('btnB','B');bind('btnC','C');
+const KEYMAP={a:'A',s:'B',d:'C'};
+addEventListener('keydown',e=>{const b=KEYMAP[e.key.toLowerCase()];if(b&&!e.repeat){e.preventDefault();press(b);}});
+addEventListener('keyup',e=>{const b=KEYMAP[e.key.toLowerCase()];if(b){e.preventDefault();release(b);}});
+
+document.getElementById('cAdd').addEventListener('click',function(){
+  if(dev.boards.filter(b=>b.type==='IOEXP').length>=2){flash('max shown');return;}
+  dev.iexpInst++; dev.boards.push(ioexpBoard(0x22+dev.iexpInst-1, dev.iexpInst));
+  flash('IO-EXP #'+dev.iexpInst+' ADDED @0x'+(0x22+dev.iexpInst-1).toString(16)); beep(900,.1,.07);
+  this.setAttribute('disabled','');});
+document.getElementById('cGrove').addEventListener('click',function(){
+  if(dev.boards.some(b=>b.type==='GROVE')){flash('already added');return;}
+  dev.boards.push(groveBoard()); flash('Grove ENV ADDED @0x44'); beep(900,.1,.07); this.setAttribute('disabled','');});
+document.getElementById('cAttack').addEventListener('click',attack);
+document.getElementById('cReboot').addEventListener('click',function(){
+  dev=freshDevice(); ui=freshUi(); dev._blip=false; setLed('#2a323d','—',false);
+  document.getElementById('cAdd').removeAttribute('disabled'); document.getElementById('cGrove').removeAttribute('disabled');});
+
+/* boot */
+dev=freshDevice(); ui=freshUi(); setLed('#2a323d','—',false);
+requestAnimationFrame(frame);
+</script>

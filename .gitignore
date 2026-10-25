@@ -1,0 +1,21 @@
+# lab outputs
+sbom/out/
+**/node_modules/
+.netlify/
+web/.netlify/
+
+# fetched QEMU twin binary + firmware image (downloaded by qemu/fetch-qemu.sh)
+qemu/twin/
+
+# os / editor
+.DS_Store
+.vscode/
+*.log
+
+# python caches
+__pycache__/
+*.pyc
+
+# PlatformIO firmware build output (students build into these; never commit them)
+.pio/
+**/.pio/

@@ -1,0 +1,93 @@
+{
+  "electrical_channels_sampled": false,
+  "files": {
+    "NOTICES.md": {
+      "bytes": 998,
+      "sha256": "223be5b58dabca0a971fffa4ac6cda502884fbb200ef6d96280f709cdb2c6ab3"
+    },
+    "README.md": {
+      "bytes": 5636,
+      "sha256": "07546f0034dec971470efd58683141b755d2738b62c2534b9c84a0d8cd0f4241"
+    },
+    "hooks/physical-bus-capture.json": {
+      "bytes": 13303,
+      "sha256": "c60b73fc2b1db6886b35ecfe0e7be8208efa7dbd9e34550d9b34e61e1e9e9427"
+    },
+    "hooks/readback.csv": {
+      "bytes": 631,
+      "sha256": "78cce3e1b3cc4b35fef25ba67a9c4041707b46ddf52d0df712061384b3187d46"
+    },
+    "serial/exchanges.csv": {
+      "bytes": 611,
+      "sha256": "29295fdc1fbba7f0aeb0f91869a2d0ba1b20541c1597cf07534e39d9d4f91bd1"
+    },
+    "serial/physical-0-reply.bin": {
+      "bytes": 7,
+      "sha256": "a3fc12a0e83c10fb4dfbcaca1b42b5cf2880fc810a7f1244f1d54d9f3e3fe5f7"
+    },
+    "serial/physical-0-request.bin": {
+      "bytes": 8,
+      "sha256": "11d866e6484a18c355da15f11807ac5064de580230316cec467058f87fe05423"
+    },
+    "serial/physical-3-reply.bin": {
+      "bytes": 7,
+      "sha256": "055981b68d39943ca8a5fcdf60fcbe9545b743905be7b041c4f5342fa15f6129"
+    },
+    "serial/physical-3-request.bin": {
+      "bytes": 8,
+      "sha256": "11d866e6484a18c355da15f11807ac5064de580230316cec467058f87fe05423"
+    },
+    "serial/timeout-events.csv": {
+      "bytes": 647,
+      "sha256": "85aacbc42ee27fb975273798b62aebcc7c8b22b6c0dc17e10b9ad31996e38c5f"
+    },
+    "serial/timeout-reply.bin": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "serial/timeout-request.bin": {
+      "bytes": 8,
+      "sha256": "11d866e6484a18c355da15f11807ac5064de580230316cec467058f87fe05423"
+    },
+    "source/capture-identity.json": {
+      "bytes": 2048,
+      "sha256": "003422df3a381fce2e3ba9905f623848ad3ea2f996cdee7f86343e1e71b8ec76"
+    },
+    "source/firmware-path.cpp.txt": {
+      "bytes": 8820,
+      "sha256": "31c29e4520ceeb0f8cbd0ed07e722dc83e3addec4cb5e0fb78a47e440bce7a03"
+    },
+    "source/installed-program.ir.json": {
+      "bytes": 78,
+      "sha256": "fba4c4ad43608b5be398d855bc65e0466166daaf5d2eeffd4096f0a2f3660003"
+    },
+    "source/serial-source.json": {
+      "bytes": 2040,
+      "sha256": "0f0a9b78f701468b4f734cac1ffbe27d203f873d211598a32c63d59c3ba4703e"
+    },
+    "tools/decode.js": {
+      "bytes": 1367,
+      "sha256": "a7681897722604ac9785460409f49c60d78094f9ad155ccc63902a016ada3b37"
+    },
+    "tools/dnp3.js": {
+      "bytes": 25133,
+      "sha256": "0d3cf50d9e38c6e850a9a5b06de58c1ed8594f764339eaa78da76258e0a71542"
+    },
+    "tools/modbus_rtu.js": {
+      "bytes": 4569,
+      "sha256": "e50ddbc55c61058dd52146df48ae03a164f846d49c07888c9a0734793659d0c8"
+    },
+    "tools/modbus_tcp.js": {
+      "bytes": 6881,
+      "sha256": "c7c1b1ee706248c3b44ab575e0ee20babbb1fdc70ee1174c0bca8dee5e758548"
+    },
+    "tools/mqtt.js": {
+      "bytes": 12004,
+      "sha256": "9f5b817b17034d1fa2288ca182b17a2b621414703304cb01adedf3a8b89a822f"
+    }
+  },
+  "id": "controller-bus-01",
+  "new_device_run": false,
+  "origin": "recorded-physical-bus-evidence",
+  "schema": "tbd.bus-study-packet/v1"
+}

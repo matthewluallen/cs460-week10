@@ -1,0 +1,13 @@
+{
+  "name": "StamPLC Teaching Firmware",
+  "version": "1.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "parts": [
+        { "path": "stamplc-factory-8MB.bin", "offset": 0 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# The lab attacker host (rogue NTP + C2) on its own network, at a fixed IP the twin
+# can target. From the Codespace / dev container:
+#   docker compose -f attacker/docker-compose.yml up -d --build
+# Then point the twin at 172.30.0.10:
+#   plc> ntpsync 172.30.0.10 1123          (Part 8 — NTP AiTM)
+# Arm / reset from the host:
+#   ./attacker/arm.sh      ./attacker/benign.sh
+services:
+  attacker:
+    build:
+      context: ..
+      dockerfile: attacker/Dockerfile
+    container_name: lab-attacker
+    networks:
+      labnet:
+        ipv4_address: 172.30.0.10
+    ports:
+      - "127.0.0.1:9000:9000"     # also expose C2 at host loopback for the Part-7 malicious image
+    restart: unless-stopped
+networks:
+  labnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

@@ -1,0 +1,13 @@
+host_receipt_seconds,console,text
+0.006735,card,[TX a0 w=8] 01 03 00 19 00 01 55 CD
+0.394869,card,[TX a1 w=8] 01 03 00 19 00 01 55 CD
+0.783151,card,[TX a2 w=8] 01 03 00 19 00 01 55 CD
+1.172696,card,[TX a3 w=8] 01 03 00 19 00 01 55 CD
+1.557204,card,no reply
+1.571959,card,sniff on
+1.827672,plc,"[BUS] RS485 rx 32: 01 03 00 19 00 01 55 CD 01 03 00 19 00 01 55 CD
+[BUS] 28587 R 0x01 Modbus RTU request (RS-485)=3"
+1.830953,plc,[BUS] 28591 R 0x01 Modbus RTU request (RS-485)=3
+1.834216,plc,[BUS] 28595 R 0x01 Modbus RTU request (RS-485)=3
+1.837446,plc,[BUS] 28599 R 0x01 Modbus RTU request (RS-485)=3
+1.858386,card,[SNIFF] id=1 fc=0x03 len=28 crc=BAD

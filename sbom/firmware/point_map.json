@@ -1,0 +1,697 @@
+{
+  "schema": "tbd.plc-point-map/v3",
+  "version": 3,
+  "description": "Shared FC3 register image and coil/DI mirrors. operator_writable gates named UI operations; intentional raw Modbus writes remain enabled. All word addresses are zero based.",
+  "register_capacity": 256,
+  "coil_capacity": 512,
+  "di_mirror_base": 100,
+  "digest_registers": {
+    "start": 43,
+    "count": 16,
+    "encoding": "SHA256 bytes as16 network-order words"
+  },
+  "vm_word_count": 8,
+  "vm_inputs": [
+    {
+      "name": "base_temperature",
+      "index": 0,
+      "source": "temp_c_x10"
+    },
+    {
+      "name": "temperature_setpoint",
+      "index": 4,
+      "source": "setpoint_tempx10"
+    },
+    {
+      "name": "high_temperature_limit",
+      "index": 5,
+      "source": "alarm_tempx10"
+    },
+    {
+      "name": "cycle_ms",
+      "index": 6,
+      "source": "cycle_ms"
+    }
+  ],
+  "unbound_vm_words": [
+    7
+  ],
+  "parameter_defaults": [
+    {
+      "point": "setpoint_tempx10",
+      "value": 250
+    },
+    {
+      "point": "alarm_tempx10",
+      "value": 400
+    },
+    {
+      "point": "cycle_ms",
+      "value": 1000
+    }
+  ],
+  "sparkplug_metrics": [
+    {
+      "name": "DI/IN0",
+      "point": "di0_start"
+    },
+    {
+      "name": "DI/IN1",
+      "point": "di1_stop"
+    },
+    {
+      "name": "DI/IN2",
+      "point": "di2_estop_in"
+    },
+    {
+      "name": "DI/IN3",
+      "point": "di3"
+    },
+    {
+      "name": "DI/IN4",
+      "point": "di4"
+    },
+    {
+      "name": "DI/IN5",
+      "point": "di5"
+    },
+    {
+      "name": "DI/IN6",
+      "point": "di6"
+    },
+    {
+      "name": "DI/IN7",
+      "point": "di7"
+    },
+    {
+      "name": "Relay/QX0",
+      "point": "relay0"
+    },
+    {
+      "name": "Relay/QX1",
+      "point": "relay1"
+    },
+    {
+      "name": "Relay/QX2",
+      "point": "relay2"
+    },
+    {
+      "name": "Relay/QX3",
+      "point": "relay3"
+    },
+    {
+      "name": "Analog/temp_x10",
+      "point": "temp_c_x10"
+    },
+    {
+      "name": "Analog/Vin_mV",
+      "point": "vin_mv"
+    },
+    {
+      "name": "Analog/I_mA",
+      "point": "current_ma"
+    }
+  ],
+  "points": [
+    {
+      "name": "estop",
+      "kind": "COIL",
+      "address": 0,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Mechanical relay request (CWE-306); circuit safety requires independent evidence"
+    },
+    {
+      "name": "relay0",
+      "kind": "COIL",
+      "address": 1,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Motor contactor (base relay 0, program-driven)"
+    },
+    {
+      "name": "relay1",
+      "kind": "COIL",
+      "address": 2,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Run light (base relay 1)"
+    },
+    {
+      "name": "relay2",
+      "kind": "COIL",
+      "address": 3,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Warning light (base relay 2)"
+    },
+    {
+      "name": "relay3",
+      "kind": "COIL",
+      "address": 4,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Fault/estop light (base relay 3)"
+    },
+    {
+      "name": "ssr1",
+      "kind": "COIL",
+      "address": 5,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Solid-state relay 1 (IO-exp)"
+    },
+    {
+      "name": "ssr2",
+      "kind": "COIL",
+      "address": 6,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Solid-state relay 2 (IO-exp)"
+    },
+    {
+      "name": "soft_estop",
+      "kind": "COIL",
+      "address": 8,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "SOFT estop honored by logic only (defeatable contrast)"
+    },
+    {
+      "name": "cmd_run",
+      "kind": "COIL",
+      "address": 9,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Operator/HMI run command (logic gates it with interlocks)"
+    },
+    {
+      "name": "di0_start",
+      "kind": "DI",
+      "address": 0,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Start pushbutton input"
+    },
+    {
+      "name": "di1_stop",
+      "kind": "DI",
+      "address": 1,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Stop pushbutton input"
+    },
+    {
+      "name": "di2_estop_in",
+      "kind": "DI",
+      "address": 2,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Hardwired E-STOP status input"
+    },
+    {
+      "name": "di3",
+      "kind": "DI",
+      "address": 3,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Digital input 3"
+    },
+    {
+      "name": "di4",
+      "kind": "DI",
+      "address": 4,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Digital input 4"
+    },
+    {
+      "name": "di5",
+      "kind": "DI",
+      "address": 5,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Digital input 5"
+    },
+    {
+      "name": "di6",
+      "kind": "DI",
+      "address": 6,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Digital input 6"
+    },
+    {
+      "name": "di7",
+      "kind": "DI",
+      "address": 7,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": true,
+      "encoding": "u16",
+      "description": "Digital input 7"
+    },
+    {
+      "name": "vin_mv",
+      "kind": "REG",
+      "address": 0,
+      "unit": "mV",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Base supply voltage"
+    },
+    {
+      "name": "current_ma",
+      "kind": "REG",
+      "address": 1,
+      "unit": "mA",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Base output current"
+    },
+    {
+      "name": "temp_c_x10",
+      "kind": "REG",
+      "address": 2,
+      "unit": "0.1C",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "s16",
+      "description": "Base temperature x10"
+    },
+    {
+      "name": "aio_ch1_mv",
+      "kind": "REG",
+      "address": 10,
+      "unit": "mV",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "s16",
+      "description": "IO-exp CH1 voltage 0-10V"
+    },
+    {
+      "name": "aio_ch1_ua",
+      "kind": "REG",
+      "address": 11,
+      "unit": "uA",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "IO-exp CH1 current 0-20mA"
+    },
+    {
+      "name": "aio_ch2_mv",
+      "kind": "REG",
+      "address": 12,
+      "unit": "mV",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "s16",
+      "description": "IO-exp CH2 voltage 0-10V"
+    },
+    {
+      "name": "aio_ch2_ua",
+      "kind": "REG",
+      "address": 13,
+      "unit": "uA",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "IO-exp CH2 current 0-20mA"
+    },
+    {
+      "name": "plc_mode",
+      "kind": "REG",
+      "address": 20,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "0=PROGRAM 1=RUN 2=REMOTE; faults inhibit outputs"
+    },
+    {
+      "name": "scan_last_us",
+      "kind": "REG",
+      "address": 21,
+      "unit": "us",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Last scan time"
+    },
+    {
+      "name": "scan_max_us",
+      "kind": "REG",
+      "address": 22,
+      "unit": "us",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Max scan time"
+    },
+    {
+      "name": "fault_count",
+      "kind": "REG",
+      "address": 23,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Active fault count"
+    },
+    {
+      "name": "forces_active",
+      "kind": "REG",
+      "address": 24,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "1 if any point is forced"
+    },
+    {
+      "name": "heartbeat",
+      "kind": "REG",
+      "address": 25,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Free-running PLC-alive counter"
+    },
+    {
+      "name": "setpoint_tempx10",
+      "kind": "REG",
+      "address": 30,
+      "unit": "0.1C",
+      "operator_writable": true,
+      "forceable": false,
+      "encoding": "s16",
+      "description": "Temperature request -> IW4; authored program must consume it (default demo does not)"
+    },
+    {
+      "name": "alarm_tempx10",
+      "kind": "REG",
+      "address": 31,
+      "unit": "0.1C",
+      "operator_writable": true,
+      "forceable": false,
+      "encoding": "s16",
+      "description": "High temperature limit -> IW5; new demo compares base IW0 against this value"
+    },
+    {
+      "name": "cycle_ms",
+      "kind": "REG",
+      "address": 32,
+      "unit": "ms",
+      "operator_writable": true,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Cycle request -> IW6; authored program must consume it (default demo does not)"
+    },
+    {
+      "name": "point_map_version",
+      "kind": "REG",
+      "address": 26,
+      "unit": "version",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Canonical semantic map version; full SHA256 is registers43-58"
+    },
+    {
+      "name": "device_mac_word0",
+      "kind": "REG",
+      "address": 40,
+      "unit": "hex",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Public device identity word; credential-training input, high octet first"
+    },
+    {
+      "name": "device_mac_word1",
+      "kind": "REG",
+      "address": 41,
+      "unit": "hex",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Public device identity word; credential-training input, high octet first"
+    },
+    {
+      "name": "device_mac_word2",
+      "kind": "REG",
+      "address": 42,
+      "unit": "hex",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Public device identity word; credential-training input, high octet first"
+    }
+  ],
+  "bound_vm_words": [
+    {
+      "name": "process_role_1",
+      "index": 1
+    },
+    {
+      "name": "process_role_2",
+      "index": 2
+    },
+    {
+      "name": "process_role_3",
+      "index": 3
+    }
+  ],
+  "process_bindings": {
+    "schema": 1,
+    "clock_register": 59,
+    "config_generation_register": 61,
+    "format_register": 63,
+    "slot_base": 64,
+    "slot_count": 3,
+    "slot_words": 16,
+    "status_register": 112,
+    "count_register": 113,
+    "digest_start": 114,
+    "digest_words": 16,
+    "clock": "boot_monotonic_read_completion",
+    "calibration": "provisional",
+    "slot_layout": [
+      {
+        "offset": 0,
+        "words": 2,
+        "name": "value",
+        "encoding": "s32_be"
+      },
+      {
+        "offset": 2,
+        "words": 1,
+        "name": "quality",
+        "encoding": "enum"
+      },
+      {
+        "offset": 3,
+        "words": 1,
+        "name": "flags",
+        "encoding": "bit0=usable bit1=has_sample bit2=has_value bit3=unique_serial"
+      },
+      {
+        "offset": 4,
+        "words": 2,
+        "name": "read_ms",
+        "encoding": "u32_be"
+      },
+      {
+        "offset": 6,
+        "words": 2,
+        "name": "sequence",
+        "encoding": "u32_be"
+      },
+      {
+        "offset": 8,
+        "words": 2,
+        "name": "acquisition_epoch",
+        "encoding": "u32_be"
+      },
+      {
+        "offset": 10,
+        "words": 2,
+        "name": "errors",
+        "encoding": "u32_be"
+      },
+      {
+        "offset": 12,
+        "words": 2,
+        "name": "losses_min",
+        "encoding": "u32_be"
+      },
+      {
+        "offset": 14,
+        "words": 2,
+        "name": "inventory_generation",
+        "encoding": "u32_be"
+      }
+    ],
+    "quality": {
+      "0": "unbound",
+      "1": "awaiting",
+      "2": "valid",
+      "3": "warmup",
+      "4": "io_error",
+      "5": "crc_error",
+      "6": "overflow",
+      "7": "stale",
+      "8": "paused",
+      "9": "missing",
+      "10": "identity_mismatch",
+      "11": "route_error",
+      "12": "value_invalid",
+      "13": "config_invalid"
+    },
+    "status": "0=valid configuration (possibly unbound),1=storage unavailable,2=stored configuration invalid",
+    "fields": [
+      {
+        "id": "Temperature",
+        "name": "temperature_x10",
+        "unit": "C",
+        "scale": 10,
+        "kind": 0
+      },
+      {
+        "id": "Humidity",
+        "name": "humidity_x1000",
+        "unit": "percent",
+        "scale": 1000,
+        "kind": 0
+      },
+      {
+        "id": "Pressure",
+        "name": "pressure_pa",
+        "unit": "Pa",
+        "scale": 1,
+        "kind": 0
+      },
+      {
+        "id": "Gas",
+        "name": "gas_ohm",
+        "unit": "ohm",
+        "scale": 1,
+        "kind": 0
+      },
+      {
+        "id": "Eco2",
+        "name": "eco2_estimate_ppm",
+        "unit": "ppm_estimate",
+        "scale": 1,
+        "kind": 1
+      },
+      {
+        "id": "Tvoc",
+        "name": "tvoc_ppb",
+        "unit": "ppb_estimate",
+        "scale": 1,
+        "kind": 1
+      },
+      {
+        "id": "Ir",
+        "name": "ir_raw",
+        "unit": "count",
+        "scale": 1,
+        "kind": 2
+      },
+      {
+        "id": "Red",
+        "name": "red_raw",
+        "unit": "count",
+        "scale": 1,
+        "kind": 2
+      },
+      {
+        "id": "Ch1Mv",
+        "name": "ch1_mv",
+        "unit": "mV",
+        "scale": 1,
+        "kind": 3
+      },
+      {
+        "id": "Ch1Ua",
+        "name": "ch1_ua",
+        "unit": "uA",
+        "scale": 1,
+        "kind": 3
+      },
+      {
+        "id": "Ch2Mv",
+        "name": "ch2_mv",
+        "unit": "mV",
+        "scale": 1,
+        "kind": 3
+      },
+      {
+        "id": "Ch2Ua",
+        "name": "ch2_ua",
+        "unit": "uA",
+        "scale": 1,
+        "kind": 3
+      },
+      {
+        "id": "NcirAmbient",
+        "name": "ambient_centi_c",
+        "unit": "C",
+        "scale": 100,
+        "kind": 4
+      },
+      {
+        "id": "NcirObject",
+        "name": "object_centi_c",
+        "unit": "C",
+        "scale": 100,
+        "kind": 4
+      },
+      {
+        "id": "Distance",
+        "name": "distance_mm",
+        "unit": "mm",
+        "scale": 1,
+        "kind": 5
+      }
+    ],
+    "admission": "Only explicitly configured valid fresh referenced IW1-3 may execute; referenced unbound IW7 is rejected. Changes to acquisition epoch/generation or regressed sequence stop executing programs. Clear fault and explicitly RUN after fresh recovery. Optional unreferenced sensors do not inhibit unrelated programs. Configuration is local PROGRAM-only and persistently read back before publication."
+  }
+}

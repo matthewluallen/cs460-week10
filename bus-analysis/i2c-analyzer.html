@@ -1,0 +1,397 @@
+<meta charset="utf-8">
+<title>StampLC I²C Analyzer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: instrument panel — lane timeline up top, decode + logic readouts below.
+     Committed single dark "test-equipment" world; all colors explicit + color-scheme dark. */
+  :root{
+    --bg:#0a0e13; --panel:#111823; --panel2:#0d141d; --edge:#1e2a38; --grid:#17222e;
+    --fg:#e7eef6; --muted:#8498ad; --dim:#5a6e83;
+    --di:#38c6d9;        /* DI reads (R) */
+    --relay:#f3a53a;     /* relay writes (W) */
+    --power:#7ddc8a;     /* INA226  0x40 */
+    --temp:#c98bf0;      /* LM75    0x48 */
+    --aio:#6ea8ff;       /* IO-exp  0x20 */
+    --signal:#5ff0b0;    /* active correlation */
+    --warn:#ff7a7a;
+    color-scheme:dark;
+    --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:"IBM Plex Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.45;
+    padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+    padding-block:18px;max-width:1120px;margin:0 auto;-webkit-font-smoothing:antialiased}
+  a{color:var(--di)}
+  h1{font-size:1.25rem;font-weight:600;margin:0;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:.82rem;margin-top:2px}
+  .eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
+  .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:.7rem}
+  .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+  .swatch{width:10px;height:10px;border-radius:2px;flex:none}
+  .panel{background:var(--panel);border:1px solid var(--edge);border-radius:10px}
+  /* controls */
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 12px;margin-bottom:12px}
+  button{font-family:var(--sans);font-size:.8rem;color:var(--fg);background:var(--panel2);
+    border:1px solid var(--edge);border-radius:7px;padding:7px 12px;cursor:pointer;transition:border-color .15s,background .15s}
+  button:hover{border-color:var(--di)}
+  button:focus-visible{outline:2px solid var(--di);outline-offset:2px}
+  button.primary{border-color:var(--signal);color:var(--signal)}
+  button.primary[aria-pressed="true"]{background:color-mix(in srgb,var(--signal) 16%,var(--panel2));border-color:var(--signal)}
+  button:disabled{opacity:.4;cursor:default}
+  .loadbtn{font-family:var(--sans);font-size:.8rem;color:var(--fg);background:var(--panel2);border:1px solid var(--edge);border-radius:7px;padding:7px 12px;cursor:pointer}
+  .loadbtn:hover{border-color:var(--power)}
+  .loadbtn:focus-within{outline:2px solid var(--power);outline-offset:2px}
+  .modetag{font-family:var(--mono);font-size:.72rem;color:var(--power)}
+  .scanlabel{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+  .scanlabel b{color:var(--fg)}
+  /* timeline */
+  .scope{overflow-x:auto;padding:0}
+  .scope-inner{min-width:760px}
+  svg{display:block;width:100%;height:auto}
+  .lane-bg{fill:var(--panel2)}
+  .lane-sep{stroke:var(--grid);stroke-width:1}
+  .scanband{fill:transparent}
+  .scanband.sel{fill:color-mix(in srgb,var(--di) 9%,transparent)}
+  .scanband.active{fill:color-mix(in srgb,var(--signal) 10%,transparent)}
+  .scanrule{stroke:var(--grid);stroke-width:1;stroke-dasharray:2 4}
+  .scantext{fill:var(--dim);font-family:var(--mono);font-size:10px}
+  .lanelabel{font-family:var(--mono);font-size:11px;fill:var(--fg)}
+  .laneaddr{font-family:var(--mono);font-size:9.5px;fill:var(--dim)}
+  .txn{cursor:pointer}
+  .txn rect{rx:3;transition:opacity .12s}
+  .txn .wv{font-family:var(--mono);font-size:9.5px;fill:#06110c;font-weight:600}
+  .txn .rv{font-family:var(--mono);font-size:9.5px;fill:var(--fg)}
+  .txn.dim{opacity:.32}
+  .txn.selected rect{stroke:var(--fg);stroke-width:1.5}
+  .corr{fill:none;stroke:var(--signal);stroke-width:1.6;marker-end:url(#arrow)}
+  .corr.ghost{stroke:var(--dim);stroke-dasharray:3 3;marker-end:url(#arrowd)}
+  .corrlabel{font-family:var(--mono);font-size:9.5px;fill:var(--signal)}
+  .corrlabel.ghost{fill:var(--dim)}
+  /* readouts */
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px}
+  @media(max-width:760px){.grid3{grid-template-columns:1fr}}
+  .card{padding:12px 14px;min-width:0}
+  .card h2{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+    font-family:var(--mono);margin:0 0 9px;font-weight:600}
+  .frame{font-family:var(--mono);font-size:.76rem;line-height:1.7}
+  .frame .row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--grid);padding:3px 0}
+  .frame .row:last-child{border-bottom:0}
+  .frame .k{color:var(--muted)} .frame .v{color:var(--fg);font-variant-numeric:tabular-nums;text-align:right}
+  .pill{display:inline-block;font-family:var(--mono);font-size:.68rem;padding:1px 7px;border-radius:999px;border:1px solid currentColor}
+  .decode{font-family:var(--mono);font-size:.74rem;color:var(--muted);margin-top:8px;word-break:break-word}
+  .decode b{color:var(--signal)}
+  .ladder{font-family:var(--mono);font-size:.78rem;line-height:1.8}
+  .rung{display:flex;gap:8px;align-items:baseline;padding:2px 6px;border-radius:5px}
+  .rung.live{background:color-mix(in srgb,var(--signal) 14%,transparent)}
+  .rung .n{color:var(--dim)}
+  .rung .on{color:var(--signal)} .rung .off{color:var(--dim)}
+  .pmrow{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:.74rem;padding:3px 0;border-bottom:1px solid var(--grid)}
+  .pmrow:last-child{border-bottom:0}
+  .pmrow .a{color:var(--muted)} .pmrow .p{color:var(--fg)}
+  .note{color:var(--muted);font-size:.76rem;margin-top:12px;padding:11px 13px;line-height:1.6}
+  .note code{font-family:var(--mono);color:var(--di);background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.92em}
+  .note b{color:var(--fg);font-weight:600}
+  .foot{color:var(--dim);font-size:.72rem;margin-top:14px;font-family:var(--mono)}
+</style>
+
+<header>
+  <div>
+    <div class="eyebrow">StampLC teaching PLC · emulated twin</div>
+    <h1>I²C Bus Analyzer</h1>
+    <div class="sub">Every bus transaction, decoded and tied to the ladder scan that caused it.</div>
+  </div>
+  <div class="legend" id="legend"></div>
+</header>
+
+<div class="panel controls">
+  <button id="prev">‹ Prev scan</button>
+  <button id="next">Next scan ›</button>
+  <button id="inject" class="primary" aria-pressed="false">⚡ Freeze &amp; force DI0 = 1</button>
+  <label class="loadbtn">Load capture<input id="capfile" type="file" accept="application/json,.json" hidden></label>
+  <span class="modetag" id="modeTag">scenario (demo)</span>
+  <div class="scanlabel" id="scanlabel"></div>
+</div>
+
+<div class="panel scope"><div class="scope-inner" id="scopeWrap"></div></div>
+
+<div class="grid3">
+  <div class="panel card">
+    <h2>Decoded transaction</h2>
+    <div id="decodePanel"><div class="decode">Select a transaction on the timeline.</div></div>
+  </div>
+  <div class="panel card">
+    <h2>Ladder scan · <span id="ladderScan">—</span></h2>
+    <div class="ladder" id="ladder"></div>
+    <div class="decode" id="scanState"></div>
+  </div>
+  <div class="panel card">
+    <h2>Point map</h2>
+    <div id="pointmap"></div>
+  </div>
+</div>
+
+<div class="panel note" id="note">
+  <b>Reconstructed, not sampled.</b> QEMU models I²C at the transaction level, so these are
+  decoded bus events placed on the scan clock, not analog SDA/SCL edges. The same transactions
+  export to a <b>VCD</b> that opens in <b>PulseView</b> (<code>bus_to_vcd.py</code> → the real
+  I²C decoder annotates Start/Address/Data/ACK/Stop). <b>Freeze &amp; force</b> mirrors the live
+  control plane: <code>QMP stop</code> → <code>qom-set /machine/soc/aw9523 di=0xFF</code> →
+  <code>cont</code> — change a register while time is stopped, then watch the next scan react.
+</div>
+<div class="foot" id="foot"></div>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script>
+/* ---- device model (real StampLC I²C map) ---- */
+const DEV = {
+  0x59:{name:"AW9523B",  role:"R=DI W=RLY",label:"DI·RLY", color:"var(--relay)", note:"8 opto DI read (port 0/1) + 4 relays written (reg 0x02)"},
+  0x43:{name:"PI4IOE5V",role:"buttons",label:"BTN",  color:"var(--di)",    note:"front buttons A/B/C + INT line"},
+  0x40:{name:"INA226",   role:"sensor",label:"POWER", color:"var(--power)", note:"bus voltage / current"},
+  0x48:{name:"LM75B",    role:"sensor",label:"TEMP",  color:"var(--temp)",  note:"board temperature"},
+  0x20:{name:"IO-exp",   role:"sensor",label:"AIO",   color:"var(--aio)",   note:"0-10V field analog in"},
+};
+const LANES = [0x59,0x43,0x40,0x48,0x20];
+const POINTMAP = [
+  {addr:0x59,bit:"P0.0 (R)",point:"di0",     rung:"rung 1 input"},
+  {addr:0x59,bit:"0x02.0 (W)",point:"relay0",rung:"rung 1 output"},
+  {addr:0x40,reg:"0x02",point:"vin_mv",   rung:"status"},
+  {addr:0x40,reg:"0x04",point:"current_ma",rung:"status"},
+  {addr:0x48,reg:"0x00",point:"temp_c_x10",rung:"status"},
+  {addr:0x20,reg:"IR10",point:"aio_ch1_mv",rung:"status"},
+];
+/* value helpers */
+const hex2=(v)=>"0x"+(v&0xFFFF).toString(16).padStart(4,"0").toUpperCase();
+const hex1=(v)=>"0x"+(v&0xFF).toString(16).padStart(2,"0").toUpperCase();
+
+/* ---- scan sequence: idle → forced input → logic drives relay → physics responds ----
+   values are the twin's documented process model (idle I=39mA 22.0C; motor on I=531mA, temp rises). */
+function scanTxns(s){
+  const di=s.di, relay=s.relay;
+  const t=[
+    {addr:0x59,dir:"R",data:[di],       decode:di?"read DI port — DI0 asserted (opto loop closed)":"read DI port (opto x8), idle",
+       point:"di0", val:di&1},
+    {addr:0x43,dir:"R",data:[0x00],     decode:"poll front buttons (A/B/C)", val:0},
+    {addr:0x48,dir:"R",data:[(s.temp>>8)&0xFF,s.temp&0xFF], decode:`LM75 temp ×10 = ${s.temp} → ${(s.temp/10).toFixed(1)} °C`, point:"temp_c_x10", val:s.temp},
+    {addr:0x40,dir:"R",data:[(s.vin>>8)&0xFF,s.vin&0xFF],   decode:`INA226 bus V = ${s.vin} mV → ${(s.vin/1000).toFixed(2)} V`, point:"vin_mv", val:s.vin},
+    {addr:0x40,dir:"R",data:[(s.cur>>8)&0xFF,s.cur&0xFF],   decode:`INA226 current = ${s.cur} mA`, point:"current_ma", val:s.cur},
+    {addr:0x20,dir:"R",data:[(s.ch1>>8)&0xFF,s.ch1&0xFF],   decode:`IO-exp CH1 = ${s.ch1} mV`, point:"aio_ch1_mv", val:s.ch1},
+  ];
+  if(s.run) t.push({addr:0x59,dir:"W",data:[relay], decode:relay?"drive RELAY0 ON (coil 0)":"RELAY0 OFF",
+       point:"relay0", val:relay&1, written:true});
+  return t;
+}
+/* 6 scans; scan index 3 is the forced-input event */
+function buildScans(forced){
+  const base=[
+    {di:0,run:true,vin:24000,cur:39, temp:220,ch1:1},
+    {di:0,run:true,vin:24000,cur:39, temp:220,ch1:1},
+    {di:0,run:true,vin:24000,cur:39, temp:221,ch1:1},
+    {di:0,run:true,vin:24000,cur:39, temp:221,ch1:1},
+    {di:0,run:true,vin:24000,cur:39, temp:222,ch1:1},
+    {di:0,run:true,vin:24000,cur:39, temp:222,ch1:1},
+  ];
+  if(forced){ // freeze+force DI0 at scan 3 → passthrough drives relay0 → physics responds
+    base[3]={di:1,run:true,vin:24000,cur:39, temp:222,ch1:1};
+    base[4]={di:1,run:true,vin:23570,cur:531,temp:235,ch1:1};
+    base[5]={di:1,run:true,vin:23570,cur:531,temp:261,ch1:1};
+  }
+  return base.map((s,i)=>{ s.relay=(s.di&1); s.idx=i; s.t0=i*22; s.txns=scanTxns(s); return s; });
+}
+
+let FORCED=false, SCANS=buildScans(false), sel={scan:null,txn:null};
+
+/* ---- legend ---- */
+document.getElementById("legend").innerHTML = LANES.map(a=>{
+  const d=DEV[a];
+  return `<span><i class="swatch" style="background:${d.color}"></i>${d.name} <em style="color:var(--dim)">0x${a.toString(16)}</em></span>`;
+}).join("");
+
+/* ---- timeline render (SVG) ---- */
+const LANE_H=34, LANE_X=86, TOP=22, SCAN_W=116, PAD=14;
+function render(){
+  const W = LANE_X + SCANS.length*SCAN_W + PAD;
+  const H = TOP + LANES.length*LANE_H + 20;
+  const laneY = a => TOP + LANES.indexOf(a)*LANE_H;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="I2C bus timeline">
+    <defs>
+      <marker id="arrow" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 z" fill="var(--signal)"/></marker>
+      <marker id="arrowd" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 z" fill="var(--dim)"/></marker>
+    </defs>`;
+  // lane backgrounds + labels
+  LANES.forEach(a=>{
+    const y=laneY(a), d=DEV[a];
+    s+=`<rect class="lane-bg" x="0" y="${y}" width="${W}" height="${LANE_H-4}"/>`;
+    s+=`<line class="lane-sep" x1="0" y1="${y+LANE_H-4}" x2="${W}" y2="${y+LANE_H-4}"/>`;
+    s+=`<rect x="0" y="${y}" width="4" height="${LANE_H-4}" fill="${d.color}"/>`;
+    s+=`<text class="lanelabel" x="12" y="${y+14}">${d.label}</text>`;
+    s+=`<text class="laneaddr" x="12" y="${y+26}">0x${a.toString(16)} ${d.role}</text>`;
+  });
+  // scan bands + rules + labels
+  SCANS.forEach(sc=>{
+    const x=LANE_X+sc.idx*SCAN_W;
+    const cls = sel.scan===sc.idx ? "sel" : (FORCED&&sc.idx>=3 ? "active":"");
+    s+=`<rect class="scanband ${cls}" data-scan="${sc.idx}" x="${x}" y="${TOP}" width="${SCAN_W}" height="${LANES.length*LANE_H}"/>`;
+    s+=`<line class="scanrule" x1="${x}" y1="${TOP}" x2="${x}" y2="${TOP+LANES.length*LANE_H}"/>`;
+    s+=`<text class="scantext" x="${x+6}" y="${TOP-8}">scan ${sc.idx} · ${sc.t0}ms</text>`;
+  });
+  // transactions
+  SCANS.forEach(sc=>{
+    const x0=LANE_X+sc.idx*SCAN_W;
+    // group by lane to stack sequential same-lane reads
+    const perLane={};
+    sc.txns.forEach((tx)=>{ (perLane[tx.addr]=perLane[tx.addr]||[]).push(tx); });
+    Object.keys(perLane).forEach(addr=>{
+      const a=+addr, y=laneY(a)+4, list=perLane[addr];
+      const bw=Math.min(46,(SCAN_W-14)/list.length - 4);
+      list.forEach((tx,j)=>{
+        const bx=x0+6+j*(bw+4);
+        const isW=tx.dir==="W";
+        const dim = sel.scan!==null && sel.scan!==sc.idx ? "dim":"";
+        const selx = (sel.txn && sel.txn.sc===sc.idx && sel.txn.addr===a && sel.txn.j===j)?"selected":"";
+        const tc = tx.point==="di0" ? "var(--di)" : tx.point==="relay0" ? "var(--relay)" : DEV[a].color;
+        const fill = isW ? tc : "none";
+        const strokeW = isW?0:1.2;
+        tx._x=bx; tx._y=y; tx._bw=bw; tx._sc=sc.idx; tx._j=j;
+        const vtxt = tx.point==="di0"||tx.point==="relay0" ? (tx.val? "1":"0")
+                    : (tx.val!=null? (tx.val>999? (tx.val/ (tx.point==="vin_mv"?1000:1)).toFixed(tx.point==="vin_mv"?1:0): tx.val):"");
+        s+=`<g class="txn ${dim} ${selx}" data-sc="${sc.idx}" data-addr="${a}" data-j="${j}">
+             <rect x="${bx}" y="${y}" width="${bw}" height="${LANE_H-12}" fill="${fill}" stroke="${tc}" stroke-width="${strokeW}"/>
+             <text class="${isW?'wv':'rv'}" x="${bx+5}" y="${y+14}">${tx.dir} ${vtxt}</text>
+           </g>`;
+      });
+    });
+  });
+  // correlation arrow: DI0 read → RELAY0 write, per scan (ghost when inactive, bright when di0=1 drove it)
+  SCANS.forEach(sc=>{
+    const di=sc.txns.find(t=>t.point==="di0"), rl=sc.txns.find(t=>t.point==="relay0");
+    if(!di||!rl) return;
+    const active = sc.di&1;
+    const show = sel.scan===sc.idx || (FORCED&&active);
+    if(!show && sel.scan!==null) return;
+    const x1=di._x+di._bw/2, y1=di._y;
+    const x2=rl._x+rl._bw/2, y2=rl._y;
+    const top=Math.min(y1,y2)-7;
+    s+=`<path class="corr ${active?'':'ghost'}" d="M${x1},${y1} C${x1},${top} ${x2},${top} ${x2},${y2}"/>`;
+    // correlation is labeled in the ladder panel ("relay0 := di0"); no on-timeline text (avoids colliding with scan labels)
+  });
+  s+=`</svg>`;
+  const wrap=document.getElementById("scopeWrap");
+  wrap.innerHTML=s;
+  wrap.querySelectorAll(".txn").forEach(g=>g.addEventListener("click",()=>{
+    selectTxn(+g.dataset.sc,+g.dataset.addr,+g.dataset.j);
+  }));
+  wrap.querySelectorAll(".scanband").forEach(b=>b.addEventListener("click",()=>selectScan(+b.dataset.scan)));
+}
+
+/* ---- selection + readouts ---- */
+function i2cFrame(tx){
+  const rd=tx.dir==="R";
+  const addrByte=(tx.addr<<1)|(rd?1:0);
+  const rows=[["Start","—"],["Address "+(rd?"read":"write"),hex1(tx.addr)+" ("+DEV[tx.addr].name+")"],
+    ["R/W",rd?"1 · read":"0 · write"],["ACK","slave"]];
+  tx.data.forEach((b,i)=>rows.push(["Data "+(rd?"read":"write")+(tx.data.length>1?" ["+i+"]":""),hex1(b)]));
+  rows.push(["Stop","—"]);
+  return rows;
+}
+function selectTxn(sc,addr,j){
+  const list=SCANS[sc].txns.filter(t=>t.addr===addr);
+  const tx=list[j]; sel={scan:sc,txn:{sc,addr,j}};
+  const isW=tx.dir==="W";
+  const rows=i2cFrame(tx).map(r=>`<div class="row"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`).join("");
+  const tc=tx.point==="di0"?'var(--di)':tx.point==="relay0"?'var(--relay)':DEV[addr].color;
+  const pill=`<span class="pill" style="color:${tc}">${isW?"WRITE":"READ"} 0x${addr.toString(16)}</span>`;
+  document.getElementById("decodePanel").innerHTML =
+    `<div style="margin-bottom:8px">${pill}</div><div class="frame">${rows}</div>
+     <div class="decode"><b>${DEV[addr].name}</b> — ${tx.decode}${tx.point?` · point <b>${tx.point}</b>`:""}</div>`;
+  render(); syncScan(sc);
+}
+function selectScan(sc){ sel={scan:sc,txn:null}; render(); syncScan(sc);
+  document.getElementById("decodePanel").innerHTML=`<div class="decode">Scan ${sc} selected — click a transaction to decode its I²C frame.</div>`;}
+function syncScan(sc){
+  const s=SCANS[sc];
+  document.getElementById("ladderScan").textContent="scan "+sc;
+  const live=(s.di&1)?"live":"";
+  document.getElementById("ladder").innerHTML=
+    `<div class="rung ${live}"><span class="n">1</span><span>relay0 := di0</span>
+       <span class="${s.di&1?'on':'off'}" style="margin-left:auto">di0=${s.di&1} → relay0=${s.relay&1}</span></div>
+     <div class="rung"><span class="n">—</span><span style="color:var(--dim)">mode = RUN · scan ≈ 22 ms</span></div>`;
+  document.getElementById("scanState").innerHTML =
+    `DI0 <b>${s.di&1}</b> · RELAY0 <b style="color:var(--relay)">${s.relay&1}</b> · ${(s.cur)} mA · ${(s.temp/10).toFixed(1)} °C`+
+    ((FORCED&&sc>=4)?` · <b style="color:var(--signal)">motor running — current & temp climbing</b>`:"");
+  document.getElementById("scanlabel").innerHTML=`scan <b>${sc}</b> / ${SCANS.length-1} · t=<b>${s.t0}</b> ms`;
+}
+document.getElementById("pointmap").innerHTML = POINTMAP.map(p=>
+  `<div class="pmrow"><span class="a">0x${p.addr.toString(16)} ${p.bit||p.reg}</span><span class="p">${p.point}</span><span style="color:var(--dim)">${p.rung}</span></div>`).join("");
+
+/* ---- controls ---- */
+let cur=0;
+function go(n){ cur=Math.max(0,Math.min(SCANS.length-1,n)); selectScan(cur);
+  document.getElementById("prev").disabled=cur===0; document.getElementById("next").disabled=cur===SCANS.length-1; }
+document.getElementById("prev").onclick=()=>go(cur-1);
+document.getElementById("next").onclick=()=>go(cur+1);
+document.getElementById("inject").onclick=(e)=>{
+  FORCED=!FORCED; SCANS=buildScans(FORCED);
+  e.currentTarget.setAttribute("aria-pressed",FORCED);
+  e.currentTarget.textContent = FORCED ? "⚡ Release force (DI0 = 0)" : "⚡ Freeze & force DI0 = 1";
+  go(FORCED?3:0);
+};
+document.getElementById("foot").textContent="StampLC twin · AW9523 0x59 (R=DI, W=relay) · PI4IOE 0x43 (buttons) · INA226 0x40 · LM75 0x48 · IO-exp 0x20 · values from the twin process model";
+
+/* ---- capture mode: load a real trace_to_sigrok transactions.json (the virtual tap,
+   or a physical-tap capture converted to the same shape) ---- */
+let CAP=[];
+const addrInfo=a=>DEV[a]||{name:"0x"+a.toString(16),role:"probe",label:"0x"+a.toString(16),color:"var(--dim)",note:"unlabeled / bus probe"};
+function loadCapture(txns){
+  CAP=txns.filter(t=>t&&typeof t.addr==="number");
+  const shown=CAP.slice(0,120);
+  document.getElementById("modeTag").textContent="live capture · "+CAP.length+" txns"+(CAP.length>120?" (first 120)":"");
+  ["inject","prev","next"].forEach(id=>document.getElementById(id).disabled=true);
+  document.getElementById("scanlabel").innerHTML="controller-model tap";
+  CAP=shown; sel={cap:null}; renderCapture();
+  document.getElementById("decodePanel").innerHTML=`<div class="decode">Real I²C capture from the twin's controller-model tap — the same data a bench logic analyzer sees. Click a transaction to decode it.</div>`;
+  document.getElementById("ladder").innerHTML=`<div class="decode">Capture mode — the ladder view follows the seeded scenario; reload the page for the correlation demo.</div>`;
+}
+function renderCapture(){
+  const addrs=[...new Set(CAP.map(t=>t.addr))].sort((a,b)=>a-b);
+  const CW=48, W=LANE_X+CAP.length*CW+PAD, H=TOP+addrs.length*LANE_H+20;
+  const laneY=a=>TOP+addrs.indexOf(a)*LANE_H;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="captured I2C bus">`;
+  addrs.forEach(a=>{const y=laneY(a),d=addrInfo(a);
+    s+=`<rect class="lane-bg" x="0" y="${y}" width="${W}" height="${LANE_H-4}"/>`+
+       `<line class="lane-sep" x1="0" y1="${y+LANE_H-4}" x2="${W}" y2="${y+LANE_H-4}"/>`+
+       `<rect x="0" y="${y}" width="4" height="${LANE_H-4}" fill="${d.color}"/>`+
+       `<text class="lanelabel" x="12" y="${y+14}">${d.label}</text>`+
+       `<text class="laneaddr" x="12" y="${y+26}">0x${a.toString(16)} ${d.role}</text>`;});
+  CAP.forEach((t,i)=>{const y=laneY(t.addr)+4,x=LANE_X+i*CW,d=addrInfo(t.addr),isW=t.dir==="W";
+    const nack=t.nack&&t.nack>0, b0=(t.bytes&&t.bytes.length)?t.bytes[0].toString(16).padStart(2,"0"):"";
+    const selx=(sel.cap===i)?"selected":"";
+    s+=`<g class="txn ${selx}" data-cap="${i}"><rect x="${x}" y="${y}" width="${CW-4}" height="${LANE_H-12}" fill="${isW?d.color:'none'}" stroke="${nack?'var(--warn)':d.color}" stroke-width="${isW?0:1.2}" stroke-dasharray="${nack?'2 2':'0'}"/>`+
+       `<text class="${isW?'wv':'rv'}" x="${x+4}" y="${y+14}">${t.dir}${b0?' '+b0:''}</text></g>`;});
+  s+=`</svg>`;
+  const wrap=document.getElementById("scopeWrap"); wrap.innerHTML=s;
+  wrap.querySelectorAll(".txn").forEach(g=>g.addEventListener("click",()=>selectCap(+g.dataset.cap)));
+}
+function selectCap(i){
+  const t=CAP[i]; sel={cap:i}; const isW=t.dir==="W",d=addrInfo(t.addr),nack=t.nack&&t.nack>0;
+  const rows=[["Start","—"],["Address "+(isW?"write":"read"),"0x"+t.addr.toString(16)+" ("+d.name+")"],["ACK",nack?"NACK":"ACK"]];
+  (t.bytes||[]).forEach((b,k)=>rows.push(["Data"+(t.bytes.length>1?" ["+k+"]":""),"0x"+b.toString(16).padStart(2,"0")]));
+  rows.push(["Stop","—"]);
+  document.getElementById("decodePanel").innerHTML=
+    `<div style="margin-bottom:8px"><span class="pill" style="color:${isW?d.color:'var(--di)'}">${isW?'WRITE':'READ'} 0x${t.addr.toString(16)}</span></div>`+
+    `<div class="frame">${rows.map(r=>`<div class="row"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`).join("")}</div>`+
+    `<div class="decode"><b>${d.name}</b> — ${d.note}${nack?' · <b style="color:var(--warn)">NACK — device absent / bus probe</b>':''}</div>`;
+  renderCapture();
+}
+document.getElementById("capfile").addEventListener("change",ev=>{
+  const f=ev.target.files&&ev.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ loadCapture(JSON.parse(r.result)); }catch(e){ document.getElementById("modeTag").textContent="could not parse capture JSON"; } };
+  r.readAsText(f);
+});
+
+render(); go(0);
+</script>

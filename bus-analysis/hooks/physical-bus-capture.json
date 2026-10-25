@@ -1,0 +1,89 @@
+{
+  "schema": "tbd.studio-bus-capture/v1",
+  "kind": "trace-window",
+  "started_utc": "2026-09-19T13:23:38.493604+00:00",
+  "ended_utc": "2026-09-19T13:24:02.221733+00:00",
+  "source_note": "Physical StamPLC USB 30:ED:A0:C9:48:4C; exact HTTP identity/readback retained in physical-source.json. CLI acquisition using the same retained diagnostic protocol; not a Web Serial transport test.",
+  "receipts": [
+    {
+      "command": "bustrace on",
+      "sent_utc": "2026-09-19T13:23:58.717675+00:00",
+      "reply": "bus trace ON",
+      "received_utc": "2026-09-19T13:23:58.777028+00:00"
+    },
+    {
+      "command": "bustrace off",
+      "sent_utc": "2026-09-19T13:23:59.779395+00:00",
+      "reply": "bus trace OFF",
+      "received_utc": "2026-09-19T13:23:59.830607+00:00"
+    }
+  ],
+  "status_raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"status\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":83,\"last_sequence\":98,\"next_sequence\":99,\"overwritten_min\":82,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}",
+  "records": [
+    {
+      "requested_sequence": 98,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":98,\"enqueue_us\":20914907,\"origin\":\"bus\",\"retained_bytes\":41,\"formatted_bytes\":41,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303931342052203078343320706f6c6c20627574746f6e732028504934494f45290a\",\"ascii_preview\":\"[BUS] 20914 R 0x43 poll buttons (PI4IOE).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":83,\"last_sequence\":98,\"next_sequence\":99,\"overwritten_min\":82,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 97,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":97,\"enqueue_us\":20878416,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303837382052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20878 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":83,\"last_sequence\":98,\"next_sequence\":99,\"overwritten_min\":82,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 96,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":96,\"enqueue_us\":20828854,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303832382052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20828 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":83,\"last_sequence\":98,\"next_sequence\":99,\"overwritten_min\":82,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 95,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":95,\"enqueue_us\":20777440,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303737372052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20777 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":83,\"last_sequence\":98,\"next_sequence\":99,\"overwritten_min\":82,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 94,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":94,\"enqueue_us\":20727721,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303732372052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20727 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":83,\"last_sequence\":98,\"next_sequence\":99,\"overwritten_min\":82,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 93,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":93,\"enqueue_us\":20673224,\"origin\":\"bus\",\"retained_bytes\":35,\"formatted_bytes\":35,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303637332052203078323020494f2d65787020434831206d563d310a\",\"ascii_preview\":\"[BUS] 20673 R 0x20 IO-exp CH1 mV=1.\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":83,\"last_sequence\":98,\"next_sequence\":99,\"overwritten_min\":82,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 92,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":92,\"enqueue_us\":20673200,\"origin\":\"bus\",\"retained_bytes\":35,\"formatted_bytes\":35,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303637332052203078343020494e413232362049206d413d3134330a\",\"ascii_preview\":\"[BUS] 20673 R 0x40 INA226 I mA=143.\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":83,\"last_sequence\":98,\"next_sequence\":99,\"overwritten_min\":82,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 91,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":91,\"enqueue_us\":20673165,\"origin\":\"bus\",\"retained_bytes\":38,\"formatted_bytes\":38,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303637332052203078343020494e413232362056696e206d563d343333370a\",\"ascii_preview\":\"[BUS] 20673 R 0x40 INA226 Vin mV=4337.\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 90,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":90,\"enqueue_us\":20673104,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d20323036373220522030783438204c4d37352074656d70207831303d3330380a\",\"ascii_preview\":\"[BUS] 20672 R 0x48 LM75 temp x10=308.\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 89,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":89,\"enqueue_us\":20668721,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303636382052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20668 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 88,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":88,\"enqueue_us\":20655896,\"origin\":\"bus\",\"retained_bytes\":41,\"formatted_bytes\":41,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303635352052203078343320706f6c6c20627574746f6e732028504934494f45290a\",\"ascii_preview\":\"[BUS] 20655 R 0x43 poll buttons (PI4IOE).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 87,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":87,\"enqueue_us\":20618472,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303631382052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20618 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 86,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":86,\"enqueue_us\":20567435,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303536372052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20567 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 85,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":85,\"enqueue_us\":20518284,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303531372052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20517 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 84,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"entry\",\"sequence\":84,\"enqueue_us\":20464591,\"origin\":\"bus\",\"retained_bytes\":37,\"formatted_bytes\":37,\"truncated\":false,\"bytes_hex\":\"5b4255535d2032303436342052203078343320706f6c6c20444920286f70746f207838290a\",\"ascii_preview\":\"[BUS] 20464 R 0x43 poll DI (opto x8).\",\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    },
+    {
+      "requested_sequence": 83,
+      "raw": "{\"schema\":\"tbd.diagnostics/v1\",\"logs\":\"missing\",\"requested_sequence\":83,\"boot_id\":\"617fcdd15f137b5605d37a1f201cb770\",\"clock\":\"boot_monotonic_enqueue\",\"exercise_id\":0,\"exercise_remaining\":0,\"exercise_generated\":0,\"status\":{\"capacity\":16,\"entry_max_bytes\":192,\"retained\":16,\"first_sequence\":84,\"last_sequence\":99,\"next_sequence\":100,\"overwritten_min\":83,\"truncated_min\":0,\"format_errors_min\":0,\"exhausted_min\":0}}"
+    }
+  ],
+  "error": null
+}

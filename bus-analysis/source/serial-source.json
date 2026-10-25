@@ -1,0 +1,68 @@
+{
+  "sources": [
+    {
+      "path": "docs/evidence/2026-09-12-rtu-worker/usb-bounded-physical.json",
+      "revision": "5db99d129981929ab5f6bd4aa5de0bf8cc7fcb1f",
+      "sha256": "b174cf8ddf32f4b1cfcb2fc920e45f5c691ca579091b611543b1c897bd9b8403"
+    },
+    {
+      "path": "docs/evidence/2026-09-12-bench-reconnected/rtu-receipt-timing.json",
+      "revision": "5db99d129981929ab5f6bd4aa5de0bf8cc7fcb1f",
+      "sha256": "d957b81a15a446226b8cfdaf076e8e292f0785b37b05c09a981d1f3ece300794"
+    },
+    {
+      "path": "docs/evidence/2026-09-12-rtu-worker/installed-program.json",
+      "revision": "5db99d129981929ab5f6bd4aa5de0bf8cc7fcb1f",
+      "sha256": "a7a2c1dfd5d47cceecbcc1ab5e81ef7594657c41d189f43c542f5d5a47456c92"
+    },
+    {
+      "path": "firmware/src/plc_core.cpp",
+      "revision": "0a9b36b63229342394a4ec3603c895699d87d2c6",
+      "sha256": "74ce86534b23050036328be1b5518b70d0fcacbbd386201daea969224ffa863c"
+    },
+    {
+      "path": "firmware/src/modbus_rtu.cpp",
+      "revision": "0a9b36b63229342394a4ec3603c895699d87d2c6",
+      "sha256": "9213c7c618e41aeaf1141cf167db6c1576f05d01b767e1f662824da7ea42a64e"
+    },
+    {
+      "path": "firmware/src/plc_engine.h",
+      "revision": "0a9b36b63229342394a4ec3603c895699d87d2c6",
+      "sha256": "805a127ad334bd4af2df2da92f9ad8ed1d9e177e8ee357dbbf4ec4bae82289aa"
+    },
+    {
+      "path": "firmware/src/plc_engine.cpp",
+      "revision": "0a9b36b63229342394a4ec3603c895699d87d2c6",
+      "sha256": "a553b47defa27ce8c417fabd523a4fea76797fd07d0d1a47003fd05da081ce46"
+    }
+  ],
+  "source_only": true,
+  "new_device_run": false,
+  "physical_program": {
+    "magic": "TBD-IR",
+    "code": [
+      [
+        2,
+        0,
+        0
+      ],
+      [
+        17,
+        0,
+        1000
+      ],
+      [
+        5,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "application_sha256": "7f3047c2c8557c31b0e7395b12f18a24281730a5e69cd380a6c52d6d49e0808a",
+  "elf_sha256": "9fd5a78f6b807325d85c2e5c25c9f11aec933b2ce9cf4c672401dc6b635553dc"
+}
