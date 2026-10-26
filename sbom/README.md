@@ -6,7 +6,8 @@ CVE?" You'll generate SBOMs in two standard formats, compare them, scan one for
 vulnerabilities, and — the honest part — see where an SBOM's view stops.
 
 Tools (installed for you): **syft** (generates SBOMs), **grype** (scans an SBOM for
-CVEs), **trivy** (does both).
+CVEs), **trivy** (does both), and **cve-bin-tool** (scans a *compiled binary* for
+embedded components + CVEs — Exercise 3).
 
 ---
 
@@ -84,6 +85,39 @@ real-world catch:
 
 Say clearly in your finding **which scope** your SBOM covered, and what it therefore
 could not have caught.
+
+## Exercise 3 — scan the *compiled binary* (the firmware-resident view)
+
+Exercise 2 read build *manifests*. Now read the shipped artifact itself. **cve-bin-tool**
+(installed for you) scans a compiled binary for the version fingerprints of well-known
+components and maps them to CVEs — so it finds the ESP-IDF libraries that actually run on
+the chip, which the source scan could not see.
+
+```bash
+bash sbom/run_cve_bin_tool.sh        # scans firmware/prebuilt/stamplc-factory-8MB.bin
+```
+
+(The first scan downloads the CVE database — a few minutes, then cached. It needs network,
+so run it in your Codespace / dev container, not an offline box.)
+
+Even with no network, you can confirm the components are really in there:
+
+```bash
+strings sbom/firmware/prebuilt/stamplc-factory-8MB.bin | grep -iE 'mbedtls|lwip|wpa_supplicant|esp-idf'
+```
+
+You'll see `mbedTLS`, `lwIP` and `wpa_supplicant` paths — the crypto and TCP/IP stacks the
+note above said "most *embedded* CVEs actually live" in. That closes the gap Exercise 2 opened:
+
+- **Source SBOM** (syft on `firmware/`) → the build's library *pins*, little CVE signal.
+- **Binary scan** (cve-bin-tool on the `.bin`) → the *firmware-resident* components that
+  ship on the device, with their CVEs — a one-shot version of the "framework → bundled
+  libraries → NVD" mapping you'd otherwise do by hand.
+
+**Finding to keep:** name one component cve-bin-tool detected in the binary, its version,
+and whether that version has a known NVD CVE — then say whether the fix is a firmware
+rebuild (bump the framework) or an architecture control, and note your reachability
+uncertainty (detected ≠ exploitable).
 
 ## The connection:  analyzer ↔ SBOM ↔ CWE ↔ CVE
 

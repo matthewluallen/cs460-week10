@@ -16,6 +16,14 @@ curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh  | sud
 curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b "$BIN" "$GRYPE_VERSION" || echo "   (grype install skipped — see sbom/README.md)"
 curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b "$BIN" "$TRIVY_VERSION" || echo "   (trivy install skipped — see sbom/README.md)"
 
+echo "==> Installing cve-bin-tool (binary CVE scanner — Part 2 Exercise 3)…"
+# Scans the COMPILED firmware .bin for embedded ESP-IDF components (mbedTLS/lwIP/…).
+# pipx keeps it isolated; fall back to pip. Non-fatal — Exercise 3 notes the offline path.
+pipx install cve-bin-tool >/dev/null 2>&1 \
+  || pip3 install --quiet --break-system-packages cve-bin-tool 2>/dev/null \
+  || pip3 install --quiet cve-bin-tool 2>/dev/null \
+  || echo "   (cve-bin-tool install skipped — see sbom/README.md Exercise 3)"
+
 echo "==> Installing bus & firmware tooling (sigrok decoder, pymodbus, nc)…"
 sudo apt-get update -qq || true
 sudo apt-get install -y -qq sigrok-cli xz-utils netcat-openbsd >/dev/null 2>&1 \
