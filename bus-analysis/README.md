@@ -16,7 +16,10 @@ Nothing in the CLI connects to a device or the network — it runs entirely in y
 Open `serial/exchanges.csv` in a text editor or spreadsheet. It lists exact
 request/reply bytes, transaction identifiers and host receipt intervals. Compare
 the two complete exchanges. `serial/timeout-events.csv` is an earlier, separate
-run whose installed image was not established. An absent reply is not a zero.
+run whose installed image was not established. An absent reply is not a zero. Note the two
+complete exchanges answer the *same* request (`01 03 00 19 00 01 55 cd`, register 25) with
+**different** values (96 vs 99): a reread is a new measurement, not proof either value is
+stable or "the" value — an observed-vs-inferred point, not corruption.
 
 Read `source/firmware-path.cpp.txt` beside the bytes. Its original numbered lines
 connect input acquisition, program execution, output writes and register

@@ -39,7 +39,7 @@ Then on the device:
 
 ```
 plc> ntpsync 172.30.0.10 1123          # armed -> the 32-bit clock wraps
-plc> clk                               # 1901/1902 — WRAPPED
+plc> clk                               # 1902 — WRAPPED
 ```
 
 ## How it reaches the device

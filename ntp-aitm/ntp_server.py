@@ -6,7 +6,7 @@
 # Once ARMED (echo arm > /tmp/ntp_state) it returns a time safely past the signed
 # 32-bit boundary (2038-01-19 03:14:07 UTC). The firmware stores the wall-clock in a
 # signed int32 (CWE-197), so the value wraps negative and the controller's clock
-# jumps to ~1901 - destroying its source-attributed audit timestamps. No exploit of
+# jumps to ~1902 - destroying its source-attributed audit timestamps. No exploit of
 # the firmware is needed: the device trusts unauthenticated network time, so whoever
 # answers the query owns the clock. That is the whole lesson.
 #

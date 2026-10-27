@@ -13,7 +13,7 @@ OS=$(uname -s); ARCH=$(uname -m)
 case "$OS/$ARCH" in
   Linux/x86_64)  ASSET=qemu-twin-linux-x86_64.tar.xz ;;
   Linux/aarch64) ASSET=qemu-twin-linux-arm64.tar.xz ;;   # local Dev Container on Apple Silicon
-  Darwin/arm64)  ASSET=qemu-twin-macos-arm64.tar.xz ;;
+  Darwin/arm64)  echo "No native macOS twin is published — open this repo in a Codespace or a local VS Code Dev Container (Linux/arm64) and fetch there. See qemu/README.md." >&2; exit 2 ;;
   *) echo "No prebuilt twin for $OS/$ARCH — build from source (see ../docs/QEMU-Twin.md)."; exit 1 ;;
 esac
 

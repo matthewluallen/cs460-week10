@@ -27,16 +27,16 @@
   <!-- Panel B: CONTROL -->
   <g transform="translate(24,272)">
     <rect width="832" height="258" rx="10" fill="#fff7f0" stroke="#e0b58a"/>
-    <text x="16" y="28" font-size="15" font-weight="700" fill="#9c4a1a">B · CONTROL view — the lab's relay / DI bus (press M)</text>
+    <text x="16" y="28" font-size="15" font-weight="700" fill="#9c4a1a">B · CONTROL view — the lab's relay / DI bus (send: mode control over USB)</text>
     <text x="16" y="48" font-size="12" fill="#444">The control bus is NOT on a Grove port — it is the internal bus on the bottom expansion header.</text>
-    <text x="16" y="65" font-size="12" fill="#444">Use a Grove → breadboard adapter. Power the Cardputer from USB/battery; share GND; leave the 5 V wire unconnected.</text>
+    <text x="16" y="65" font-size="12" fill="#444">Use Grove→pin (Dupont) leads — no breadboard. Power the Cardputer from USB/battery; share GND; leave the 5 V wire unconnected.</text>
     <rect x="40" y="92" width="150" height="128" rx="8" fill="#222"/>
     <text x="115" y="120" font-size="13" fill="#fff" text-anchor="middle" font-weight="700">Cardputer</text>
     <text x="58" y="152" font-size="12" fill="#e33" font-weight="700">SDA · G2</text>
     <text x="58" y="176" font-size="12" fill="#f9a825" font-weight="700">SCL · G1</text>
     <text x="58" y="200" font-size="12" fill="#6c6" font-weight="700">GND</text>
     <rect x="330" y="92" width="150" height="128" rx="8" fill="#f0e9d8" stroke="#c7b48a"/>
-    <text x="405" y="158" font-size="12" fill="#887" text-anchor="middle">breadboard</text>
+    <text x="405" y="158" font-size="12" fill="#887" text-anchor="middle">Dupont leads</text>
     <line x1="190" y1="148" x2="330" y2="124" stroke="#e33" stroke-width="3"/>
     <line x1="190" y1="172" x2="330" y2="156" stroke="#f9a825" stroke-width="3"/>
     <line x1="190" y1="196" x2="330" y2="188" stroke="#4a4" stroke-width="3"/>
@@ -51,5 +51,5 @@
     <line x1="480" y1="188" x2="560" y2="186" stroke="#4a4" stroke-width="3"/>
   </g>
 
-  <text x="24" y="566" font-size="11" fill="#888">Passive tap · 3.3 V logic only · confirm the exact header pads on the StamPLC schematic before clipping · press E to export JSON for parity with the twin.</text>
+  <text x="24" y="566" font-size="11" fill="#888">Passive tap · 3.3 V logic only · confirm the exact header pads on the StamPLC schematic before clipping · send 'export' over USB for parity with the twin.</text>
 </svg>

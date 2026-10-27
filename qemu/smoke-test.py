@@ -13,7 +13,7 @@ the Week-10 lab depends on, so a firmware/image/twin regression is caught in CI:
   6. hmi          the HMI JSON API on :8080 serves live points
   7. bus/sigrok   the virtual I2C tap decodes to the same 0x59/0x43 transactions
                   a bench logic analyzer would see (sigrok I2C decoder)
-  8. ntp/y2038    a rogue SNTP server steps the clock past 2038 -> it wraps to 1901
+  8. ntp/y2038    a rogue SNTP server steps the clock past 2038 -> it wraps to 1902
                   (unauthenticated network time + 32-bit truncation; NTP AiTM lab)
   9. overflow     an unauthenticated overlong /api/tag write overflows into the I/O force
                   image and energizes relay0 by memory corruption, with no audit entry
@@ -170,7 +170,7 @@ def main():
         s88, b88 = http_get("http://127.0.0.1:8080/api/points")
         check("hmi.port8080", s88 == 200 and '"mode"' in b88, f"status={s88}")
 
-        # 7/8. NTP AiTM / Y2038: a rogue time server steps the clock past 2038 -> wraps to 1901.
+        # 7/8. NTP AiTM / Y2038: a rogue time server steps the clock past 2038 -> wraps to 1902.
         # The device reaches the host at 127.0.0.1 (the twin maps guest->127.0.0.1 to loopback).
         ntp_state = "/tmp/smoke-ntp-state"
         try: os.unlink(ntp_state)
@@ -188,7 +188,7 @@ def main():
             with open(ntp_state, "w") as f: f.write("arm")     # arm the rogue server
             cmd(sock, "ntpsync 127.0.0.1 12345", 6)            # spoof a time > 2038
             cw = cmd(sock, "clk", 1.5)
-            check("ntp.y2038_wrap", "WRAPPED" in cw, "clk wraps to ~1901 after the spoof")
+            check("ntp.y2038_wrap", "WRAPPED" in cw, "clk wraps to ~1902 after the spoof")
         finally:
             ntp.terminate()
             try: os.unlink(ntp_state)

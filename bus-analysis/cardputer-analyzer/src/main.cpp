@@ -10,9 +10,16 @@
 //     expansion header: SDA=GPIO13, SCL=GPIO15, + common GND -> relays/DI    [MODE: CONTROL]
 //     (0x59 AW9523 relays+opto-DI, 0x43 PI4IOE buttons, 0x40/0x48/0x32 sensors)
 //
-// It is a PASSIVE tap: the two pins are INPUT only, never driven, so it cannot
-// disturb the bus. Press E to dump captured transactions as JSON over USB serial
+// It is a PASSIVE tap by default: the two pins are INPUT only, never driven, so it
+// cannot disturb the bus. Send 'export' over USB serial to dump captured transactions as JSON
 // (115200) to feed i2c-analyzer.html / parity_test.py.
+//
+// ACTIVE INJECTION (teaching demo, OFF by default): when explicitly armed ('inject on',
+// CONTROL mode), the 'force <addr> <reg> <val>' command drives the tap pins for ONE I2C
+// write — e.g. forcing a relay ON by writing the AW9523 (0x59) output latch. This is a
+// live demonstration of ATT&CK ICS T0855 (Unauthorized Command Message) / T0831
+// (Manipulation of Control) for the CS460 lab; run it against the QEMU twin or an
+// isolated bench, not a live process. Each arm fires once, then auto-disarms.
 //
 // Bench-validate on real hardware. Design target is the StamPLC 400 kHz bursty bus;
 // a continuously saturated 400 kHz bus may drop events (noted on screen as "drop").
@@ -21,6 +28,13 @@
 #include <driver/gpio.h>
 #include "esp_system.h"
 #include "soc/rtc_cntl_reg.h"   // RTC_CNTL_OPTION1_REG / FORCE_DOWNLOAD_BOOT (buttonless reflash)
+#include "soc/gpio_struct.h"    // GPIO.in — fast two-line read for the raw-sample capture
+#include "esp_cpu.h"            // esp_cpu_get_cycle_count — cycle-accurate sample spacing
+#include "esp_mac.h"            // esp_efuse_mac_get_default — stable per-unit id for the USB handshake
+#include <Wire.h>               // active injection drives the tap via the 2nd I2C peripheral (Wire1)
+#include <Preferences.h>        // NVS persistence for USB-configurable capture settings (rate/samples/mode)
+#include <string.h>
+#include <stdlib.h>
 
 // ---- capture pins (Cardputer Grove connector) ----
 static const gpio_num_t PIN_SDA = GPIO_NUM_2;
@@ -63,6 +77,7 @@ struct Txn {
   uint8_t  data[16];
   uint8_t  n;         // data byte count (capped at 16)
   bool     overflow;  // >16 data bytes seen
+  bool     injected;  // this frame was INJECTED by the analyzer (active T0855 demo)
 };
 static const int TXN_MAX = 64;
 static Txn      g_txn[TXN_MAX];
@@ -76,11 +91,13 @@ static uint8_t  a_byte = 0;
 static bool     a_first = true;
 static Txn      a_cur;
 
+static void decode_sv(const Txn& t);   // fwd: decode a completed frame into a human-readable sensor value
 static void txn_commit() {
   if (!a_active) return;
   g_txn[g_txn_head] = a_cur;
   g_txn_head = (g_txn_head + 1) % TXN_MAX;
   g_txn_count++;
+  decode_sv(a_cur);
   a_active = false;
 }
 static void txn_start(uint32_t t_us) {
@@ -109,11 +126,24 @@ static const Dev CONTROL_DEVS[] = {
   {0x48, "LM75 temp"},     {0x32, "RX8130 rtc"}, {0x20, "IO-exp"},
 };
 enum Mode { MODE_SENSOR = 0, MODE_CONTROL = 1 };
-static Mode g_mode = MODE_SENSOR;   // PORT.A works on first boot; press M for the control bus
+static Mode g_mode = MODE_SENSOR;   // PORT.A works on first boot; send 'mode control' over USB for the control bus
 static bool g_paused = false;
 static bool g_stream = false;       // serial: stream each new decoded txn as a line
+static bool g_inject_armed = false; // active injection gate — default OFF (safe); one shot per arm
 static char s_line[96];             // serial command line buffer
 static int  s_len = 0;
+
+// ---- USB-configurable capture settings (persisted in NVS; see cfg_save/cfg_load) ----
+// All configurable over USB: `rate <hz>`, `samples <n>`, `mode sensor|control`, shown by `settings`.
+static uint32_t g_rate  = 4000000;  // #CAP default sample rate  ('rate <hz>')   — survives reboot
+static uint32_t g_nsamp = 50000;    // #CAP default sample count ('samples <n>')  — survives reboot
+
+// ---- risky-command confirmation gate (config-change validation over USB) ----
+// force/reboot/download are stateful or drive the bus, so a typed command only ARMS them;
+// the next line must be 'confirm' (or y/yes) to proceed — anything else cancels.
+enum Pending { PEND_NONE = 0, PEND_FORCE, PEND_REBOOT, PEND_DOWNLOAD };
+static Pending g_pending = PEND_NONE;
+static uint8_t g_pf_addr = 0x59, g_pf_reg = 0x02, g_pf_val = 0x01;  // stashed 'force' args awaiting confirm
 
 static const Dev* dev_table(int& count) {
   if (g_mode == MODE_SENSOR) { count = sizeof(SENSOR_DEVS)/sizeof(Dev); return SENSOR_DEVS; }
@@ -125,50 +155,82 @@ static const char* dev_name(uint8_t addr) {
   return "?";
 }
 
+// ---- LIVE decoded sensor values (shown on the LCD so the student sees results, not just raw bytes) ----
+struct SV { uint8_t addr; char name[12]; char val[14]; uint32_t t; bool used; };
+static SV g_sv[8];
+static uint16_t g_lastReg[128];   // last register the controller wrote to each address (for register-addressed reads)
+static void upsertSV(uint8_t addr, const char* name, const char* val) {
+  int slot = -1, oldest = 0;
+  for (int i = 0; i < 8; i++) { if (g_sv[i].used && g_sv[i].addr == addr) { slot = i; break; }
+    if (!g_sv[i].used) { if (slot < 0) slot = i; } else if (g_sv[i].t < g_sv[oldest].t) oldest = i; }
+  if (slot < 0) slot = oldest;
+  g_sv[slot].used = true; g_sv[slot].addr = addr; g_sv[slot].t = millis();
+  strncpy(g_sv[slot].name, name, sizeof(g_sv[slot].name)-1); g_sv[slot].name[sizeof(g_sv[slot].name)-1] = 0;
+  strncpy(g_sv[slot].val,  val,  sizeof(g_sv[slot].val)-1);  g_sv[slot].val[sizeof(g_sv[slot].val)-1]  = 0;
+}
+static void decode_sv(const Txn& t) {
+  uint8_t a = t.addr & 0x7F; char v[14];
+  if (!t.read) {                            // a write carries the register pointer
+    if (t.n >= 1) { if (a == 0x29 && t.n >= 2) g_lastReg[a] = ((uint16_t)t.data[0] << 8) | t.data[1]; else g_lastReg[a] = t.data[0]; }
+    return;
+  }
+  uint16_t reg = g_lastReg[a];
+  switch (a) {
+    case 0x57: if (t.n >= 3) { uint32_t um = ((uint32_t)t.data[0]<<16)|((uint32_t)t.data[1]<<8)|t.data[2]; snprintf(v,sizeof(v),"%lu mm",(unsigned long)(um/1000)); upsertSV(a,"RCWL ultra",v); } break;
+    case 0x23: if (t.n >= 2) { uint16_t raw = ((uint16_t)t.data[0]<<8)|t.data[1]; snprintf(v,sizeof(v),"%u lux",(unsigned)(raw/1.2f)); upsertSV(a,"BH1750",v); } break;
+    case 0x29: if (reg==0x0096 && t.n>=2) { uint16_t mm=((uint16_t)t.data[0]<<8)|t.data[1]; snprintf(v,sizeof(v),"%u mm",mm); upsertSV(a,"VL53 ToF",v); }
+               else if (reg==0x010F && t.n>=1) { snprintf(v,sizeof(v),"id %02X",t.data[0]); upsertSV(a,"VL53",v); } break;
+    case 0x40: if (reg==0x00 && t.n>=4) { int32_t c=(int32_t)((uint32_t)t.data[0]|((uint32_t)t.data[1]<<8)|((uint32_t)t.data[2]<<16)|((uint32_t)t.data[3]<<24)); snprintf(v,sizeof(v),"%ld cnt",(long)c); upsertSV(a,"Encoder",v); } break;
+    case 0x5A: if (reg==0x07 && t.n>=2) { uint16_t raw=t.data[0]|((uint16_t)t.data[1]<<8); float c=raw*0.02f-273.15f; snprintf(v,sizeof(v),"%d.%d C",(int)c,abs((int)(c*10))%10); upsertSV(a,"MLX/NCIR",v); }
+               else if (reg==0x0F && t.n>=1) { snprintf(v,sizeof(v),"who %02X",t.data[0]); upsertSV(a,"TMOS",v); } break;
+    case 0x62: upsertSV(a,"SCD40 CO2","(9B+CRC)"); break;
+    case 0x77: if (reg==0xD0 && t.n>=1) { snprintf(v,sizeof(v),"id %02X",t.data[0]); upsertSV(a,"BME688",v); } break;
+  }
+}
+
 // ---- display ----
-static M5Canvas g_cv(&M5Cardputer.Display);
+// display reference is bound LOCALLY inside draw() (after begin()) — a file-scope
+// `static auto& = M5Cardputer.Display` binds during static init, before begin() sets
+// up the panel, leaving _panel null -> LoadProhibited on the first height() in draw().
 static uint32_t g_last_draw = 0;
 
 static uint16_t txn_color(const Txn& t) {
+  if (t.injected) return TFT_RED;     // INJECTED write (active attack) — stands out
   if (t.read)  return TFT_GREEN;      // reads (e.g. poll DI / sensor)
   return TFT_ORANGE;                  // writes (e.g. relay latch)
 }
 
 static void draw() {
-  const int W = M5Cardputer.Display.width();   // 240
-  const int H = M5Cardputer.Display.height();  // 135
-  g_cv.fillSprite(TFT_BLACK);
+  auto& g_cv = M5Cardputer.Display;            // bind at call time (after begin), like the controller
+  const int W = g_cv.width();                  // 240
+  const int H = g_cv.height();                 // 135
+  g_cv.fillScreen(TFT_BLACK);
 
   // header
   g_cv.setTextSize(1);
   g_cv.setTextColor(TFT_WHITE, TFT_BLACK);
   g_cv.setCursor(2, 2);
-  g_cv.printf("StamPLC Bus  [%s]%s", g_mode == MODE_CONTROL ? "CONTROL" : "SENSOR",
+  g_cv.printf("ANALYZER [%s]%s", g_mode == MODE_CONTROL ? "CONTROL" : "SENSOR",
               g_paused ? " PAUSED" : "");
   g_cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
   g_cv.setCursor(W - 70, 2);
   g_cv.printf("#%lu", (unsigned long)g_txn_count);
   g_cv.drawFastHLine(0, 12, W, TFT_DARKGREY);
 
-  // lanes: one row per known device, recent activity as a moving tick
-  int count; const Dev* devs = dev_table(count);
-  int y = 16;
-  const int laneH = 11;
-  for (int i = 0; i < count && y < 16 + laneH * 6; i++, y += laneH) {
-    g_cv.setTextColor(TFT_CYAN, TFT_BLACK);
-    g_cv.setCursor(2, y);
-    g_cv.printf("%02X %-13s", devs[i].addr, devs[i].name);
-    // scan recent txns for this address, draw ticks right-to-left (newest first)
-    int x = W - 4;
-    for (int k = 0; k < TXN_MAX && x > 110; k++) {
-      int idx = (g_txn_head - 1 - k + TXN_MAX * 2) % TXN_MAX;
-      if ((uint32_t)k >= g_txn_count) break;
-      const Txn& t = g_txn[idx];
-      if (t.addr != devs[i].addr) continue;
-      g_cv.fillRect(x - 3, y, 3, 7, txn_color(t));
-      x -= 5;
-    }
+  // LIVE VALUES — decoded sensor readings (the "results" the student watches: real vs forged)
+  int y = 15;
+  g_cv.setTextColor(TFT_YELLOW, TFT_BLACK);
+  g_cv.setCursor(2, y); g_cv.print("LIVE VALUES (decoded)"); y += 11;
+  bool shown[8] = {false}; int printed = 0;
+  for (int pass = 0; pass < 8 && printed < 6; pass++) {
+    int best = -1; uint32_t bt = 0;
+    for (int i = 0; i < 8; i++) if (g_sv[i].used && !shown[i] && g_sv[i].t >= bt) { bt = g_sv[i].t; best = i; }
+    if (best < 0) break; shown[best] = true; printed++;
+    g_cv.setTextColor(TFT_CYAN,  TFT_BLACK); g_cv.setCursor(2,   y); g_cv.printf("%02X %-10s", g_sv[best].addr, g_sv[best].name);
+    g_cv.setTextColor(TFT_GREEN, TFT_BLACK); g_cv.setCursor(140, y); g_cv.print(g_sv[best].val);
+    y += 11;
   }
+  if (printed == 0) { g_cv.setTextColor(TFT_DARKGREY, TFT_BLACK); g_cv.setCursor(2, y); g_cv.print("waiting for sensor reads..."); }
 
   // decoded log: last few transactions as text
   int logY = H - 42;
@@ -181,15 +243,132 @@ static void draw() {
     g_cv.setCursor(2, logY + k * 8);
     char hex[28] = {0}; int p = 0;
     for (int b = 0; b < t.n && p < (int)sizeof(hex) - 3; b++) p += snprintf(hex + p, sizeof(hex) - p, "%02X ", t.data[b]);
-    g_cv.printf("%c %02X %-11s %s", t.read ? 'R' : 'W', t.addr, dev_name(t.addr), hex);
+    g_cv.printf("%c %02X %-11s %s", t.injected ? '!' : (t.read ? 'R' : 'W'), t.addr, dev_name(t.addr), hex);
   }
 
-  // footer hints + drops
-  g_cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  g_cv.setCursor(2, H - 9);
-  g_cv.printf("M:mode  P:pause  C:clr  E:export  drop:%lu", (unsigned long)g_drops);
+  // footer hints + drops (red injection banner when armed)
+  if (g_inject_armed) {
+    g_cv.setTextColor(TFT_RED, TFT_BLACK);
+    g_cv.setCursor(2, H - 9);
+    g_cv.printf("** INJECT ARMED (T0855) **  USB:clear  drop:%lu", (unsigned long)g_drops);
+  } else {
+    g_cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    g_cv.setCursor(2, H - 9);
+    g_cv.printf("USB console (115200): type 'help'  drop:%lu", (unsigned long)g_drops);
+  }
 
-  g_cv.pushSprite(0, 0);
+  // direct draw: no pushSprite
+}
+
+// ---- raw-sample capture -> #CAP stream for the web waveform app ----
+// Busy-wait uniform sampler on the same Grove pins (bit0=SDA/G2, bit1=SCL/G1).
+// Complements the interrupt sniffer: the ISRs decode transactions for the LCD/JSON,
+// this streams raw samples so the browser can draw a true SDA/SCL waveform + re-decode.
+//   protocol:  "#CAP rate=<hz> nch=2 nsamp=<n>\n"  then <n> bytes (bit0=SDA, bit1=SCL)
+static const uint32_t CAP_MAXN = 60000;
+static uint8_t g_cap[CAP_MAXN];
+static void stream_cap(uint32_t rate, uint32_t nsamp) {
+  if (nsamp > CAP_MAXN) nsamp = CAP_MAXN;
+  detachInterrupt(digitalPinToInterrupt((int)PIN_SCL));
+  detachInterrupt(digitalPinToInterrupt((int)PIN_SDA));
+  uint32_t cyc = 240000000UL / rate; if (cyc < 10) cyc = 10;
+  // wait up to 600 ms for an I2C START (SDA 1->0 while SCL high); else free-run
+  uint32_t t0 = millis();
+  uint8_t prev = (uint8_t)(((GPIO.in >> 2) & 1) | (((GPIO.in >> 1) & 1) << 1));
+  while (millis() - t0 < 600) {
+    uint32_t in = GPIO.in; uint8_t s = (uint8_t)(((in >> 2) & 1) | (((in >> 1) & 1) << 1));
+    if ((prev & 2) && (s & 2) && (prev & 1) && !(s & 1)) break;
+    prev = s;
+  }
+  portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+  portENTER_CRITICAL(&mux);
+  uint32_t base = esp_cpu_get_cycle_count();
+  for (uint32_t i = 0; i < nsamp; i++) {
+    uint32_t in = GPIO.in;
+    g_cap[i] = (uint8_t)(((in >> 2) & 1) | (((in >> 1) & 1) << 1));
+    uint32_t target = base + (i + 1) * cyc;
+    while ((int32_t)(esp_cpu_get_cycle_count() - target) < 0) { }
+  }
+  portEXIT_CRITICAL(&mux);
+  attachInterrupt(digitalPinToInterrupt((int)PIN_SCL), sclISR, RISING);
+  attachInterrupt(digitalPinToInterrupt((int)PIN_SDA), sdaISR, CHANGE);
+  Serial.printf("#CAP rate=%u nch=2 nsamp=%u\n", (unsigned)rate, (unsigned)nsamp);
+  Serial.write(g_cap, nsamp);
+  Serial.flush();
+}
+
+// ---- persisted settings + the deferred 'download' action (used by the confirm gate) ----
+static Preferences g_prefs;
+static void cfg_save() {
+  if (g_prefs.begin("busview", false)) {           // RW
+    g_prefs.putULong("rate",  g_rate);
+    g_prefs.putULong("nsamp", g_nsamp);
+    g_prefs.putUChar("mode",  (uint8_t)g_mode);
+    g_prefs.end();
+  }
+}
+static void cfg_load() {
+  if (g_prefs.begin("busview", true)) {            // RO
+    g_rate  = g_prefs.getULong("rate",  4000000);
+    g_nsamp = g_prefs.getULong("nsamp", 50000);
+    g_mode  = (Mode)g_prefs.getUChar("mode", (uint8_t)MODE_SENSOR);
+    g_prefs.end();
+  }
+  if (g_rate  < 500000)    g_rate  = 500000;        // clamp to the sane capture window
+  if (g_rate  > 20000000)  g_rate  = 20000000;
+  if (g_nsamp < 16)        g_nsamp = 16;
+  if (g_nsamp > CAP_MAXN)  g_nsamp = CAP_MAXN;
+}
+static void bv_settings() {
+  Serial.printf("[CFG] mode=%s rate=%u Hz samples=%u (persisted in NVS 'busview')\n",
+                g_mode == MODE_CONTROL ? "control" : "sensor", (unsigned)g_rate, (unsigned)g_nsamp);
+}
+static void do_download() {   // reboot into ROM download mode so esptool can reflash over USB with no BOOT button
+  Serial.println("[OK] entering download mode - reflash now (esptool write-flash)"); Serial.flush(); delay(120);
+#ifdef RTC_CNTL_OPTION1_REG
+  REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+#endif
+  esp_restart();
+}
+
+// ---- ACTIVE INJECTION (T0855 demo) — drives the tap to write ONE I2C frame ----
+// The opposite of the passive tap. Gated: CONTROL mode + explicitly armed; one shot.
+// Records the forced write into the txn buffer (red '!' on the LCD, "inj":true in JSON)
+// so the analyzer shows its own attack the same way it shows legitimate traffic.
+static void record_injected(uint8_t addr, uint8_t reg, uint8_t val) {
+  Txn t = Txn{};
+  t.t_us = micros();
+  t.addr = addr; t.read = false;
+  t.data[0] = reg; t.data[1] = val; t.n = 2;
+  t.injected = true;
+  g_txn[g_txn_head] = t;
+  g_txn_head = (g_txn_head + 1) % TXN_MAX;
+  g_txn_count++;
+}
+static void force_write(uint8_t addr, uint8_t reg, uint8_t val) {
+  if (g_mode != MODE_CONTROL) { Serial.println("[ERR] force: CONTROL mode only (send 'mode control' / press M)"); return; }
+  if (!g_inject_armed)        { Serial.println("[ERR] force: not armed (send 'inject on' first)"); return; }
+  Serial.printf("[FORCE] *** ACTIVE INJECTION (T0855) *** writing 0x%02X -> reg 0x%02X @0x%02X\n",
+                (unsigned)val, (unsigned)reg, (unsigned)addr);
+  // stop passively sniffing while we drive the two lines ourselves
+  detachInterrupt(digitalPinToInterrupt((int)PIN_SCL));
+  detachInterrupt(digitalPinToInterrupt((int)PIN_SDA));
+  Wire1.begin((int)PIN_SDA, (int)PIN_SCL, 100000);
+  Wire1.beginTransmission(addr);
+  Wire1.write(reg);
+  Wire1.write(val);
+  uint8_t rc = Wire1.endTransmission(true);   // 0 = device ACKed the write
+  Wire1.end();
+  // restore the high-impedance passive tap exactly as setup() left it
+  gpio_set_direction(PIN_SDA, GPIO_MODE_INPUT);
+  gpio_set_direction(PIN_SCL, GPIO_MODE_INPUT);
+  pinMode((int)PIN_SDA, INPUT);
+  pinMode((int)PIN_SCL, INPUT);
+  attachInterrupt(digitalPinToInterrupt((int)PIN_SCL), sclISR, RISING);
+  attachInterrupt(digitalPinToInterrupt((int)PIN_SDA), sdaISR, CHANGE);
+  record_injected(addr, reg, val);
+  g_inject_armed = false;   // one trigger-pull per arm — disarm immediately
+  Serial.printf("[FORCE] result rc=%u (%s); auto-disarmed\n", (unsigned)rc, rc == 0 ? "ACK/ok" : "NACK/err");
 }
 
 // ---- JSON export over USB serial (feeds i2c-analyzer / parity_test) ----
@@ -202,7 +381,7 @@ static void export_json() {
     Serial.printf("  {\"t_us\":%lu,\"addr\":%u,\"dir\":\"%c\",\"data\":[",
                   (unsigned long)t.t_us, t.addr, t.read ? 'R' : 'W');
     for (int b = 0; b < t.n; b++) Serial.printf("%s%u", b ? "," : "", t.data[b]);
-    Serial.printf("]}%s\n", k ? "," : "");
+    Serial.printf("]%s}%s\n", t.injected ? ",\"inj\":true" : "", k ? "," : "");
   }
   Serial.println("]}");
 }
@@ -210,8 +389,20 @@ static void export_json() {
 // ---- USB-serial control console (headless control, PLC-style) ----
 // Lets this analyzer be driven entirely over USB-CDC (115200), the same way the
 // StamPLC's plc> console is driven — no keyboard/LCD needed.
+// Stable identity handshake so the web app (and a human among many identical
+// "USB JTAG/serial debug unit" ports) can confirm THIS is our analyzer. The S3's
+// USB descriptor name is fixed in ROM and identical across units, so we identify
+// in software: a magic token + role + per-unit MAC, emitted at boot and on `id`.
+#define CS460_ID_MAGIC "CS460-BUSVIEW"
+static void print_id() {
+  uint8_t m[6] = {0}; esp_efuse_mac_get_default(m);
+  Serial.printf("[ID] " CS460_ID_MAGIC " role=ANALYZER fw=v3 mac=%02X:%02X:%02X:%02X:%02X:%02X\n",
+                m[0], m[1], m[2], m[3], m[4], m[5]);
+}
 static void bv_help() {
-  Serial.println("[HELP] help | ver | stats | export | mode sensor|control | pause | resume | clear | stream on|off | reboot | download");
+  Serial.println("[HELP] help | id | ver | stats | export | cap | {arm json} | mode sensor|control | pause | resume | clear | stream on|off | reboot | download");
+  Serial.println("[HELP] CONFIG (USB, persisted in NVS): rate <hz> | samples <n> | settings   (reboot/download/force need a 'confirm' line)");
+  Serial.println("[HELP] INJECT (T0855 demo, CONTROL+armed): inject on|off | force <addr> <reg> <val> | {\"cmd\":\"force\",\"addr\":89,\"reg\":2,\"val\":1}");
 }
 static void bv_stats() {
   Serial.printf("[STATS] mode=%s total=%lu drops=%lu paused=%d stream=%d\n",
@@ -231,25 +422,72 @@ static void bv_stats() {
   Serial.println("[STATS] end");
 }
 static void bv_exec(const char* ln) {
+  // confirmation gate: a prior risky command is awaiting 'confirm' (config-change validation)
+  if (g_pending != PEND_NONE) {
+    Pending p = g_pending; g_pending = PEND_NONE;
+    if (!strcmp(ln, "confirm") || !strcmp(ln, "y") || !strcmp(ln, "yes")) {
+      switch (p) {
+        case PEND_FORCE:    force_write(g_pf_addr, g_pf_reg, g_pf_val); break;
+        case PEND_REBOOT:   Serial.println("[OK] rebooting"); Serial.flush(); delay(120); esp_restart(); break;
+        case PEND_DOWNLOAD: do_download(); break;
+        default: break;
+      }
+    } else {
+      Serial.printf("[CANCEL] no confirmation ('%s') - action aborted\n", ln);
+    }
+    return;
+  }
+  // raw-sample capture for the web waveform app: {"cmd":"arm","rate":..,"samples":..,"bus":..} or "cap"
+  if ((ln[0] == '{' && strstr(ln, "arm")) || !strcmp(ln, "cap")) {
+    uint32_t rate = g_rate, nsamp = g_nsamp;   // persisted defaults; a per-arm rate:/samples: overrides for this capture only
+    const char* r = strstr(ln, "rate");    if (r) { const char* c = strchr(r, ':'); if (c) rate  = (uint32_t)strtoul(c + 1, nullptr, 10); }
+    const char* s = strstr(ln, "samples"); if (s) { const char* c = strchr(s, ':'); if (c) nsamp = (uint32_t)strtoul(c + 1, nullptr, 10); }
+    if (rate < 500000) rate = 500000;
+    if (strstr(ln, "expansion")) g_mode = MODE_CONTROL;
+    else if (strstr(ln, "porta")) g_mode = MODE_SENSOR;
+    stream_cap(rate, nsamp);
+    return;
+  }
+  // ACTIVE INJECTION: JSON {"cmd":"force","addr":..,"reg":..,"val":..} (hex or dec) — the web attack panel
+  if (ln[0] == '{' && strstr(ln, "force")) {
+    uint8_t addr = 0x59, reg = 0x02, val = 0x01;   // defaults: force the AW9523 relay latch
+    const char* a = strstr(ln, "addr"); if (a) { const char* c = strchr(a, ':'); if (c) addr = (uint8_t)strtoul(c + 1, nullptr, 0); }
+    const char* r = strstr(ln, "reg");  if (r) { const char* c = strchr(r, ':'); if (c) reg  = (uint8_t)strtoul(c + 1, nullptr, 0); }
+    const char* v = strstr(ln, "val");  if (v) { const char* c = strchr(v, ':'); if (c) val  = (uint8_t)strtoul(c + 1, nullptr, 0); }
+    force_write(addr, reg, val);
+    return;
+  }
   if      (!strcmp(ln, "help") || !strcmp(ln, "?"))   bv_help();
-  else if (!strcmp(ln, "ver"))                        Serial.println("[VER] StamPLC Bus Viewer v2 (serial-controlled)");
+  else if (!strcmp(ln, "id") || !strcmp(ln, "whoami")) print_id();
+  else if (!strcmp(ln, "ver"))                        Serial.println("[VER] StamPLC Bus Viewer v3 (sniff + #CAP waveform + guarded T0855 inject)");
   else if (!strcmp(ln, "stats") || !strcmp(ln, "s"))  bv_stats();
   else if (!strcmp(ln, "export") || !strcmp(ln, "e")) export_json();
   else if (!strcmp(ln, "pause"))                      { g_paused = true;  Serial.println("[OK] paused"); }
   else if (!strcmp(ln, "resume"))                     { g_paused = false; Serial.println("[OK] resumed"); }
   else if (!strcmp(ln, "clear") || !strcmp(ln, "c"))  { g_txn_head = 0; g_txn_count = 0; g_drops = 0; a_active = false; Serial.println("[OK] cleared"); }
-  else if (!strcmp(ln, "mode sensor"))                { g_mode = MODE_SENSOR;  Serial.println("[OK] mode SENSOR"); }
-  else if (!strcmp(ln, "mode control"))               { g_mode = MODE_CONTROL; Serial.println("[OK] mode CONTROL"); }
+  else if (!strcmp(ln, "mode sensor"))                { g_mode = MODE_SENSOR;  cfg_save(); Serial.println("[OK] mode SENSOR (saved)"); }
+  else if (!strcmp(ln, "mode control"))               { g_mode = MODE_CONTROL; cfg_save(); Serial.println("[OK] mode CONTROL (saved)"); }
+  else if (!strncmp(ln, "rate ", 5))                  { uint32_t hz = (uint32_t)strtoul(ln + 5, nullptr, 0); if (hz < 500000) hz = 500000; if (hz > 20000000) hz = 20000000; g_rate = hz; cfg_save(); Serial.printf("[OK] capture rate=%u Hz (saved to NVS)\n", (unsigned)g_rate); }
+  else if (!strncmp(ln, "samples ", 8))               { uint32_t n = (uint32_t)strtoul(ln + 8, nullptr, 0); if (n < 16) n = 16; if (n > CAP_MAXN) n = CAP_MAXN; g_nsamp = n; cfg_save(); Serial.printf("[OK] capture samples=%u (saved to NVS)\n", (unsigned)g_nsamp); }
+  else if (!strcmp(ln, "settings") || !strcmp(ln, "cfg")) bv_settings();
   else if (!strcmp(ln, "stream on"))                  { g_stream = true;  Serial.println("[OK] stream on"); }
   else if (!strcmp(ln, "stream off"))                 { g_stream = false; Serial.println("[OK] stream off"); }
-  else if (!strcmp(ln, "reboot"))                     { Serial.println("[OK] rebooting"); Serial.flush(); delay(120); esp_restart(); }
-  else if (!strcmp(ln, "download"))                   { // reboot into ROM download mode so esptool can reflash over USB with no BOOT button
-    Serial.println("[OK] entering download mode - reflash now (esptool write-flash)"); Serial.flush(); delay(120);
-#ifdef RTC_CNTL_OPTION1_REG
-    REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
-#endif
-    esp_restart();
+  else if (!strcmp(ln, "inject on") || !strcmp(ln, "arm"))    { g_inject_armed = true;  Serial.println("[WARN] INJECTION ARMED - next 'force' DRIVES the bus (ATT&CK ICS T0855). CONTROL mode, one shot."); }
+  else if (!strcmp(ln, "inject off") || !strcmp(ln, "disarm")){ g_inject_armed = false; Serial.println("[OK] injection disarmed"); }
+  else if (!strncmp(ln, "force ", 6)) {               // text form: force <addr> <reg> <val> (hex 0x.. or dec) — confirm-gated
+    char* end; unsigned long a = strtoul(ln + 6, &end, 0);
+    unsigned long r = strtoul(end, &end, 0);
+    unsigned long v = strtoul(end, &end, 0);
+    if (g_mode != MODE_CONTROL)  Serial.println("[ERR] force: CONTROL mode only (send 'mode control')");
+    else if (!g_inject_armed)    Serial.println("[ERR] force: not armed (send 'inject on' first)");
+    else {
+      g_pf_addr = (uint8_t)a; g_pf_reg = (uint8_t)r; g_pf_val = (uint8_t)v; g_pending = PEND_FORCE;
+      Serial.printf("[CONFIRM] force 0x%02X -> reg 0x%02X @0x%02X will DRIVE the bus (ATT&CK ICS T0855). Type 'confirm' to proceed, anything else cancels.\n",
+                    (unsigned)v, (unsigned)r, (unsigned)a);
+    }
   }
+  else if (!strcmp(ln, "reboot"))                     { g_pending = PEND_REBOOT;   Serial.println("[CONFIRM] reboot the analyzer? Type 'confirm' to proceed, anything else cancels."); }
+  else if (!strcmp(ln, "download"))                   { g_pending = PEND_DOWNLOAD; Serial.println("[CONFIRM] enter ROM download mode (reboots to reflash)? Type 'confirm' to proceed, anything else cancels."); }
   else Serial.printf("[ERR] unknown '%s' (type help)\n", ln);
 }
 static void handle_serial() {
@@ -262,29 +500,20 @@ static void handle_serial() {
   }
 }
 
-static void handle_keys() {
-  if (!M5Cardputer.Keyboard.isChange() || !M5Cardputer.Keyboard.isPressed()) return;
-  auto st = M5Cardputer.Keyboard.keysState();
-  for (char c : st.word) {
-    switch (c) {
-      case 'm': case 'M': g_mode = (g_mode == MODE_CONTROL) ? MODE_SENSOR : MODE_CONTROL; break;
-      case 'p': case 'P': g_paused = !g_paused; break;
-      case 'c': case 'C': g_txn_head = 0; g_txn_count = 0; g_drops = 0; a_active = false; break;
-      case 'e': case 'E': export_json(); break;
-      default: break;
-    }
-  }
-}
+// (The Cardputer keyboard is intentionally NOT polled — all control is over the USB console.
+//  The key handler was removed to fix a boot crash; mode/pause/clear/export are typed commands.)
 
 void setup() {
   auto cfg = M5.config();
   M5Cardputer.begin(cfg);
   M5Cardputer.Display.setRotation(1);
   M5Cardputer.Display.fillScreen(TFT_BLACK);
-  g_cv.createSprite(M5Cardputer.Display.width(), M5Cardputer.Display.height());
+  // no sprite (direct draw)
   Serial.begin(115200);
   Serial.println();
-  Serial.println("[BUSVIEW] StamPLC Bus Viewer v2 ready - USB serial control; type 'help'");
+  Serial.println("[BUSVIEW] StamPLC Bus Viewer v3 ready - USB serial control; type 'help'");
+  cfg_load();   // restore USB-configured capture rate / samples / mode from NVS (defaults on first boot)
+  print_id();   // emit identity at boot so a listener/the web app can confirm the analyzer without probing
 
   // passive high-impedance tap — INPUT only, never drive the bus
   gpio_set_direction(PIN_SDA, GPIO_MODE_INPUT);
@@ -293,12 +522,17 @@ void setup() {
   pinMode((int)PIN_SCL, INPUT);
   attachInterrupt(digitalPinToInterrupt((int)PIN_SCL), sclISR, RISING);
   attachInterrupt(digitalPinToInterrupt((int)PIN_SDA), sdaISR, CHANGE);
+  draw();   // first paint from setup() — display is initialized here (like the controller)
 }
 
 void loop() {
-  // drain the ISR ring and decode
+  // drain the ISR ring and decode. BOUNDED per iteration: on an active/noisy bus the
+  // edge ISRs advance g_head as fast as we drain, so an unbounded while() never returns
+  // and loop() would never reach handle_serial()/draw()/USB service —
+  // dead console + frozen screen with no crash. Budget guarantees the loop always breathes.
   if (!g_paused) {
-    while (g_tail != g_head) {
+    int budget = 1024;
+    while (g_tail != g_head && budget-- > 0) {
       Ev e = g_ring[g_tail];
       g_tail = (g_tail + 1) & (RING - 1);
       switch (e.type) {
@@ -321,9 +555,13 @@ void loop() {
     }
   }
   last_streamed = g_txn_count;
-  M5Cardputer.update();
-  handle_keys();
-  handle_serial();
+  handle_serial();   // USB console only (mode/pause/clear/export); no keyboard/update — matches the known-good controller
   uint32_t now = millis();
-  if (now - g_last_draw >= 100) { g_last_draw = now; draw(); }  // ~10 fps
+  // direct-draw (no double-buffer): redraw only when something changed, so the screen is steady
+  static uint32_t lN = 0xFFFFFFFF; static int lM = -1; static bool lP = false, lA = false; static uint32_t lD = 0;
+  if (now - g_last_draw >= 100) {
+    if (g_txn_count != lN || (int)g_mode != lM || g_paused != lP || g_inject_armed != lA || g_drops != lD) {
+      g_last_draw = now; lN = g_txn_count; lM = g_mode; lP = g_paused; lA = g_inject_armed; lD = g_drops; draw();
+    }
+  }
 }

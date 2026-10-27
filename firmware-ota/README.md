@@ -100,7 +100,7 @@ every weakness class you can justify **from what you observed in this exchange**
 CWE-22 (path traversal) is **not** established by this upload — the OTA log path is built
 from the client's numeric IP, which can't contain `../`. The weakness lives elsewhere: the
 HMI **log viewer** builds a file path straight from your input with no sanitization
-(`web_hmi.cpp`: `filepath = "/logs/" + file`; `LOG_VIEWER_PATH_SANITIZE 0`). You can read it
+(`config.h`: `#define LOG_VIEWER_PATH_SANITIZE 0`; `web_hmi.cpp`: `filepath = String(LOG_DIR) + "/" + filename`). You can read it
 in the source, and watch the device accept an un-sanitized traversal path:
 
 ```bash
