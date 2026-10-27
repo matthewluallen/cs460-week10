@@ -6,8 +6,11 @@ CVE?" You'll generate SBOMs in two standard formats, compare them, scan one for
 vulnerabilities, and — the honest part — see where an SBOM's view stops.
 
 Tools (installed for you): **syft** (generates SBOMs), **grype** (scans an SBOM for
-CVEs), **trivy** (does both), and **cve-bin-tool** (scans a *compiled binary* for
-embedded components + CVEs — Exercise 3).
+CVEs), **cve-bin-tool** (scans a *compiled binary* for embedded components + CVEs —
+Exercise 3), and **flawfinder** + **cppcheck** (source-code SAST — Exercise 4). **trivy**
+(does SBOM + scan in one) is installed when available as an optional second opinion.
+The point of using several is that each has a *different blind spot* — that contrast is
+the lesson, not any one tool's output.
 
 ---
 
@@ -72,9 +75,14 @@ Try scanning the firmware source itself:
 syft dir:firmware        # what does it find?
 ```
 
-You'll get **almost nothing** — a `platformio.ini` of C/C++ library pins is not a
-package ecosystem the scanner catalogs, and there's no compiled tree here. That's the
-real-world catch:
+Look hard at what comes back — this is the trap. On a **clean** `firmware/` you get
+**almost nothing**, because a `platformio.ini` of C/C++ library pins is not a package
+ecosystem syft catalogs. But if you've **built** it (so `firmware/.pio/` exists), syft
+cheerfully reports **dozens of "components" — all GitHub Actions** like `actions/checkout`.
+Those aren't the firmware: they're the **CI workflows of the vendored libraries** PlatformIO
+downloaded into `.pio/libdeps/`. The scanner found a layer it *can* parse (workflow YAML) and
+confidently listed the wrong thing. Neither view is the device's real dependency set. That's
+the real-world catch:
 
 - **Build-host / toolchain SBOM** (what Exercise 2 scans) finds plenty and is where
   supply-chain attacks like *XZ* and *SolarWinds* live — but those components don't all
@@ -130,6 +138,47 @@ present, and state the lesson in one sentence: **absent from the scan is not abs
 device.** Then take one component you know is in the firmware (from Exercise 1), look its version
 up in the NVD yourself, and say whether a fix would be a firmware rebuild or an architecture
 control (detected ≠ exploitable — and *not*-detected ≠ *not*-present).
+
+## Exercise 4 — scan the *source code* (SAST), and watch it miss the point
+
+Exercises 1–3 asked **"which *components* carry known CVEs?"** (SBOM + CVE matching). A different
+tool class — **SAST** (static application security testing) — asks **"which *code patterns* are
+weak?"** Run two on the firmware source (installed for you):
+
+```bash
+flawfinder --minlevel=2 sbom/firmware/src          # CWE-tagged risky C/C++ calls
+cppcheck  --enable=all --inconclusive --suppress=missingIncludeSystem sbom/firmware/src
+```
+
+On this firmware you'll get a **flood** — roughly **330 flawfinder hits** (almost all `CWE-120`/
+`CWE-119` buffer calls, plus `CWE-134` format, `CWE-190` integer, `CWE-362` race) and **~150
+cppcheck findings** (`cstyleCast`, `functionStatic`, uninitialized members, style). Nearly **500
+findings between them.**
+
+Now the point: **not one of them is the vulnerability this lab is about.** SAST finds *code-pattern*
+weaknesses (memory safety, format strings, style). It does **not** find the firmware's actual
+security story — which is **missing-control / architectural** weaknesses:
+
+| The lab's real CWE | Where it lives | Found by |
+|---|---|---|
+| `CWE-798` default/hardcoded creds | `serial_config.h` — `cfg_pass` defaults to `openplc`, unchanged in the field | reading the code |
+| `CWE-306/319` no-auth, cleartext Modbus/HTTP | `modbus_tcp_server.cpp`, `eth_http.cpp` | design review + the analyzer capture |
+| `CWE-494` unsigned/unauth OTA | `eth_ota.cpp`, `ota_handler.cpp` | design review + the twin's `/api/upload` |
+| `CWE-78` command injection | `vulnerabilities.cpp` — shell metacharacters reach a command | reading the code |
+| `CWE-330` weak PRNG token | `vulnerabilities.cpp` — an LCG with `esp_random()` commented out | reading the code |
+
+A quick way to see the gap yourself:
+
+```bash
+grep -rinE 'password|secret|token *=' sbom/firmware/src      # CWE-798/330 — SAST flagged none of these
+grep -rinE 'EthernetServer|WebServer|http://|Modbus'  sbom/firmware/src   # CWE-306/319
+```
+
+**Finding to keep:** report the SAST totals (≈330 + ≈150) and then state plainly that the lab's
+headline CWEs appear in **none** of them. SAST answers a real but *different* question; architectural
+and missing-control weaknesses need **design review plus runtime evidence** — which is exactly what
+the analyzer and the QEMU twin provide in the next section. (This is why no single scanner "passes"
+a device: composition, CVE, binary, and SAST each have a different blind spot.)
 
 ## The connection:  analyzer ↔ SBOM ↔ CWE ↔ CVE
 

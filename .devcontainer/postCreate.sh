@@ -14,7 +14,13 @@ echo "==> Installing SBOM / vulnerability tools (syft, grype, trivy)…"
 # see sbom/README.md for the direct-download fallback.
 curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh  | sudo sh -s -- -b "$BIN" "$SYFT_VERSION"  || echo "   (syft install skipped — see sbom/README.md)"
 curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b "$BIN" "$GRYPE_VERSION" || echo "   (grype install skipped — see sbom/README.md)"
-curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b "$BIN" "$TRIVY_VERSION" || echo "   (trivy install skipped — see sbom/README.md)"
+# trivy is an OPTIONAL second scanner (Exercise 2 works with syft+grype alone). Try the
+# official install.sh, then fall back to the release tarball, then give up quietly.
+curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b "$BIN" "$TRIVY_VERSION" 2>/dev/null \
+  || { case "$(uname -m)" in aarch64|arm64) TA=Linux-ARM64;; *) TA=Linux-64bit;; esac; \
+       curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${TRIVY_VERSION#v}_${TA}.tar.gz" -o /tmp/trivy.tgz 2>/dev/null \
+       && sudo tar -xzf /tmp/trivy.tgz -C "$BIN" trivy 2>/dev/null && echo "   trivy installed (tarball fallback)"; } \
+  || echo "   (trivy optional — skipped; syft+grype cover Exercise 2)"
 
 echo "==> Installing cve-bin-tool (binary CVE scanner — Part 2 Exercise 3) + gsutil (for the CVE mirror)…"
 # cve-bin-tool fingerprints a compiled .bin for component versions. pipx keeps it isolated; fall
@@ -26,6 +32,13 @@ pipx install cve-bin-tool >/dev/null 2>&1 \
   || echo "   (cve-bin-tool install skipped — see sbom/README.md Exercise 3)"
 pip3 install --quiet gsutil 2>/dev/null || pip3 install --quiet --break-system-packages gsutil 2>/dev/null \
   || echo "   (gsutil install skipped — Exercise 3 notes the fallback)"
+
+echo "==> Installing SAST tools for Part 2 Exercise 4 (flawfinder; cppcheck came via apt above)…"
+# flawfinder = CWE-tagged risky-C/C++ pattern scanner. cppcheck (apt, above) = bug/style SAST.
+# Exercise 4 runs both to show SAST finds code-pattern weaknesses but MISSES the firmware's
+# architectural CWEs (no-auth / cleartext / unsigned-OTA / default creds). Non-fatal.
+pip3 install --quiet flawfinder 2>/dev/null || pip3 install --quiet --break-system-packages flawfinder 2>/dev/null \
+  || echo "   (flawfinder install skipped — see sbom/README.md Exercise 4)"
 
 # Pre-cache the mirror CVE data so the first Exercise-3 scan is quick. json-mirror = cve-bin-tool's
 # public CVE snapshot (no NVD key, no NVD API). GAD (GitLab advisories) is disabled: its multi-doc
@@ -42,7 +55,7 @@ fi
 
 echo "==> Installing bus & firmware tooling (sigrok decoder, pymodbus, nc)…"
 sudo apt-get update -qq || true
-sudo apt-get install -y -qq sigrok-cli xz-utils netcat-openbsd >/dev/null 2>&1 \
+sudo apt-get install -y -qq sigrok-cli xz-utils netcat-openbsd cppcheck >/dev/null 2>&1 \
   || echo "   (some apt packages skipped — Parts 1/6 note fallbacks)"
 pip3 install --quiet --break-system-packages pymodbus 2>/dev/null \
   || pip3 install --quiet pymodbus 2>/dev/null \
@@ -90,6 +103,7 @@ echo "============================================================"
 echo " CS460 Week 10 lab ready."
 echo "   syft:  $(command -v syft  >/dev/null && echo installed || echo 'not installed')    grype: $(command -v grype >/dev/null && echo installed || echo 'not installed')"
 echo "   sigrok:$(command -v sigrok-cli >/dev/null && echo ' installed' || echo ' not installed')  node: $(node --version)   python: $(python3 --version)"
+echo "   cve-bin-tool:$(command -v cve-bin-tool >/dev/null && echo ' installed' || echo ' not installed')  flawfinder:$(command -v flawfinder >/dev/null && echo ' installed' || echo ' not installed')  cppcheck:$(command -v cppcheck >/dev/null && echo ' installed' || echo ' not installed')  trivy:$(command -v trivy >/dev/null && echo ' installed' || echo ' optional/absent')"
 echo "   pio:   $PIOST"
 echo "   twin:  $TWIN"
 echo
