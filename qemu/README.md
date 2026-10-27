@@ -11,6 +11,14 @@ vulnerable Modbus / HMI / OTA services you'd meet on the bench — entirely in s
 ./qemu/console.sh           # the plc> console   (quit: Ctrl-C)
 ```
 
+> **On an Apple-Silicon Mac?** There's no native-macOS twin — the patched QEMU is built
+> for Linux only (the release ships `qemu-twin-linux-x86_64` and `-linux-arm64`; stock
+> Homebrew `qemu-system-xtensa` can't model the StampLC's I²C / LCD / W5500, so it stalls
+> at boot). Run the twin in a **Codespace**, or open this repo in a **local VS Code Dev
+> Container** (*Dev Containers: Reopen in Container*) — that's Linux arm64, so
+> `fetch-qemu.sh` pulls the matching `qemu-twin-linux-arm64` build and everything works.
+> (`run.sh`/`fetch-qemu.sh` stop with this message if you run them straight on macOS.)
+
 ## Helper scripts (short to type, annotated inside)
 
 Every long or fiddly command in Parts 6–7 has a small wrapper. You never have to

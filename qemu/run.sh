@@ -24,7 +24,7 @@ OS=$(uname -s); ARCH=$(uname -m)
 case "$OS/$ARCH" in
   Linux/x86_64)  BDIR="$HERE/twin/qemu-twin-linux-x86_64" ;;
   Linux/aarch64) BDIR="$HERE/twin/qemu-twin-linux-arm64" ;;   # local Dev Container on Apple Silicon
-  Darwin/arm64)  BDIR="$HERE/twin/qemu-twin-macos-arm64" ;;
+  Darwin/arm64)  echo "No native macOS twin — run the twin in a Codespace or a local Linux/arm64 Dev Container (see qemu/README.md)." >&2; exit 2 ;;
   *) echo "Unsupported platform $OS/$ARCH — build from source (see ../docs/QEMU-Twin.md)."; exit 1 ;;
 esac
 IMG="${FLASH_IMG:-$HERE/twin/stamplc-flash-8MB.bin}"

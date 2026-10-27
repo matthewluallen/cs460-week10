@@ -4,7 +4,7 @@ Parts 6–7 showed an attacker who *replaces* the firmware. This part needs no f
 at all. The device asks the network "what time is it?", **trusts the answer with no
 authentication**, and stores that time in a **signed 32-bit field**. An adversary on the
 time path answers with a date past **2038-01-19 03:14:07 UTC**, the 32-bit value wraps,
-and the controller's clock jumps to **1901** — and the audit trail that says *who did
+and the controller's clock jumps to **1902** — and the audit trail that says *who did
 what, when* is now dated to the Taft administration.
 
 The protocol is the attack surface — the same thesis as the unauthenticated-Modbus write
@@ -67,7 +67,7 @@ authenticated the server — `ntpsync` accepted the first reply that arrived.
 
 ---
 
-## Exercise 2 — the on-path attack: step the clock to 1901
+## Exercise 2 — the on-path attack: step the clock to 1902
 
 Real devices don't sync once; they keep asking. Turn that on, then play the attacker.
 
@@ -156,7 +156,7 @@ grep -n "int32_t s_epoch32\|(int32_t)unix64\|settimeofday" sbom/firmware/src/tim
 The weakness is one cast: the 64-bit network time is stored as `(int32_t)` (`time_sync.cpp`).
 The runtime `WRAPPED` is its consequence. Note what is **not** corrupted: the
 source-attributed **audit log** still timestamps with `millis()` (a *monotonic* uptime
-counter), so it never shows 1901 — which is exactly the fix you'll recommend below.
+counter), so it never shows 1902 — which is exactly the fix you'll recommend below.
 
 | Observed in this attack | CWE |
 |---|---|

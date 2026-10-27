@@ -13,7 +13,7 @@ What it asserts:
                172.30.0.10:1123 (dind bridge is routable from the host netns)
   B. boot      the twin reaches the `plc>` console
   C. benign    `ntpsync 172.30.0.10 1123` -> clk shows a current, un-truncated date
-  D. detonate  arm the container, re-sync -> clk WRAPS past 2038 to ~1901
+  D. detonate  arm the container, re-sync -> clk WRAPS past 2038 to ~1902
 
 Prereqs (the wrapper attacker/codespace-e2e.sh does these first):
   - the twin fetched           ./qemu/fetch-qemu.sh
@@ -158,7 +158,7 @@ def main():
               f"container now serves unix={armed}")
         cmd(sock, f"ntpsync {ATTACKER} {NTP_PORT}", 6)
         cw = cmd(sock, "clk", 1.5)
-        check("detonate.y2038_wrap", "WRAPPED" in cw, "twin clk wraps to ~1901 after the container spoof")
+        check("detonate.y2038_wrap", "WRAPPED" in cw, "twin clk wraps to ~1902 after the container spoof")
     finally:
         # leave the container benign for the next run
         subprocess.run(["bash", os.path.join(ROOT, "attacker", "benign.sh")],

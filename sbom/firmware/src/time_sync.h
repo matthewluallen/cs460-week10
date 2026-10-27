@@ -5,7 +5,7 @@
 //   * and stores the wall-clock in a signed 32-bit field (CWE-197 / Y2038),
 // so an on-path attacker who answers the time query can step the controller's
 // clock - or push it past 2038-01-19 03:14:07 UTC so the 32-bit field wraps and
-// the `clk` readout (and any wall-clock-derived field) reads 1901. The adverse
+// the `clk` readout (and any wall-clock-derived field) reads 1902. The adverse
 // effect is observable, not dangerous; see docs for which records show the wrap.
 //
 // THREADING: every W5500 socket operation runs on the communications core

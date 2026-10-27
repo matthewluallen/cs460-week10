@@ -15,7 +15,7 @@ static const uint32_t NTP_UNIX_DELTA = 2208988800UL;   // 1900-01-01 -> 1970-01-
 // THE INTENTIONAL WEAKNESS (teaching build): kept in a *signed 32-bit* field. A
 // correct controller uses 64-bit time_t; this truncates the network-supplied time
 // (CWE-197), so any value past 2038-01-19 03:14:07 UTC wraps negative and the clock
-// reads 1901. The secure build (#else) stores the full 64-bit epoch and never wraps.
+// reads 1902. The secure build (#else) stores the full 64-bit epoch and never wraps.
 #ifdef ENABLE_CWE_DEMOS
 static int32_t  s_epoch32     = 0;
 #else

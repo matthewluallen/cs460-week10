@@ -52,5 +52,12 @@ the bus — the ladder editor and the bus analyzer are two halves of one picture
 here is optional and offline; your change reaches your team's PLC in **Part 5** through the
 class front end, not over USB.
 
+**Output syntax — `Relay[n]` vs `COIL[n]`.** The two sample programs use two spellings:
+`passthrough.st` writes `Relay[0]`, `latch_with_estop.st` writes `COIL[0]`/`COIL[1]` (the
+OpenPLC/Modbus-coil form). Both address the **same physical relay n** — Modbus coils 0–3 map
+to relays 0–3. For your change, keep the style of the program you're editing. (These raw
+indices are distinct from Logic Studio's *named* points like `motor` or `estop`, which carry
+their own catalog addresses — a symbol name is not the relay's address.)
+
 Keep your finding small: which change you made, what you **predicted**, what the device
 **did**, and whether they matched.

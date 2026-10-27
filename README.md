@@ -32,7 +32,7 @@ QEMU firmware twin for Parts 6–7 — built for x86-64 (Codespaces) or arm64 (l
 | 5 | **Wire & run** — one input → your logic → one output, on a real StampLC, driven remotely | [`wiring/`](wiring/) | Yes (remote) |
 | 6 | **Firmware & the unsigned update** — boot the *real* firmware in the twin; find and prove an unsigned-OTA weakness | [`firmware-ota/`](firmware-ota/) | No (twin) |
 | 7 | **Supply-chain kill switch** — detonate a dormant OTA payload through a compromised update source; trace it to a relay | [`supply-chain/`](supply-chain/) | No (twin) |
-| 8 | **NTP adversary-in-the-middle & Y2038** — spoof the unauthenticated network time the controller trusts; wrap its 32-bit clock to 1901 | [`ntp-aitm/`](ntp-aitm/) | No (twin) |
+| 8 | **NTP adversary-in-the-middle & Y2038** — spoof the unauthenticated network time the controller trusts; wrap its 32-bit clock to 1902 | [`ntp-aitm/`](ntp-aitm/) | No (twin) |
 | 9 | **Remediation — the secure build** — flip one compile switch (`-e m5stamplc_secure`); verify each CWE from Parts 6–8 is actually fixed, and which need an architecture, not a patch | [`remediation/`](remediation/) | No (twin) |
 
 Work the parts in order; each builds on the last. Part 5 uses the class **front end**

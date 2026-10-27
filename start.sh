@@ -9,7 +9,7 @@ CS460 Week 10 — StampLC: SBOM/HBOM + Bus & Firmware Analysis
   Part 5  wiring/         drive a real StampLC from the class front end  (remote)
   Part 6  firmware-ota/   boot the twin; find the unsigned-OTA bug       (twin)
   Part 7  supply-chain/   detonate a dormant OTA kill switch             (twin)
-  Part 8  ntp-aitm/       spoof network time; wrap the clock to 1901     (twin)
+  Part 8  ntp-aitm/       spoof network time; wrap the clock to 1902     (twin)
   Part 9  remediation/    flip the secure build; watch the attacks fail  (twin)
 
 Helper scripts (Parts 6-9): short to type, annotated inside, and they print the

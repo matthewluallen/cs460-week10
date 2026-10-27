@@ -38,7 +38,8 @@ the lab network.
 - **Input (remote):** no wiring — the front end's **Trigger** uses the firmware `force`
   command to assert/clear DI 0 directly in the I/O image. (This is why we dropped the earlier
   "add an AtomS3 to drive the input" idea: `force` needs no second device, no loop‑voltage
-  supply, and no power for a remote student.)
+  supply, and no power for a remote student. This dropped DI‑driver idea is unrelated to the
+  separate Atom I²C *sensor spoofer* rig used in the bench demos.)
 
 > **Relay names.** The four relays are **relay0–relay3**. Names like `motor` or `light_green`
 > are *labels you can give a relay inside a PLC program* — they aren't the relay's name. Part 4

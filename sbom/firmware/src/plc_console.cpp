@@ -334,7 +334,7 @@ static void cmd_cwe() {
     Serial.println("  CWE-200 MAC exposed in banners (enables service-pw derivation)");
     Serial.println("  CWE-197 32-bit wall-clock truncation (Y2038)  CWE-306/345 unauth+unverified SNTP time (AiTM)");
     Serial.println("  try: 'svcinfo', then 'login service SRV-...', 'login operator 1234', 'passwd ...'");
-    Serial.println("  try: 'clk', then 'ntpsync <ip>' - an on-path time server can step this clock to 1901");
+    Serial.println("  try: 'clk', then 'ntpsync <ip>' - an on-path time server can step this clock to 1902");
     Serial.println("  ports: Modbus 502, HMI 8080, telnet 23, OTA 80, SNTP 123 (client/outbound)");
 }
 
