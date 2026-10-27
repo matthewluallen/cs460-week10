@@ -24,6 +24,21 @@ pipx install cve-bin-tool >/dev/null 2>&1 \
   || pip3 install --quiet cve-bin-tool 2>/dev/null \
   || echo "   (cve-bin-tool install skipped — see sbom/README.md Exercise 3)"
 
+# Optional: pre-cache the NVD CVE database so the first Exercise-3 scan returns immediately.
+# The NVD feed is rate-limited without a key, so we only do this when the (free) key is present
+# as the Codespaces secret NVD_API_KEY. Without it we skip — the offline 'strings' proof still works.
+# Get a key at https://nvd.nist.gov/developers/request-an-api-key  (Settings > Codespaces secrets).
+if command -v cve-bin-tool >/dev/null 2>&1 && [ -n "${NVD_API_KEY:-}" ]; then
+  echo "==> Pre-caching the CVE database + warming the Exercise-3 scan (NVD_API_KEY present)…"
+  FW=sbom/firmware/prebuilt/stamplc-factory-8MB.bin
+  mkdir -p sbom/out
+  { [ -f "$FW" ] && cve-bin-tool "$FW" --nvd-api-key "$NVD_API_KEY" -f html -o sbom/out/cve-bin-tool-firmware.html >/dev/null 2>&1 \
+      && echo "   CVE database cached; report pre-generated at sbom/out/cve-bin-tool-firmware.html"; } \
+    || echo "   (CVE-DB pre-cache skipped — run 'bash sbom/run_cve_bin_tool.sh' later)"
+else
+  echo "==> CVE database not pre-cached (no NVD_API_KEY) — first Exercise-3 scan builds it; add the key to speed it up."
+fi
+
 echo "==> Installing bus & firmware tooling (sigrok decoder, pymodbus, nc)…"
 sudo apt-get update -qq || true
 sudo apt-get install -y -qq sigrok-cli xz-utils netcat-openbsd >/dev/null 2>&1 \

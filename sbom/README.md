@@ -100,6 +100,13 @@ bash sbom/run_cve_bin_tool.sh        # scans firmware/prebuilt/stamplc-factory-8
 (The first scan downloads the CVE database — a few minutes, then cached. It needs network,
 so run it in your Codespace / dev container, not an offline box.)
 
+> **Make the database fast (recommended).** Without a key the first NVD download is slow and
+> rate-limited — it can stall near 0%. Get a free key at
+> <https://nvd.nist.gov/developers/request-an-api-key>, then either `export NVD_API_KEY=<key>`
+> before running the script, or — in Codespaces — add it under **Settings → Codespaces → Secrets**
+> as `NVD_API_KEY`. The dev container then pre-caches the database on build, so your first scan
+> returns immediately. (`run_cve_bin_tool.sh` picks the key up automatically when it's set.)
+
 Even with no network, you can confirm the components are really in there:
 
 ```bash

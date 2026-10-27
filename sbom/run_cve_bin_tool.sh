@@ -33,9 +33,18 @@ fi
 
 echo "== Scanning with cve-bin-tool (first run downloads the CVE DB — be patient) =="
 # -f html writes a readable report; console output shows the table too.
-# Add  --nvd-api-key <key>  to speed the database up if you have one.
-cve-bin-tool "$BIN" -f html -o out/cve-bin-tool-firmware.html || \
-  echo "   (scan did not complete — most often the CVE-DB download needs open network; retry in a Codespace)"
+# An NVD API key makes the CVE-DB download ~10x faster and avoids rate-limit stalls.
+NVD_ARGS=""
+if [ -n "${NVD_API_KEY:-}" ]; then
+  NVD_ARGS="--nvd-api-key ${NVD_API_KEY}"
+  echo "   (NVD_API_KEY detected — fast database path)"
+else
+  echo "   NOTE: no NVD_API_KEY set — the FIRST database build is slow and rate-limited."
+  echo "         Free key: https://nvd.nist.gov/developers/request-an-api-key"
+  echo "         then 'export NVD_API_KEY=<key>' (or add it as a Codespaces secret; see sbom/README.md Ex.3)."
+fi
+cve-bin-tool "$BIN" $NVD_ARGS -f html -o out/cve-bin-tool-firmware.html || \
+  echo "   (scan did not complete — the CVE-DB download needs open network and, realistically, an NVD_API_KEY; see sbom/README.md)"
 
 echo
 echo "Done. Open out/cve-bin-tool-firmware.html."
