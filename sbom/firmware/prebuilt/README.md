@@ -7,7 +7,7 @@ firmware on a device — **no toolchain, no build**. (To modify + rebuild instea
 
 | File | What it is |
 |---|---|
-| `stamplc-factory-8MB.bin` | **One-file image** — flash to offset `0x0` (bootloader + partitions + boot_app0 + app merged). Easiest. |
+| `stamplc-factory-8MB.bin` | **One-file image** — flash to offset `0x0` (bootloader + partitions + boot_app0 + app merged). Easiest. The file is ~1.7 MB; "8MB" is the **target flash size**, not the file length. The QEMU twin's release asset `stamplc-flash-8MB.bin` is **this exact image padded to a full 8 MB with 0xFF** (verified byte-identical prefix) — same firmware, two packagings; `qemu/smoke-test.py` pads this file the same way at runtime. |
 | `firmware.bin` | App only (offset `0x10000`) |
 | `bootloader.bin` / `partitions.bin` / `boot_app0.bin` | The other parts (`0x0` / `0x8000` / `0xe000`) |
 | `SHA256SUMS.txt` | Integrity — `sha256sum -c SHA256SUMS.txt` |
