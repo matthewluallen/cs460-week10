@@ -6,13 +6,18 @@
 //
 // Where you clip the two Grove signal lines decides what you see:
 //   * StamPLC PORT.A (plug straight in) -> the sensor I2C bus (BME688 0x77)  [MODE: SENSOR]
-//   * internal control bus via a Grove->breadboard adapter to the bottom
+//   * internal control bus via Grove->pin (Dupont) leads to the bottom
 //     expansion header: SDA=GPIO13, SCL=GPIO15, + common GND -> relays/DI    [MODE: CONTROL]
 //     (0x59 AW9523 relays+opto-DI, 0x43 PI4IOE buttons, 0x40/0x48/0x32 sensors)
 //
 // It is a PASSIVE tap by default: the two pins are INPUT only, never driven, so it
 // cannot disturb the bus. Send 'export' over USB serial to dump captured transactions as JSON
 // (115200) to feed i2c-analyzer.html / parity_test.py.
+//
+// USB-DISCONNECT TOLERANT: the analyzer never depends on a host staying attached. A bounded
+// serial TX timeout means a closed or stalled port can never wedge the capture loop (export
+// and #CAP included); a client dropping and another opening the port is handled cleanly, with
+// a fresh banner + id + state on every reconnect. Say 'bye' to end a session before closing it.
 //
 // ACTIVE INJECTION (teaching demo, OFF by default): when explicitly armed ('inject on',
 // CONTROL mode), the 'force <addr> <reg> <val>' command drives the tap pins for ONE I2C
@@ -144,6 +149,16 @@ static uint32_t g_nsamp = 50000;    // #CAP default sample count ('samples <n>')
 enum Pending { PEND_NONE = 0, PEND_FORCE, PEND_REBOOT, PEND_DOWNLOAD };
 static Pending g_pending = PEND_NONE;
 static uint8_t g_pf_addr = 0x59, g_pf_reg = 0x02, g_pf_val = 0x01;  // stashed 'force' args awaiting confirm
+
+// ---- USB-CDC connection lifecycle (disconnect-tolerant) ----
+// g_usb_up tracks whether a host has the port open, derived from the CDC connected flag AND
+// recent RX, so it stays correct even where (bool)Serial is flaky on the USB-Serial/JTAG path:
+// a client that is sending commands is, by definition, connected.
+static bool     g_usb_up = false;
+static uint32_t g_last_rx = 0;            // millis() of the last byte received over USB
+static uint32_t g_last_streamed = 0;      // 'stream' baseline, resynced on connect / clear
+static const uint32_t RX_GRACE_MS = 3000;
+static inline bool usb_present() { return (bool)Serial || (g_last_rx != 0 && (millis() - g_last_rx) < RX_GRACE_MS); }
 
 static const Dev* dev_table(int& count) {
   if (g_mode == MODE_SENSOR) { count = sizeof(SENSOR_DEVS)/sizeof(Dev); return SENSOR_DEVS; }
@@ -346,7 +361,7 @@ static void record_injected(uint8_t addr, uint8_t reg, uint8_t val) {
   g_txn_count++;
 }
 static void force_write(uint8_t addr, uint8_t reg, uint8_t val) {
-  if (g_mode != MODE_CONTROL) { Serial.println("[ERR] force: CONTROL mode only (send 'mode control' / press M)"); return; }
+  if (g_mode != MODE_CONTROL) { Serial.println("[ERR] force: CONTROL mode only (send 'mode control')"); return; }
   if (!g_inject_armed)        { Serial.println("[ERR] force: not armed (send 'inject on' first)"); return; }
   Serial.printf("[FORCE] *** ACTIVE INJECTION (T0855) *** writing 0x%02X -> reg 0x%02X @0x%02X\n",
                 (unsigned)val, (unsigned)reg, (unsigned)addr);
@@ -400,7 +415,7 @@ static void print_id() {
                 m[0], m[1], m[2], m[3], m[4], m[5]);
 }
 static void bv_help() {
-  Serial.println("[HELP] help | id | ver | stats | export | cap | {arm json} | mode sensor|control | pause | resume | clear | stream on|off | reboot | download");
+  Serial.println("[HELP] help | id | ver | stats | export | cap | {arm json} | mode sensor|control | pause | resume | clear | stream on|off | bye | reboot | download");
   Serial.println("[HELP] CONFIG (USB, persisted in NVS): rate <hz> | samples <n> | settings   (reboot/download/force need a 'confirm' line)");
   Serial.println("[HELP] INJECT (T0855 demo, CONTROL+armed): inject on|off | force <addr> <reg> <val> | {\"cmd\":\"force\",\"addr\":89,\"reg\":2,\"val\":1}");
 }
@@ -464,14 +479,19 @@ static void bv_exec(const char* ln) {
   else if (!strcmp(ln, "export") || !strcmp(ln, "e")) export_json();
   else if (!strcmp(ln, "pause"))                      { g_paused = true;  Serial.println("[OK] paused"); }
   else if (!strcmp(ln, "resume"))                     { g_paused = false; Serial.println("[OK] resumed"); }
-  else if (!strcmp(ln, "clear") || !strcmp(ln, "c"))  { g_txn_head = 0; g_txn_count = 0; g_drops = 0; a_active = false; Serial.println("[OK] cleared"); }
+  else if (!strcmp(ln, "clear") || !strcmp(ln, "c"))  { g_txn_head = 0; g_txn_count = 0; g_drops = 0; a_active = false; g_last_streamed = 0; Serial.println("[OK] cleared"); }
   else if (!strcmp(ln, "mode sensor"))                { g_mode = MODE_SENSOR;  cfg_save(); Serial.println("[OK] mode SENSOR (saved)"); }
   else if (!strcmp(ln, "mode control"))               { g_mode = MODE_CONTROL; cfg_save(); Serial.println("[OK] mode CONTROL (saved)"); }
   else if (!strncmp(ln, "rate ", 5))                  { uint32_t hz = (uint32_t)strtoul(ln + 5, nullptr, 0); if (hz < 500000) hz = 500000; if (hz > 20000000) hz = 20000000; g_rate = hz; cfg_save(); Serial.printf("[OK] capture rate=%u Hz (saved to NVS)\n", (unsigned)g_rate); }
   else if (!strncmp(ln, "samples ", 8))               { uint32_t n = (uint32_t)strtoul(ln + 8, nullptr, 0); if (n < 16) n = 16; if (n > CAP_MAXN) n = CAP_MAXN; g_nsamp = n; cfg_save(); Serial.printf("[OK] capture samples=%u (saved to NVS)\n", (unsigned)g_nsamp); }
   else if (!strcmp(ln, "settings") || !strcmp(ln, "cfg")) bv_settings();
-  else if (!strcmp(ln, "stream on"))                  { g_stream = true;  Serial.println("[OK] stream on"); }
+  else if (!strcmp(ln, "stream on"))                  { g_stream = true;  g_last_streamed = g_txn_count; Serial.println("[OK] stream on"); }
   else if (!strcmp(ln, "stream off"))                 { g_stream = false; Serial.println("[OK] stream off"); }
+  else if (!strcmp(ln, "bye") || !strcmp(ln, "disconnect")) {   // cooperative handoff: stop talking, keep capturing
+    g_stream = false; s_len = 0;
+    Serial.println("[OK] bye - stream off; safe to close the port (capture keeps running)");
+    Serial.flush();
+  }
   else if (!strcmp(ln, "inject on") || !strcmp(ln, "arm"))    { g_inject_armed = true;  Serial.println("[WARN] INJECTION ARMED - next 'force' DRIVES the bus (ATT&CK ICS T0855). CONTROL mode, one shot."); }
   else if (!strcmp(ln, "inject off") || !strcmp(ln, "disarm")){ g_inject_armed = false; Serial.println("[OK] injection disarmed"); }
   else if (!strncmp(ln, "force ", 6)) {               // text form: force <addr> <reg> <val> (hex 0x.. or dec) — confirm-gated
@@ -492,11 +512,32 @@ static void bv_exec(const char* ln) {
 }
 static void handle_serial() {
   while (Serial.available() > 0) {
+    g_last_rx = millis();        // any RX proves a host is attached
     int c = Serial.read();
     if (c == '\r') continue;
     if (c == '\n') { s_line[s_len] = 0; if (s_len > 0) bv_exec(s_line); s_len = 0; continue; }
     if (s_len < (int)sizeof(s_line) - 1) s_line[s_len++] = (char)c;
     else { s_len = 0; Serial.println("[ERR] line too long"); }
+  }
+}
+
+// ---- USB connect / disconnect lifecycle ----
+// React to the host opening or closing the port so the device never streams into a closed
+// port and always greets a reconnecting client (banner + id + state), the same way boot does.
+static void handle_usb_lifecycle() {
+  bool up_now = usb_present();
+  if (up_now && !g_usb_up) {            // connect edge: a client just opened the port
+    g_usb_up = true;
+    s_len = 0;                          // drop any half-typed line from a prior client
+    g_last_streamed = g_txn_count;      // don't replay the backlog to a fresh client
+    Serial.println();
+    Serial.println("[BUSVIEW] StamPLC Bus Viewer v3 ready - USB serial control; type 'help'");
+    print_id();                         // identity so the web app can confirm the analyzer
+    bv_stats();                         // current state so a reconnecting client resumes cleanly
+  } else if (!up_now && g_usb_up) {     // disconnect edge: the host closed / vanished
+    g_usb_up = false;
+    g_stream = false;                   // stop streaming into a closed port (also unblocks capture)
+    s_len = 0;
   }
 }
 
@@ -510,6 +551,9 @@ void setup() {
   M5Cardputer.Display.fillScreen(TFT_BLACK);
   // no sprite (direct draw)
   Serial.begin(115200);
+  // Bounded TX timeout: a write may stall at most this long if the USB host is gone, so a
+  // disconnected or non-reading host can NEVER wedge the capture loop (export / #CAP included).
+  Serial.setTxTimeoutMs(250);
   Serial.println();
   Serial.println("[BUSVIEW] StamPLC Bus Viewer v3 ready - USB serial control; type 'help'");
   cfg_load();   // restore USB-configured capture rate / samples / mode from NVS (defaults on first boot)
@@ -523,9 +567,11 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt((int)PIN_SCL), sclISR, RISING);
   attachInterrupt(digitalPinToInterrupt((int)PIN_SDA), sdaISR, CHANGE);
   draw();   // first paint from setup() — display is initialized here (like the controller)
+  g_usb_up = usb_present();   // seed link state so a host attached at boot isn't re-greeted
 }
 
 void loop() {
+  handle_usb_lifecycle();   // react to the host attaching/detaching before any serial I/O
   // drain the ISR ring and decode. BOUNDED per iteration: on an active/noisy bus the
   // edge ISRs advance g_head as fast as we drain, so an unbounded while() never returns
   // and loop() would never reach handle_serial()/draw()/USB service —
@@ -542,10 +588,9 @@ void loop() {
       }
     }
   }
-  // serial streaming of new txns (headless live view)
-  static uint32_t last_streamed = 0;
-  if (g_stream && g_txn_count != last_streamed) {
-    uint32_t miss = g_txn_count - last_streamed;
+  // serial streaming of new txns (headless live view) — only while a host is attached
+  if (g_stream && g_usb_up && g_txn_count != g_last_streamed) {
+    uint32_t miss = g_txn_count - g_last_streamed;
     uint32_t show = miss > (uint32_t)TXN_MAX ? (uint32_t)TXN_MAX : miss;
     for (uint32_t i = 0; i < show; i++) {
       int back = (int)(show - 1 - i);
@@ -554,7 +599,7 @@ void loop() {
       Serial.printf("[TXN] t=%lu %c 0x%02X %s n=%u\n", (unsigned long)t.t_us, t.read ? 'R' : 'W', t.addr, dev_name(t.addr), t.n);
     }
   }
-  last_streamed = g_txn_count;
+  g_last_streamed = g_txn_count;   // keep the baseline current (also when not streaming / detached)
   handle_serial();   // USB console only (mode/pause/clear/export); no keyboard/update — matches the known-good controller
   uint32_t now = millis();
   // direct-draw (no double-buffer): redraw only when something changed, so the screen is steady
