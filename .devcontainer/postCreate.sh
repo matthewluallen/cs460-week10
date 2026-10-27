@@ -16,6 +16,30 @@ curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh  | sud
 curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b "$BIN" "$GRYPE_VERSION" || echo "   (grype install skipped — see sbom/README.md)"
 curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b "$BIN" "$TRIVY_VERSION" || echo "   (trivy install skipped — see sbom/README.md)"
 
+echo "==> Installing cve-bin-tool (binary CVE scanner — Part 2 Exercise 3) + gsutil (for the CVE mirror)…"
+# cve-bin-tool fingerprints a compiled .bin for component versions. pipx keeps it isolated; fall
+# back to pip. gsutil lets it pull CVE data from the json-mirror (a public GCS bucket) instead of
+# the NVD API — so Exercise 3 needs NO NVD key and works even when nvd.nist.gov is down. Non-fatal.
+pipx install cve-bin-tool >/dev/null 2>&1 \
+  || pip3 install --quiet --break-system-packages cve-bin-tool 2>/dev/null \
+  || pip3 install --quiet cve-bin-tool 2>/dev/null \
+  || echo "   (cve-bin-tool install skipped — see sbom/README.md Exercise 3)"
+pip3 install --quiet gsutil 2>/dev/null || pip3 install --quiet --break-system-packages gsutil 2>/dev/null \
+  || echo "   (gsutil install skipped — Exercise 3 notes the fallback)"
+
+# Pre-cache the mirror CVE data so the first Exercise-3 scan is quick. json-mirror = cve-bin-tool's
+# public CVE snapshot (no NVD key, no NVD API). GAD (GitLab advisories) is disabled: its multi-doc
+# YAML crashes cve-bin-tool's parser. Non-fatal; the offline 'strings' proof always works.
+if command -v cve-bin-tool >/dev/null 2>&1; then
+  echo "==> Pre-caching the CVE mirror + warming the Exercise-3 scan (no NVD key needed)…"
+  FW=sbom/firmware/prebuilt/stamplc-factory-8MB.bin
+  mkdir -p sbom/out
+  { [ -f "$FW" ] && PATH="$HOME/.local/bin:$PATH" cve-bin-tool "$FW" -n json-mirror --disable-data-source GAD \
+      -f html -o sbom/out/cve-bin-tool-firmware.html >/dev/null 2>&1 \
+      && echo "   CVE mirror cached; report pre-generated at sbom/out/cve-bin-tool-firmware.html"; } \
+    || echo "   (CVE mirror pre-cache skipped — run 'bash sbom/run_cve_bin_tool.sh' later)"
+fi
+
 echo "==> Installing bus & firmware tooling (sigrok decoder, pymodbus, nc)…"
 sudo apt-get update -qq || true
 sudo apt-get install -y -qq sigrok-cli xz-utils netcat-openbsd >/dev/null 2>&1 \

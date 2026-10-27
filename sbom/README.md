@@ -6,7 +6,8 @@ CVE?" You'll generate SBOMs in two standard formats, compare them, scan one for
 vulnerabilities, and — the honest part — see where an SBOM's view stops.
 
 Tools (installed for you): **syft** (generates SBOMs), **grype** (scans an SBOM for
-CVEs), **trivy** (does both).
+CVEs), **trivy** (does both), and **cve-bin-tool** (scans a *compiled binary* for
+embedded components + CVEs — Exercise 3).
 
 ---
 
@@ -84,6 +85,51 @@ real-world catch:
 
 Say clearly in your finding **which scope** your SBOM covered, and what it therefore
 could not have caught.
+
+## Exercise 3 — scan the *compiled binary* (the firmware-resident view)
+
+Exercise 2 read build *manifests*. Now read the shipped artifact itself. **cve-bin-tool**
+(installed for you) scans a compiled binary for the version fingerprints of well-known
+components and maps them to CVEs. The interesting part is what it does — and does **not** —
+find in this firmware.
+
+```bash
+bash sbom/run_cve_bin_tool.sh        # scans firmware/prebuilt/stamplc-factory-8MB.bin
+```
+
+The script uses cve-bin-tool's **json-mirror** data source (a public CVE snapshot pulled with
+`gsutil`), so it needs **no NVD API key** and works even when `nvd.nist.gov` is down or
+rate-limited. The dev container installs `gsutil` and pre-caches the mirror on build, so the
+first scan is quick. (If you have an NVD key and want the live feed instead:
+`cve-bin-tool <bin> --nvd-api-key <key>`.)
+
+Even with no network, you can confirm the components are really in there:
+
+```bash
+strings sbom/firmware/prebuilt/stamplc-factory-8MB.bin | grep -iE 'mbedtls|lwip|wpa_supplicant|esp-idf'
+```
+
+You'll see `mbedTLS`, `lwIP` and `wpa_supplicant` paths — the crypto and TCP/IP stacks the
+note above said "most *embedded* CVEs actually live" in.
+
+**Now compare that to what cve-bin-tool reports: on this image it finds `0 products with known
+CVEs`.** That is not a bug and not a clean bill of health — it *is* the lesson. cve-bin-tool
+matches by *version fingerprints*, and the ESP-IDF monolithic build does not expose the bundled
+libraries' versions in a form its checkers recognize — even though `strings` proves the code is
+right there. So:
+
+- **Source SBOM** (syft on `firmware/`) → the build's library *pins*, little CVE signal.
+- **Binary scan** (cve-bin-tool on the `.bin`) → here, **0 detections** — a dedicated binary
+  scanner still misses firmware-resident components when their versions aren't fingerprintable.
+- **The real firmware-resident view** comes from mapping the **framework version → the libraries
+  it bundles → the NVD** by hand (the Exercise-1 method), not from any one-shot scan.
+
+**Finding to keep:** report cve-bin-tool's result for this binary (how many products / CVEs it
+detected — likely **0**), reconcile it against the `strings` evidence that the components ARE
+present, and state the lesson in one sentence: **absent from the scan is not absent from the
+device.** Then take one component you know is in the firmware (from Exercise 1), look its version
+up in the NVD yourself, and say whether a fix would be a firmware rebuild or an architecture
+control (detected ≠ exploitable — and *not*-detected ≠ *not*-present).
 
 ## The connection:  analyzer ↔ SBOM ↔ CWE ↔ CVE
 
