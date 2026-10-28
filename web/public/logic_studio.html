@@ -3338,13 +3338,24 @@ function acceptBusReply(line){
   if(!busWaiter.matches(line))return false;
   const w=busWaiter;busWaiter=null;clearTimeout(w.timer);w.resolve(line);return true;
 }
+// Console diagnostic reads share ONE serial stream and ONE reply slot (busWaiter).
+// If two are in flight at once (connect read + a render poll + the load read-back),
+// their replies interleave and the post-load readback fails to verify. Serialize every
+// busCommand through a queue so exactly one request is outstanding at a time; each waits
+// for the previous to settle before it sends. Its 5 s timeout starts when it actually
+// runs, so a queued request never times out waiting its turn.
+let busQueue=Promise.resolve();
 function busCommand(command,matches){
-  return new Promise((resolve,reject)=>{
-    busNeed(!busWaiter,'Diagnostic command already pending');
+  const run=()=>new Promise((resolve,reject)=>{
+    if(!conn){reject(Error('Not connected'));return;}
+    if(busWaiter){reject(Error('Diagnostic command already pending'));return;}
     const w={matches,resolve,reject,timer:null};busWaiter=w;
     w.timer=setTimeout(()=>{if(busWaiter===w){busWaiter=null;reject(Error('No matching reply to '+command));}},5000);
     send(command,true).then(ok=>{if(!ok&&busWaiter===w){clearTimeout(w.timer);busWaiter=null;reject(Error('Could not send '+command));}});
   });
+  const result=busQueue.then(run,run);
+  busQueue=result.then(()=>{},()=>{});   // keep the chain alive regardless of outcome
+  return result;
 }
 async function busTraceCommand(on){
   const receipt={command:'bustrace '+(on?'on':'off'),sent_utc:new Date().toISOString(),reply:null,received_utc:null};busCapture.receipts.push(receipt);
