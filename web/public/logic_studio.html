@@ -378,6 +378,7 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
       <button class="btn" id="bSensors">Grove devices</button>
       <button class="btn" id="bBench" title="Pick a simple test circuit and drive it on the running firmware">⚡ Test bench</button>
       <button class="btn" id="bConnect">Connect USB</button>
+      <button class="btn" id="bConnectTwin" title="Drive the QEMU twin over the twin-bridge WebSocket (no USB)">Connect twin</button>
       <button class="btn" id="bReadStatus" disabled>Read controller status</button>
       <button class="btn pri" id="bDownload" disabled>Load application ▸</button>
       <button class="btn" id="bMonitor" disabled>Start monitoring</button>
@@ -2792,9 +2793,14 @@ const BENCH_CIRCUITS=[{
        +'the amber LED turns off. Flip NO↔NC in your ladder and predict which LED follows the button.'
 }];
 let benchStyle='snap', benchCircuitId='pushbutton-led', benchPressed=false, benchTimer=null;
+let benchRelay=[0,0,0,0];   // relay act state, parsed by the bench from its own `io` polls
 function benchCircuit(){return BENCH_CIRCUITS.find(c=>c.id===benchCircuitId)||BENCH_CIRCUITS[0];}
-function benchForce(v){ try{ if((typeof conn!=='undefined')&&conn&&typeof send==='function') send('force IX'+benchCircuit().input.di+' '+(v?1:0)); }catch(e){} }
-function benchOutputStates(c){ return c.outputs.map(o=>{ try{ return (typeof liveVal==='function') && liveVal('QX',o.qx)===1; }catch(e){ return false; } }); }
+// Force the input via the raw transport (bypasses the read-only monitor guard), so the
+// bench drives the controller whether it's a USB board or the twin over the bridge.
+function benchForce(v){ if((typeof conn!=='undefined')&&conn) rawSend('force IX'+benchCircuit().input.di+' '+(v?1:0)); }
+function benchOutputStates(c){ return c.outputs.map(o=>benchRelay[o.qx]===1); }
+// Parse relay act state from the bench's own `io` replies, independent of monitor mode.
+function benchIoLine(line){ const m=/relay([0-3])\s+cmd=\d+\s+act=([01])/.exec(line); if(m) benchRelay[+m[1]]=+m[2]; }
 // Snap-style SVG: StampLC terminal strip (left) wired to snap blocks (right), with
 // a +V rail and a GND(−) rail so the loops actually close — relay COM fed from +V,
 // DI-common (C) and every LED return tied to −. Electrically complete, N LEDs.
@@ -2861,11 +2867,10 @@ function benchSvgSnap(c,states,pressed){
 function benchSvg(c,states,pressed){ return benchStyle==='snap'?benchSvgSnap(c,states,pressed)
   : `<div style="padding:28px;text-align:center;color:var(--ink2)">DIN-rail terminal-block layout — coming next. Use Snap blocks for now.</div>`; }
 function benchStatusLine(){
-  if(typeof conn==='undefined'||!conn) return ['Connect USB (toolbar) to drive the firmware.','er'];
-  if(typeof monTimer!=='undefined'&&monTimer===null) return ['Click “Start monitoring” so the LEDs can read the relays.','rx'];
+  if(typeof conn==='undefined'||!conn) return ['Connect USB (a board) or Connect twin (the QEMU twin) to drive it.','er'];
   const mode=(typeof controllerStatus!=='undefined'&&controllerStatus)?controllerStatus.mode:null;
-  if(mode&&String(mode).toUpperCase()!=='RUN') return ['Set the controller to RUN so your ladder executes (now: '+mode+').','rx'];
-  return ['Hold the button to assert DI1; watch the relays light the LEDs.','ok'];
+  if(mode&&String(mode).toUpperCase()!=='RUN') return ['Load your program and set the controller to RUN so your ladder runs (now: '+mode+').','rx'];
+  return ['Hold the button to assert DI1; the relay readback lights the LEDs.','ok'];
 }
 function benchRefresh(){
   const host=document.getElementById('benchSvg'); if(!host){ if(benchTimer){clearInterval(benchTimer);benchTimer=null;} return; }
@@ -2893,9 +2898,13 @@ function openTestBench(){
     <div class="row"><button class="btn pri" onclick="closeModal()">Close</button></div></div>`);
   modalInner.querySelector('#benchSel').onchange=e=>{benchCircuitId=e.target.value;benchPressed&&benchForce(0);benchPressed=false;openTestBench();};
   modalInner.querySelectorAll('#benchStyleSeg button').forEach(b=>b.onclick=()=>{benchStyle=b.dataset.s;benchRefresh();modalInner.querySelectorAll('#benchStyleSeg button').forEach(x=>x.classList.toggle('on',x.dataset.s===benchStyle));});
+  if(!lineListeners.includes(benchIoLine))lineListeners.push(benchIoLine);
   benchRefresh();
   if(benchTimer)clearInterval(benchTimer);
-  benchTimer=setInterval(()=>{ if(!document.getElementById('benchSvg')){clearInterval(benchTimer);benchTimer=null; if(benchPressed){benchPressed=false;benchForce(0);} return;} benchRefresh(); },400);
+  benchTimer=setInterval(()=>{ const host=document.getElementById('benchSvg');
+    if(!host){clearInterval(benchTimer);benchTimer=null; if(benchPressed){benchPressed=false;benchForce(0);} return;}
+    if((typeof conn!=='undefined')&&conn) rawSend('io');   // bench polls relay state itself
+    benchRefresh(); },500);
 }
 function openSensors(){openProjectModules();}
 function openLegacySensors(){
@@ -3459,6 +3468,10 @@ const REGISTER_CATALOG={"expansion_relay":{"kind":"COIL","address":0,"unit":"","
 
 /* ===== Web-Serial: observation state is separate from editor state ===== */
 let port=null,reader=null,writer=null,rxBuf='',monitorLive=null,monTimer=null,conn=false;
+let wsSock=null,lineListeners=[];
+// Low-level write that bypasses the read-only monitor guard — used by the Test bench's
+// force/io and by the twin WebSocket transport. Writes to USB (writer) or twin (wsSock).
+function rawSend(t){ try{ if(wsSock&&wsSock.readyState===1){wsSock.send(t+'\n');return true;} if(writer){writer.write(strBytes(t+'\n'));return true;} }catch(e){} return false; }
 let controllerStatus=null,lastSampleAt=null,controllerModeAt=null,pointReplyAt=null;let hbTimer=null;
 const executionReader=StudioExecution.createExecutionReader();
 let executionReading=false,executionMessage='';
@@ -3580,10 +3593,28 @@ async function connect(){
   finally{connecting=false;button.disabled=false;button.textContent=port?'Disconnect USB':'Connect USB';}
 }
 async function disconnect(){
-  const oldPort=port;port=null;setConn(false);
+  const oldPort=port,oldWs=wsSock;port=null;wsSock=null;setConn(false);
   if(reader){try{await reader.cancel();}catch(e){}}
   if(writer){try{writer.releaseLock();}catch(e){}writer=null;}
   if(oldPort){try{await oldPort.close();}catch(e){log('USB close: '+e.message,'rx');}}
+  if(oldWs){try{oldWs.close();}catch(e){}}
+}
+// Connect to a running QEMU twin through twin-bridge (WebSocket -> twin console).
+// The browser can't Web-Serial a Codespace socket, so the bridge relays it; from here
+// the twin behaves exactly like a USB-connected controller (status, force, load, io).
+function connectTwin(url){
+  if(connecting||port||wsSock)return;
+  url=(url||'').trim()||'ws://localhost:8081';
+  let ws; try{ws=new WebSocket(url);}catch(e){log('Twin connect failed: '+e.message,'er');return;}
+  connecting=true; const button=document.getElementById('bConnect'); if(button)button.disabled=true;
+  ws.onopen=()=>{ wsSock=ws; rxBuf=''; connecting=false; setConn(true);
+    log('Twin connected: '+url+' — console over WebSocket (no USB).','ok');
+    send('status'); readProjectIdentity().catch(()=>{}); };
+  ws.onmessage=(ev)=>{ const txt=(typeof ev.data==='string')?ev.data:new TextDecoder().decode(ev.data);
+    rxBuf+=txt; let nl; while((nl=rxBuf.indexOf('\n'))>=0){ onLine(rxBuf.slice(0,nl).replace(/\r$/,'')); rxBuf=rxBuf.slice(nl+1);} if(rxBuf.length>65536)rxBuf=''; };
+  ws.onerror=()=>{ log('Twin WebSocket error — is the bridge running?  ./qemu/twin-bridge.py','er'); };
+  ws.onclose=()=>{ connecting=false; const b=document.getElementById('bConnect'); if(b)b.disabled=false;
+    if(wsSock===ws){wsSock=null;setConn(false);log('Twin disconnected.','rx');} };
 }
 async function readLoop(){
   const activePort=port,activeReader=activePort.readable.getReader();reader=activeReader;const dec=new TextDecoder();
@@ -3604,13 +3635,14 @@ function onLine(line){
   try{heroStatus(line);}catch(e){}
   if(/forced|unforced|cleared/i.test(line))log(line,'fc');
   if(/mode=|MODE=|Uptime|fault/i.test(line))log(line,'rx');
+  for(const fn of lineListeners){try{fn(line);}catch(e){}}
 }
 async function send(t,busOwner=false){
   if(busBusy&&!busOwner){log('Diagnostic capture owns this console; other commands wait.','rx');return false;}
   if(MODE==='online'&&!['pjson','status','project json','execution json','proto json','logs status','devices status','devices samples','portc status','bindings json'].includes(t)&&!/^logs read [1-9][0-9]{0,15}$/.test(t)&&!/^screen (request|(?:manifest|cancel) [0-9a-f]{32} [0-9a-f]{16}|read [0-9a-f]{32} [0-9a-f]{16} [0-9]{1,5} [0-9]{1,3})$/.test(t)){log('Monitor is read-only; no controller change sent.','er');return false;}
-  if(!conn||!writer){log('USB is not connected.','er');return false;}
-  try{await writer.write(strBytes(t+'\n'));if(!t.startsWith('pjson')&&!t.startsWith('screen read '))log('» '+t.slice(0,58)+(t.length>58?'…':''),'tx');return true;}
-  catch(e){log('USB write failed: '+e.message,'er');await disconnect();return false;}
+  if(!conn||(!writer&&!wsSock)){log('Not connected.','er');return false;}
+  try{ if(wsSock){wsSock.send(t+'\n');} else {await writer.write(strBytes(t+'\n'));} if(!t.startsWith('pjson')&&!t.startsWith('screen read '))log('» '+t.slice(0,58)+(t.length>58?'…':''),'tx');return true;}
+  catch(e){log('write failed: '+e.message,'er');await disconnect();return false;}
 }
 async function download(){
   if(stDraftState?.dirty){log('Unapplied ST draft exists; apply it or save it separately before loading.','er');return;}
@@ -3781,7 +3813,11 @@ document.getElementById('bRegisters').onclick=openRegisterTable;
 document.getElementById('bSensors').onclick=openSensors;
 document.getElementById('bBench').onclick=openTestBench;
 document.getElementById('bSFC').onclick=openSFC;
-document.getElementById('bConnect').onclick=()=>port?disconnect():connect();
+document.getElementById('bConnect').onclick=()=>(port||wsSock)?disconnect():connect();
+document.getElementById('bConnectTwin').onclick=()=>{ if(port||wsSock){disconnect();return;}
+  const def=(location.protocol==='https:'?'wss://':'ws://')+(location.hostname||'localhost')+':8081';
+  const url=prompt('Connect to the QEMU twin bridge (start it with ./qemu/twin-bridge.py):',def);
+  if(url)connectTwin(url); };
 document.getElementById('bReadStatus').onclick=async()=>{await send('status');try{await readProjectIdentity();}catch(e){log('Application identity unavailable: '+e.message,'er');}};
 document.getElementById('executionRead').onclick=readExecutionDiagnostics;
 document.getElementById('executionExport').onclick=()=>{if(executionReader.receipt)downloadText('studio-execution-evidence.json',JSON.stringify({export_kind:'historical_controller_receipt_not_current_status',exported_utc:new Date().toISOString(),...executionReader.receipt},null,2),'application/json');};
