@@ -1,0 +1,25 @@
+{
+  "schema": "tbd.logic-project/v1",
+  "id": "interlocked-pair",
+  "name": "Ventilation interlock",
+  "revision": 1,
+  "program": {
+    "scan_ms": 50,
+    "nets": [
+      {"id":"N1","label":"Demand and enable drive the fan","expr":{"t":"series","id":"e3","kids":[{"t":"c","id":"e1","io":"IX","idx":0,"neg":false},{"t":"c","id":"e2","io":"IX","idx":1,"neg":false}]},"coil":{"io":"QX","idx":0,"neg":false}},
+      {"id":"N2","label":"Board temperature above 30 C lights warm","expr":{"t":"cmp","id":"e4","op":"GT","idx":0,"k":300},"coil":{"io":"QX","idx":1,"neg":false}}
+    ]
+  },
+  "symbols": {
+    "IX0": {"name":"demand","comment":"Logical input 0 uses physical input 1"},
+    "IX1": {"name":"enable","comment":"Logical input 1 uses physical input 0"},
+    "QX0": {"name":"fan","comment":"Logical output 0 uses physical relay 1"},
+    "QX1": {"name":"warm","comment":"Logical output 1 uses physical relay 0"},
+    "IW0": {"name":"temperature","comment":"Explicit board-temperature source","unit":"0.1C"}
+  },
+  "settings": {
+    "bindings": {"digital_inputs":[1,0,2,3,4,5,6,7],"digital_outputs":[1,0,2,3],"word_inputs":["board_temperature","parameter","parameter","parameter","parameter","parameter","parameter","parameter"]},
+    "parameters": [0,120,0,0,0,0,0,0]
+  },
+  "experiment": {"control_route":"baseline","notes":"The fan interlock is application logic, not an independent safety function or a firmware security control. Compare mappings and behavior with Input indicator."}
+}

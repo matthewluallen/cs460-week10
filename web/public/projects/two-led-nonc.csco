@@ -1,0 +1,23 @@
+{
+  "schema": "tbd.logic-project/v1",
+  "id": "two-led-nonc",
+  "name": "Two LEDs -- NO / NC",
+  "revision": 1,
+  "program": {
+    "scan_ms": 50,
+    "nets": [
+      {"id":"N1","label":"NO: button (IX1) pressed -> Relay 1 / green","expr":{"t":"c","id":"e1","io":"IX","idx":1,"neg":false},"coil":{"io":"QX","idx":1,"neg":false}},
+      {"id":"N2","label":"NC: button (IX1) released -> Relay 2 / amber","expr":{"t":"c","id":"e2","io":"IX","idx":1,"neg":true},"coil":{"io":"QX","idx":2,"neg":false}}
+    ]
+  },
+  "symbols": {
+    "IX1": {"name":"button","comment":"Pushbutton on digital input 1"},
+    "QX1": {"name":"green_led","comment":"Green LED on Relay 1 (N.O.: on when pressed)"},
+    "QX2": {"name":"amber_led","comment":"Amber LED on Relay 2 (N.C.: on when released)"}
+  },
+  "settings": {
+    "bindings": {"digital_inputs":[0,1,2,3,4,5,6,7],"digital_outputs":[0,1,2,3],"word_inputs":["parameter","parameter","parameter","parameter","parameter","parameter","parameter","parameter"]},
+    "parameters": [0,0,0,0,0,0,0,0]
+  },
+  "experiment": {"control_route":"baseline","notes":"Pairs with the Studio Test bench 'Two LEDs -- NO / NC'. One button, opposite actions: N.O. on Relay 1, N.C. on Relay 2."}
+}

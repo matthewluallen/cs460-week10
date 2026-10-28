@@ -1,0 +1,19 @@
+{
+  "schema": "tbd.logic-project/v1",
+  "id": "pushbutton",
+  "name": "Pushbutton -> green LED",
+  "revision": 1,
+  "program": {
+    "scan_ms": 50,
+    "nets": [{"id":"N1","label":"Button (IX1) drives Relay 1 / green LED","expr":{"t":"c","id":"e1","io":"IX","idx":1,"neg":false},"coil":{"io":"QX","idx":1,"neg":false}}]
+  },
+  "symbols": {
+    "IX1": {"name":"button","comment":"Pushbutton on digital input 1"},
+    "QX1": {"name":"green_led","comment":"Green LED on Relay 1 (N.O. contact)"}
+  },
+  "settings": {
+    "bindings": {"digital_inputs":[0,1,2,3,4,5,6,7],"digital_outputs":[0,1,2,3],"word_inputs":["parameter","parameter","parameter","parameter","parameter","parameter","parameter","parameter"]},
+    "parameters": [0,0,0,0,0,0,0,0]
+  },
+  "experiment": {"control_route":"baseline","notes":"Pairs with the Studio Test bench 'Pushbutton -> green LED'. Press asserts IX1; the N.O. rung closes Relay 1."}
+}

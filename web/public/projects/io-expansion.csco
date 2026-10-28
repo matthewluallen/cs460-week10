@@ -1,0 +1,18 @@
+{
+  "schema":"tbd.logic-project/v1",
+  "id":"io-expansion",
+  "name":"IO expansion level alarm",
+  "revision":1,
+  "program":{"scan_ms":50,"nets":[{"id":"N1","label":"Expansion CH1 above 1000 mV drives expansion relay","expr":{"t":"cmp","id":"e1","op":"GT","idx":0,"k":1000},"coil":{"io":"QX","idx":0,"neg":false}}]},
+  "symbols":{
+    "IW0":{"name":"level_mv","comment":"Process slot 1: explicit IO expansion CH1 voltage","unit":"mV"},
+    "QX0":{"name":"level_alarm","comment":"Expansion mechanical relay; not a contact measurement"}
+  },
+  "settings":{
+    "bindings":{"digital_inputs":[0,1,2,3,4,5,6,7],"digital_outputs":[4,1,2,3],"word_inputs":["process1","parameter","parameter","parameter","parameter","parameter","parameter","parameter"]},
+    "parameters":[0,0,0,0,0,0,0,0],
+    "io_expansion":{"address":32,"revision":1},
+    "process_bindings":{"schema":1,"inputs":[{"role":"level_mv","driver":"stamplc-io-candidate","field":"ch1_mv","bus":1,"mux":0,"channel":-1,"address":32,"part":32,"revision":1,"serial":null},null,null]}
+  },
+  "experiment":{"control_route":"baseline","notes":"Expected module address 0x20 and revision 1 are example settings, not detected facts. Read modules and select the actual supported identity before loading. Invalid or absent source must prevent RUN."}
+}

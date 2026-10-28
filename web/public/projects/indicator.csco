@@ -1,0 +1,19 @@
+{
+  "schema": "tbd.logic-project/v1",
+  "id": "indicator",
+  "name": "Input indicator",
+  "revision": 1,
+  "program": {
+    "scan_ms": 50,
+    "nets": [{"id":"N1","label":"Request drives the indicator","expr":{"t":"c","id":"e1","io":"IX","idx":0,"neg":false},"coil":{"io":"QX","idx":0,"neg":false}}]
+  },
+  "symbols": {
+    "IX0": {"name":"request","comment":"Logical input 0 uses physical input 0"},
+    "QX0": {"name":"indicator","comment":"Logical output 0 uses physical relay 0"}
+  },
+  "settings": {
+    "bindings": {"digital_inputs":[0,1,2,3,4,5,6,7],"digital_outputs":[0,1,2,3],"word_inputs":["parameter","parameter","parameter","parameter","parameter","parameter","parameter","parameter"]},
+    "parameters": [0,0,0,0,0,0,0,0]
+  },
+  "experiment": {"control_route":"baseline","notes":"Run the same application on each firmware profile. Record the reported profile separately; this file cannot select it."}
+}

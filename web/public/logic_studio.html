@@ -594,8 +594,10 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
    if(sm)H.scanUs=+sm[1]; if(hb)H.hb=+hb[1]; if(sn){H.scanN=+sn[1];} if(fa)H.forces=H.forces; if(fa)H.faults=+fa[1]; };
  window.renderHero=function(){
    const connNow=(typeof conn!=='undefined')&&conn;
-   // auto-enable the native bus stream when connected
-   if(connNow && !H.streamReq){ H.streamReq=true; try{ if(typeof send==='function') send('busstream on'); }catch(e){} }
+   // The live @BUS stream is NOT auto-enabled: its lines interleave with chunked
+   // console replies (project/execution json), truncating the readback and blocking
+   // Load/RUN. Enable it explicitly from the Bus monitor (enableBusStream) when wanted;
+   // the hero still shows scan time, heartbeat and faults from status polls.
    if(!connNow) H.streamReq=false;
    // device meta
    const mb=document.getElementById('heroModeBadge'), mi=mInt();
@@ -2322,6 +2324,7 @@ function openProject(){
 }
 function openExampleProjects(){
   showModal(`<h3>Example project files</h3><div class="body"><p>Each file supplies its own logic, names and I/O mappings. All use the same generic runtime and can be loaded into either firmware profile. Choose an example explicitly; none is installed automatically.</p>
+    <p><b>Part 5 Test-bench pair:</b> <button class="btn" data-example="pushbutton">Open Pushbutton → green LED</button> <a href="projects/pushbutton.csco" download>.csco</a> · <button class="btn" data-example="two-led-nonc">Open Two LEDs — NO / NC</button> <a href="projects/two-led-nonc.csco" download>.csco</a></p>
     <p><button class="btn" data-example="indicator">Open Input indicator</button> <a href="projects/indicator.csco" download>Download indicator.csco</a></p>
     <p><button class="btn" data-example="interlocked-pair">Open Ventilation interlock</button> <a href="projects/interlocked-pair.csco" download>Download interlocked-pair.csco</a></p>
     <p><button class="btn" data-example="io-expansion">Open IO expansion level alarm</button> <a href="projects/io-expansion.csco" download>Download io-expansion.csco</a></p>
@@ -2887,7 +2890,7 @@ function benchRefresh(){
 function openTestBench(){
   const c=benchCircuit(), coils=c.outputs.map(o=>o.coil).join(' + ');
   showModal(`<h3>⚡ Test bench</h3><div class="body">
-    <p>Pick a simple circuit and drive it on the running firmware. The components mirror a real rig; the control is virtual (it sends <code>force di${c.input.di}</code> over USB) and the ${coils} readback lights the LED${c.outputs.length>1?'s':''}.</p>
+    <p>Pick a simple circuit and drive it on the running firmware. The components mirror a real rig; the control is virtual (it sends <code>force IX${c.input.di} 1</code> on the running controller) and the ${coils} readback lights the LED${c.outputs.length>1?'s':''}.</p>
     <div class="row" style="justify-content:flex-start;gap:10px;flex-wrap:wrap">
       <label>Circuit <select id="benchSel">${BENCH_CIRCUITS.map(x=>`<option value="${x.id}" ${x.id===benchCircuitId?'selected':''}>${x.name}</option>`).join('')}</select></label>
       <span class="mseg" id="benchStyleSeg"><button data-s="snap" class="${benchStyle==='snap'?'on':''}">Snap blocks</button><button data-s="dinrail" class="${benchStyle==='dinrail'?'on':''}">DIN-rail</button></span>
