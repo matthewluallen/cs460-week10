@@ -30,21 +30,35 @@ QEMU firmware twin for Parts 6–7 — built for x86-64 (Codespaces) or arm64 (l
 | 1 | **Bus analysis** — decode a real recorded Modbus RTU exchange and reason about what it does (and doesn't) establish | [`bus-analysis/`](bus-analysis/) | No |
 | 2 | **SBOM** — generate and compare software bills of materials (SPDX vs CycloneDX), then scan for CVEs | [`sbom/`](sbom/) | No |
 | 3 | **HBOM** — map the StampLC's hardware components and reconcile them with what the bus actually shows | [`hbom/`](hbom/) | No |
-| 4 | **Ladder logic** — start from a prebuilt program; enable one rung (or add one function) | [`ladder/`](ladder/) | No (apply remotely in Part 5) |
-| 5 | **Wire & run** — one input → your logic → one output, driven through the twin's console / HMI (validated on a real StampLC) | [`wiring/`](wiring/) | Twin |
+| 4 | **Ladder logic** — start from a prebuilt program; enable one rung (or add one function) | [`ladder/`](ladder/) | No (apply on your twin in Part 5) |
+| 5 | **Wire & run** — one input → your logic → one output, driven from the **Logic Studio** against **your own twin** (every step validated on a real StampLC too) | [`wiring/`](wiring/) | Twin |
 | 6 | **Firmware & the unsigned update** — boot the *real* firmware in the twin; find and prove an unsigned-OTA weakness | [`firmware-ota/`](firmware-ota/) | No (twin) |
 | 7 | **Supply-chain kill switch** — detonate a dormant OTA payload through a compromised update source; trace it to a relay | [`supply-chain/`](supply-chain/) | No (twin) |
 | 8 | **NTP adversary-in-the-middle & Y2038** — spoof the unauthenticated network time the controller trusts; wrap its 32-bit clock to 1901 | [`ntp-aitm/`](ntp-aitm/) | No (twin) |
 | 9 | **Direct remediation and compensating controls** — preserve the vulnerable/secure build switch, compare a specific changed path or exposure control, and record its evidence and remaining limits | [`remediation/`](remediation/) | No (twin) |
 
-Work the parts in order; each builds on the last. Part 5 uses the class **front end**
-(URL + your team code handed out in class) to toggle your team's input and watch the
-output — the device stays on the lab bench, you stay remote.
+Work the parts in order; each builds on the last. In Part 5 you run **your own twin** and
+drive it from the **Logic Studio** in your browser — no teams, no shared bench, no hardware:
+
+```bash
+./qemu/studio.sh          # starts your twin + serves the Studio on port 8080
+```
+
+Then open the forwarded port **8080** (Codespaces pops it up; locally it's
+`http://localhost:8080`) and click **Connect twin**. The one server both serves the page and
+bridges it to your twin, so the connection is same-origin — nothing to configure.
+
+> **Have a real M5StampLC?** The *same* Studio drives it over USB: open it on your own
+> machine (`http://localhost:8080` via a local Dev Container, or any HTTPS copy) in
+> **Chrome or Edge**, plug in the board, and click **Connect USB** instead of Connect twin.
+> (USB needs the device on the machine running the browser, so this path doesn't work from a
+> cloud Codespace — use the twin there. Every step is validated identically on real silicon.)
 
 ## Browser tools (served from `web/public/`)
 
 Several parts use small browser apps that run straight from this repo — no build step, no
-lab network. Serve the folder once and open them on the forwarded port:
+lab network. `./qemu/studio.sh` already serves this folder on port 8080; for the no-device
+tools alone you can instead run:
 
 ```bash
 ./tools/serve-web.sh    # serves web/public; open the forwarded port in your browser
@@ -52,10 +66,9 @@ lab network. Serve the folder once and open them on the forwarded port:
 
 | Tool | File | Where it fits |
 |------|------|---------------|
-| **TBD Logic Studio** — correlated ladder / Structured Text; opens prepared application projects and compiles the runtime payload; embedded **Bus monitor** | `web/public/logic_studio.html` | Part 4 |
+| **TBD Logic Studio** — ladder / Structured Text authoring; drives **your twin** (Connect twin) or a **real board over USB** (Connect USB); embedded **Bus monitor** | `web/public/logic_studio.html` | Parts 4 & 5 |
 | **Protocol Studio** — follow one captured or live frame field-by-field, from the wire up | `web/public/protocol_studio.html` | Parts 1 & 6 |
 | **Operator panel** — the StampLC HMI / operator view | `web/public/panel.html` | Parts 6–7 |
-| **Team Console** — pick a program and apply it to your team's PLC (the Part 5 front end) | `web/public/index.html` | Part 5 |
 
 Logic Studio's **Bus monitor** and Part 1's I²C analyzer (`bus-analysis/i2c-analyzer.html`)
 share one lane-timeline engine, so the same capture decodes identically in either — the

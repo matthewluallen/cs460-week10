@@ -3602,9 +3602,16 @@ async function disconnect(){
 // Connect to a running QEMU twin through twin-bridge (WebSocket -> twin console).
 // The browser can't Web-Serial a Codespace socket, so the bridge relays it; from here
 // the twin behaves exactly like a USB-connected controller (status, force, load, io).
+// Default bridge URL: same origin as the served page (so one forwarded Codespace
+// port and localhost both "just work"); falls back to localhost when opened as file://.
+function twinDefaultUrl(){
+  if(location.protocol==='http:'||location.protocol==='https:')
+    return (location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
+  return 'ws://localhost:8080/ws';
+}
 function connectTwin(url){
   if(connecting||port||wsSock)return;
-  url=(url||'').trim()||'ws://localhost:8081';
+  url=(url||'').trim()||twinDefaultUrl();
   let ws; try{ws=new WebSocket(url);}catch(e){log('Twin connect failed: '+e.message,'er');return;}
   connecting=true; const button=document.getElementById('bConnect'); if(button)button.disabled=true;
   ws.onopen=()=>{ wsSock=ws; rxBuf=''; connecting=false; setConn(true);
@@ -3815,7 +3822,7 @@ document.getElementById('bBench').onclick=openTestBench;
 document.getElementById('bSFC').onclick=openSFC;
 document.getElementById('bConnect').onclick=()=>(port||wsSock)?disconnect():connect();
 document.getElementById('bConnectTwin').onclick=()=>{ if(port||wsSock){disconnect();return;}
-  const def=(location.protocol==='https:'?'wss://':'ws://')+(location.hostname||'localhost')+':8081';
+  const def=twinDefaultUrl();
   const url=prompt('Connect to the QEMU twin bridge (start it with ./qemu/twin-bridge.py):',def);
   if(url)connectTwin(url); };
 document.getElementById('bReadStatus').onclick=async()=>{await send('status');try{await readProjectIdentity();}catch(e){log('Application identity unavailable: '+e.message,'er');}};

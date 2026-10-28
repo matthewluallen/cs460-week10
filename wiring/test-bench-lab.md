@@ -18,6 +18,20 @@ decides what happens; **Relay 1's N.O. contact** switches +V to the **green LED*
 the LED returns to the **−** rail. The LED lights **only if your ladder connects DI1 to
 Relay 1** — so this tests *your logic*, not a hard-wired shortcut.
 
+## Connect the Studio to a controller
+
+Start your twin and the Studio with one command, then open port **8080** and click
+**Connect twin**:
+
+```
+./qemu/studio.sh          # twin + Studio on http://localhost:8080 (Codespaces: forwarded 8080)
+```
+
+The server serves the page and bridges it to your twin on the same origin, so there is
+nothing to configure. (Have a real M5StampLC? Open the same Studio on your own machine in
+Chrome/Edge, plug in the board, and click **Connect USB** instead — the rest of this section
+is identical.)
+
 ## A. Build and load the one-rung program
 
 1. In Logic Studio, build one rung: a **normally-open contact on `%IX1`** driving the

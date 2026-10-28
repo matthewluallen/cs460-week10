@@ -1,35 +1,46 @@
 #!/usr/bin/env python3
-"""twin-bridge — let the browser Logic Studio drive the QEMU twin.
+"""twin-bridge — serve the Logic Studio AND bridge it to the QEMU twin, on one port.
 
-The Studio connects over Web Serial, which only reaches a physical USB device. The
-twin's console is a local socket, not USB. This bridge exposes that console as a
-WebSocket so the Studio's "Connect twin" button can drive the emulated controller
-exactly as it would a real StampLC over USB — force inputs, read I/O, load a program.
+The Studio is a static web page; the twin's console is a local socket, not a USB
+device, so the browser can't reach it over Web Serial. This one server solves both
+halves at once:
 
-    ┌──────────┐  Web Serial? no      ┌──────────────┐  unix/tcp socket  ┌──────┐
-    │  Studio  │ ──ws://host:8081──▶  │  twin-bridge  │ ───────────────▶ │ twin │
-    └──────────┘   (this script)      └──────────────┘   /tmp/plc-serial └──────┘
+  * it serves the Studio (and the rest of web/public) over HTTP, and
+  * it upgrades a WebSocket on /ws and relays it to the twin's console socket.
+
+Because the page and the socket share one origin, the Studio's "Connect twin" URL is
+just same-origin /ws — correct in a Codespace (one forwarded port, no host:port
+guessing) and on a laptop (localhost) alike. One student, one port, no teams, no
+hardware, no Netlify.
+
+    ┌──────────┐  http (page) + ws:///ws   ┌──────────────┐  unix/tcp socket  ┌──────┐
+    │ browser  │ ◀───── one origin ──────▶ │  twin-bridge  │ ────────────────▶ │ twin │
+    └──────────┘       :8080               └──────────────┘   /tmp/plc-serial  └──────┘
 
 Dependency-free (Python 3 stdlib only), so it runs in a Codespace or a laptop with
-no `pip install`. One browser at a time is plenty for a student.
+no `pip install`.
 
     ./qemu/run.sh &                 # start the twin (console on /tmp/plc-serial)
-    ./qemu/twin-bridge.py           # then open the Studio and click "Connect twin"
+    ./qemu/twin-bridge.py           # open http://localhost:8080  →  click "Connect twin"
 
 Options (env or flags):
-    --port 8081             WebSocket port to listen on (default 8081)
+    --port 8080                WebSocket + HTTP port (default 8080)
     --serial /tmp/plc-serial   twin console: a unix socket path, or host:port for TCP
+    --dir <path>               static web root (default: ../web/public next to this script)
 """
-import argparse, base64, hashlib, os, socket, struct, sys, threading
+import argparse, base64, hashlib, mimetypes, os, posixpath, socket, struct, sys, threading
+import urllib.parse
 
 WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+INDEX = "logic_studio.html"   # what "/" serves
 
 
 def ws_accept(key):
     return base64.b64encode(hashlib.sha1((key + WS_MAGIC).encode()).digest()).decode()
 
 
-def recv_http_headers(conn):
+def recv_http_request(conn):
+    """Read one HTTP request head. Return (method, path, headers) or None."""
     data = b""
     while b"\r\n\r\n" not in data:
         chunk = conn.recv(1024)
@@ -39,16 +50,20 @@ def recv_http_headers(conn):
         if len(data) > 65536:
             return None
     head = data.split(b"\r\n\r\n", 1)[0].decode("latin1")
+    lines = head.split("\r\n")
+    try:
+        method, path, _ = lines[0].split(" ", 2)
+    except ValueError:
+        return None
     headers = {}
-    for line in head.split("\r\n")[1:]:
+    for line in lines[1:]:
         if ":" in line:
             k, v = line.split(":", 1)
             headers[k.strip().lower()] = v.strip()
-    return headers
+    return method, path, headers
 
 
 def ws_frame(payload, opcode=0x1):
-    """Build a server->client frame (never masked). Text (0x1) by default."""
     data = payload.encode() if isinstance(payload, str) else payload
     header = bytearray([0x80 | opcode])
     n = len(data)
@@ -62,7 +77,6 @@ def ws_frame(payload, opcode=0x1):
 
 
 def ws_reader(conn):
-    """Yield decoded payloads from client frames; stop on close/error."""
     buf = b""
     def need(n):
         nonlocal buf
@@ -107,11 +121,30 @@ def open_twin(serial):
     return s
 
 
-def handle(conn, serial):
-    headers = recv_http_headers(conn)
-    if not headers or "sec-websocket-key" not in headers:
-        conn.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\ntwin-bridge: WebSocket only\r\n")
-        conn.close(); return
+def serve_static(conn, path, root):
+    """Serve a file from `root`. Path traversal is rejected."""
+    rel = urllib.parse.urlparse(path).path
+    rel = urllib.parse.unquote(rel)
+    if rel == "/" or rel == "":
+        rel = "/" + INDEX
+    # normalize and confine to root
+    clean = posixpath.normpath(rel).lstrip("/")
+    full = os.path.realpath(os.path.join(root, clean))
+    root_real = os.path.realpath(root)
+    if not (full == root_real or full.startswith(root_real + os.sep)) or not os.path.isfile(full):
+        body = b"404 not found"
+        conn.sendall(b"HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n"
+                     b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body)
+        return
+    ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
+    with open(full, "rb") as f:
+        body = f.read()
+    conn.sendall(("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
+                  "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
+                  % (ctype, len(body))).encode() + body)
+
+
+def ws_relay(conn, headers, serial):
     accept = ws_accept(headers["sec-websocket-key"])
     conn.sendall(("HTTP/1.1 101 Switching Protocols\r\n"
                   "Upgrade: websocket\r\nConnection: Upgrade\r\n"
@@ -151,21 +184,46 @@ def handle(conn, serial):
     print("[bridge] connection closed", flush=True)
 
 
+def handle(conn, serial, root):
+    try:
+        req = recv_http_request(conn)
+        if not req:
+            conn.close(); return
+        method, path, headers = req
+        if headers.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in headers:
+            ws_relay(conn, headers, serial)
+        elif method in ("GET", "HEAD"):
+            serve_static(conn, path, root)
+            conn.close()
+        else:
+            conn.sendall(b"HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\n\r\n")
+            conn.close()
+    except OSError:
+        try: conn.close()
+        except OSError: pass
+
+
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Bridge the QEMU twin console to a WebSocket for the Studio.")
-    ap.add_argument("--port", type=int, default=int(os.environ.get("BRIDGE_PORT", "8081")))
+    here = os.path.dirname(os.path.abspath(__file__))
+    ap = argparse.ArgumentParser(description="Serve the Logic Studio and bridge it to the QEMU twin, on one port.")
+    ap.add_argument("--port", type=int, default=int(os.environ.get("BRIDGE_PORT", "8080")))
     ap.add_argument("--serial", default=os.environ.get("SERIAL_SOCK", "/tmp/plc-serial"),
                     help="twin console: a unix socket path, or host:port for TCP")
+    ap.add_argument("--dir", default=os.environ.get("STUDIO_DIR", os.path.join(here, "..", "web", "public")),
+                    help="static web root to serve (default ../web/public)")
     a = ap.parse_args(argv)
+    root = os.path.realpath(a.dir)
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("0.0.0.0", a.port)); srv.listen(4)
-    print("twin-bridge: ws://localhost:%d  ->  %s" % (a.port, a.serial), flush=True)
-    print("In the Studio, click 'Connect twin' and use this URL (or the forwarded Codespace URL).", flush=True)
+    srv.bind(("0.0.0.0", a.port)); srv.listen(16)
+    print("twin-bridge: http://localhost:%d  (Studio)   ws:///ws  ->  %s" % (a.port, a.serial), flush=True)
+    print("Open that URL (in a Codespace, the forwarded port 8080) and click 'Connect twin'.", flush=True)
+    if not os.path.isfile(os.path.join(root, INDEX)):
+        print("  WARNING: %s not found under %s — static serving will 404." % (INDEX, root), flush=True)
     try:
         while True:
             conn, _ = srv.accept()
-            threading.Thread(target=handle, args=(conn, a.serial), daemon=True).start()
+            threading.Thread(target=handle, args=(conn, a.serial, root), daemon=True).start()
     except KeyboardInterrupt:
         print("\ntwin-bridge: stopped", flush=True)
     return 0
