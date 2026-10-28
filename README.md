@@ -6,9 +6,11 @@ A hands-on lab on the **M5Stack StampLC**, a small real PLC (ESP32-S3; 4 relays,
 the controller, and drive one **input → ladder logic → output** on a live device — all
 from this repo.
 
-Most of this lab runs **entirely in your browser or a container — no device required.**
-The one live part (driving a real StampLC) is reached remotely through the class front
-end; you never join the lab network.
+The whole lab runs **in your browser and the QEMU firmware twin — no hardware required.**
+The twin boots the *real, unmodified* StampLC firmware, so you run it, drive it, and attack
+it exactly as you would a device over USB. A physical StampLC on the bench validated every
+step on real silicon; it appears here only as reference ("this is what it looks like on
+hardware"), never as something you need to own or connect to.
 
 ## Open the lab
 
@@ -29,11 +31,11 @@ QEMU firmware twin for Parts 6–7 — built for x86-64 (Codespaces) or arm64 (l
 | 2 | **SBOM** — generate and compare software bills of materials (SPDX vs CycloneDX), then scan for CVEs | [`sbom/`](sbom/) | No |
 | 3 | **HBOM** — map the StampLC's hardware components and reconcile them with what the bus actually shows | [`hbom/`](hbom/) | No |
 | 4 | **Ladder logic** — start from a prebuilt program; enable one rung (or add one function) | [`ladder/`](ladder/) | No (apply remotely in Part 5) |
-| 5 | **Wire & run** — one input → your logic → one output, on a real StampLC, driven remotely | [`wiring/`](wiring/) | Yes (remote) |
+| 5 | **Wire & run** — one input → your logic → one output, driven through the twin's console / HMI (validated on a real StampLC) | [`wiring/`](wiring/) | Twin |
 | 6 | **Firmware & the unsigned update** — boot the *real* firmware in the twin; find and prove an unsigned-OTA weakness | [`firmware-ota/`](firmware-ota/) | No (twin) |
 | 7 | **Supply-chain kill switch** — detonate a dormant OTA payload through a compromised update source; trace it to a relay | [`supply-chain/`](supply-chain/) | No (twin) |
-| 8 | **NTP adversary-in-the-middle & Y2038** — spoof the unauthenticated network time the controller trusts; wrap its 32-bit clock to 1902 | [`ntp-aitm/`](ntp-aitm/) | No (twin) |
-| 9 | **Remediation — the secure build** — flip one compile switch (`-e m5stamplc_secure`); verify each CWE from Parts 6–8 is actually fixed, and which need an architecture, not a patch | [`remediation/`](remediation/) | No (twin) |
+| 8 | **NTP adversary-in-the-middle & Y2038** — spoof the unauthenticated network time the controller trusts; wrap its 32-bit clock to 1901 | [`ntp-aitm/`](ntp-aitm/) | No (twin) |
+| 9 | **Direct remediation and compensating controls** — preserve the vulnerable/secure build switch, compare a specific changed path or exposure control, and record its evidence and remaining limits | [`remediation/`](remediation/) | No (twin) |
 
 Work the parts in order; each builds on the last. Part 5 uses the class **front end**
 (URL + your team code handed out in class) to toggle your team's input and watch the
@@ -45,12 +47,12 @@ Several parts use small browser apps that run straight from this repo — no bui
 lab network. Serve the folder once and open them on the forwarded port:
 
 ```bash
-python3 -m http.server -d web/public 8000
+./tools/serve-web.sh    # serves web/public; open the forwarded port in your browser
 ```
 
 | Tool | File | Where it fits |
 |------|------|---------------|
-| **TBD Logic Studio** — ladder / Structured-Text editor; compiles to the device IR; embedded **Bus monitor** | `web/public/logic_studio.html` | Part 4 |
+| **TBD Logic Studio** — correlated ladder / Structured Text; opens prepared application projects and compiles the runtime payload; embedded **Bus monitor** | `web/public/logic_studio.html` | Part 4 |
 | **Protocol Studio** — follow one captured or live frame field-by-field, from the wire up | `web/public/protocol_studio.html` | Parts 1 & 6 |
 | **Operator panel** — the StampLC HMI / operator view | `web/public/panel.html` | Parts 6–7 |
 | **Team Console** — pick a program and apply it to your team's PLC (the Part 5 front end) | `web/public/index.html` | Part 5 |
@@ -58,6 +60,30 @@ python3 -m http.server -d web/public 8000
 Logic Studio's **Bus monitor** and Part 1's I²C analyzer (`bus-analysis/i2c-analyzer.html`)
 share one lane-timeline engine, so the same capture decodes identically in either — the
 ladder editor and the bus analyzer are two views of the one device.
+
+### Generic application workflow under review
+
+The private generic-runtime draft separates the firmware from application logic,
+tag names, mappings and defaults. In Studio, **Open project → inspect and validate →
+PROGRAM → Load application → Read installed application → RUN**. Both vulnerable
+and secure firmware use this same contract. A newly loaded application stays stopped.
+Reboot defaults to PROGRAM; an intentionally added startup ST declaration or ladder
+rung can request RUN on a later reboot after readiness checks.
+
+- [Prepared projects and deployment contract](docs/GENERIC-RUNTIME.md)
+- [RUN, PROGRAM, REMOTE, startup and optional per-host point permissions](docs/OPERATING-MODES-AND-ACCESS.md)
+- [Expansion-module unit-test coverage and its limits](sbom/firmware/tests/EXPANSION-COVERAGE.md)
+- [PLC capability review and implementation priorities](docs/PLC-CAPABILITY-ROADMAP.md)
+- [Approved implementation sequence and acceptance requirements](docs/APPROVED-IMPLEMENTATION-PLAN.md)
+- [Initial read-only capture from a normally booted local board](tools/bench/README.md)
+- [Local USB installation and bench handoff for Claude](docs/CLAUDE-USB-HANDOFF.md), with the [pinned two-profile candidate](docs/USB-BENCH-CANDIDATE.json)
+- [Execution timing, watchdog results and historical first-fault evidence](docs/EXECUTION-DIAGNOSTICS.md)
+- [Exact-artifact QEMU physics, loadable plant models and replay](docs/QEMU-Twin.md)
+
+This draft does not replace the published classroom binaries or the earlier
+fixed-application exercises until the reviewed student export is released. Use the
+exact firmware/project combination named by the exercise; the legacy Team Console
+and prepared generic-project loader have different deployment contracts.
 
 ## How you'll be graded
 
@@ -68,17 +94,41 @@ your sources and your individual contribution. A clean tool run is not a grade; 
 reasoning is. See the assignment on Canvas for the rubric and the top-5 CVE / HBOM
 tables to complete.
 
-## The firmware twin (Parts 6–7)
+## The firmware twin — your test bench (no hardware)
 
-Parts 6 and 7 run the **real, unmodified firmware** — the same `plc>` console and
+The twin runs the **real, unmodified firmware** — the same `plc>` console and
 Modbus / HMI / OTA services you'd meet on the bench — in an emulator, so you can boot it,
-attack it, and watch the consequence on the I²C bus with **no hardware**. The dev
-container fetches it for you (`qemu/fetch-qemu.sh`); start it with `./qemu/run.sh`.
+drive it, attack it, and watch the consequence on the I²C bus with **no hardware**. The dev
+container fetches it for you (`qemu/fetch-qemu.sh`).
+
+**Run a firmware version, then control it like it's plugged in over USB.** Use two
+terminals — one for the running twin, one for the console:
+
+```bash
+./qemu/run.sh              # terminal 1: boot the vulnerable teaching build
+./qemu/console.sh          # terminal 2: the plc> console  (identical to USB on hardware)
+```
+
+Each script explains what it's doing as it runs. The console is the real USB console:
+`mode run`, `io`, `force`, `status`, `busstream on`, `btn a|b|c`, `cwe`, `proto`,
+`login`, `passwd`, `clk`, `ntpsync` all behave exactly as on a physical StampLC.
+
+**Compare the two builds.** Part 9 hardens the firmware; build and boot the secure image
+next to the vulnerable one and re-run the attacks:
+
+```bash
+./qemu/build-twin.sh secure    # compile + package the hardened image (once)
+./qemu/run.sh secure           # boot it; ./qemu/console.sh to drive it
+./remediation/verify-secure.sh # re-run the Part 6-8 attacks — each is now refused
+```
+
+`./qemu/run.sh malicious` boots the Part-7 supply-chain image the same way.
 
 Under the hood it's a **patched** build of Espressif's QEMU (a stock `qemu-system-xtensa`
-boots the chip but can't model the StampLC's I²C sensors, LCD, or W5500). You never have
-to build it — but if you're curious, **[docs/QEMU-Twin.md](docs/QEMU-Twin.md)** has the
-full build recipe, the live interfaces, the dated provenance, and the gotchas.
+boots the chip but can't model the StampLC's I²C sensors, LCD, or W5500). The
+prebuilt model avoids a local emulator build.
+**[docs/QEMU-Twin.md](docs/QEMU-Twin.md)** records its observed interfaces, the
+separate new-artifact physics gate, and the missing custom patch-source provenance.
 
 **Building the firmware from source** (optional) is a separate, simpler path — the
 controller source in [`sbom/firmware/`](sbom/firmware/) compiles with PlatformIO in

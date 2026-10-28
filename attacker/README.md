@@ -11,7 +11,7 @@ the `docker-in-docker` feature); locally you just need Docker.
 ## Start it
 
 ```bash
-docker compose -f attacker/docker-compose.yml up -d --build
+./attacker/up.sh        # docker compose up -d --build, wrapped as one short command
 ```
 
 That brings up `lab-attacker` at **172.30.0.10**, running:
@@ -39,7 +39,7 @@ Then on the device:
 
 ```
 plc> ntpsync 172.30.0.10 1123          # armed -> the 32-bit clock wraps
-plc> clk                               # 1902 — WRAPPED
+plc> clk                               # 1902-04-27 — WRAPPED (same post-2038 step as Part 8)
 ```
 
 ## How it reaches the device
@@ -52,5 +52,5 @@ is needed on the firmware: `ntpsync`/`netcfg ntp` already take any IP.
 ## Stop it
 
 ```bash
-docker compose -f attacker/docker-compose.yml down
+./attacker/down.sh      # docker compose down, wrapped as one short command
 ```

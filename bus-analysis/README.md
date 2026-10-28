@@ -16,10 +16,7 @@ Nothing in the CLI connects to a device or the network — it runs entirely in y
 Open `serial/exchanges.csv` in a text editor or spreadsheet. It lists exact
 request/reply bytes, transaction identifiers and host receipt intervals. Compare
 the two complete exchanges. `serial/timeout-events.csv` is an earlier, separate
-run whose installed image was not established. An absent reply is not a zero. Note the two
-complete exchanges answer the *same* request (`01 03 00 19 00 01 55 cd`, register 25) with
-**different** values (96 vs 99): a reread is a new measurement, not proof either value is
-stable or "the" value — an observed-vs-inferred point, not corruption.
+run whose installed image was not established. An absent reply is not a zero.
 
 Read `source/firmware-path.cpp.txt` beside the bytes. Its original numbered lines
 connect input acquisition, program execution, output writes and register
@@ -30,24 +27,41 @@ representation, not a program to install for this activity.
 ## The decoder CLI (pure Node, no device)
 
 Node.js is already installed in the Codespace — no packages, network, controller
-or Python needed. From the repo root, change into this folder, then run:
+or Python needed. From the repo root, run the decoder script — it decodes the
+request, both complete replies, and the empty timeout reply in one pass:
 
 ```sh
-cd bus-analysis          # all paths below are relative to this folder
-node tools/decode.js rtu-request serial/physical-0-request.bin
-node tools/decode.js rtu-reply serial/physical-0-reply.bin serial/physical-0-request.bin
-node tools/decode.js rtu-reply serial/physical-3-reply.bin serial/physical-3-request.bin
-node tools/decode.js rtu-reply serial/timeout-reply.bin serial/timeout-request.bin
+./bus-analysis/decode.sh   # decode the RTU request + two replies + the timeout reply
 ```
 
-The first command should identify a valid function-03 request. Complete replies
-should report `status: valid` and decoded `values`. The empty timeout reply
-should report `unavailable`, with no accepted value and a nonzero process exit.
-That last result is expected evidence handling, not a broken installation.
+The request should identify a valid function-03 read of register 25. Both
+complete replies should report `status: valid` and a decoded `values`. The empty
+timeout reply should report `unavailable`, with no accepted value and a nonzero
+process exit — that is expected evidence handling, not a broken installation.
+
+The two complete exchanges answer the **identical** request `01 03 00 19 00 01
+55 cd` yet return different values (register 25 = 96 in physical-0, 99 in
+physical-3, both CRC-valid): a reread is a *new acquisition* of a live quantity,
+not corruption of the first reply.
+
 Inspect the field explanations and compare the value with its source meaning.
 The interactive analyzer below shows the same fields beside the bytes. The CLI's
 other protocol modules (`tools/*.js`) are unchanged; this part's cases concern
 Modbus RTU.
+
+### Active learning
+- **Predict** — before running, write down (a) what you think register 25
+  decodes to and what it *means* (value, scale, signedness — note you cannot know
+  scale without the firmware map), and (b) *why* two rereads of the identical
+  request would differ, if they do.
+- **Run** — `./bus-analysis/decode.sh`
+- **Reconcile** — compare your prediction with the decoded `values` (96 vs 99).
+  This establishes that both replies are well-formed, matched and CRC-valid, and
+  that the difference is a fresh sample. It does **not** establish the physical
+  quantity, its units, or that either number is independent process truth — a CRC
+  authenticates nothing and a map is still required.
+- **Pair check** — explain to a partner why "same bytes in, different value out"
+  is evidence of acquisition timing, not of a corrupted or spoofed frame.
 
 RS-485 is the electrical interface. Modbus RTU is the message format. A holding
 register is a 16-bit value whose meaning comes from the device map. CRC means
@@ -61,10 +75,10 @@ not a PCAP or sampled logic-analyzer channels. Do not invent an Ethernet layer.
 The **TBD Logic Studio** ships in this repo at `../web/public/logic_studio.html`:
 a ladder / Structured-Text editor with a **Bus monitor** whose lane-timeline view
 is the same one `i2c-analyzer.html` uses. Open it in the Codespace by serving the
-`web/public` folder and forwarding the port:
+`web/public` folder (shared helper used by several parts) and forwarding the port:
 
 ```bash
-python3 -m http.server -d web/public 8000   # from the repo root; open logic_studio.html on forwarded port 8000
+./tools/serve-web.sh            # serves web/public on port 8000 (PORT=… to change); open logic_studio.html on the forwarded port
 ```
 
 In **Bus monitor → Open capture**, choose `bus-analysis/hooks/physical-bus-capture.json`.
@@ -110,9 +124,7 @@ protocol-timing view, not an analog acquisition (QEMU models the bus at the
 transaction level).
 
 ```bash
-python3 tools/bus_to_vcd.py hooks/physical-bus-capture.json bus.vcd
-sigrok-cli -i bus.vcd -P i2c:scl=SCL:sda=SDA -A i2c   # Start/Address/Data/ACK/Stop
-# or open bus.vcd in PulseView and add the I²C decoder (SCL, SDA)
+./bus-analysis/to-sigrok.sh   # bus_to_vcd.py -> bus.vcd, then sigrok-cli decodes it (or open bus.vcd in PulseView)
 ```
 
 Each transaction decodes back to its device and value — e.g. address `0x48`
@@ -128,10 +140,18 @@ JSON — a **live** capture while the logic runs. Run the twin **slowed** so the
 bus cadence is human-paced instead of thousands of transactions a second:
 
 ```bash
-# slowed twin:  qemu-system-xtensa ... -icount shift=5,sleep=on ...
-python3 tools/twin_sampler.py --samples 20 --interval 0.5 --out live
-sigrok-cli -i live.vcd -P i2c:scl=SCL:sda=SDA -A i2c
+./bus-analysis/live-sample.sh   # twin_sampler.py (live) -> live.vcd + live.json, then sigrok-cli decodes it
 ```
+
+Run the twin slowed first (see `tools/twin_tap.sh`, which launches it with
+`-icount shift=5,sleep=on`). Tunables: `SAMPLES`, `INTERVAL`, `OUT`.
+
+The teaching firmware also exposes this same bus traffic directly: `busstream on`
+on the serial console streams decoded `@BUS <ms> <R|W> 0x<addr> <decode>` lines —
+the live form of the exact transactions these recorded captures decode — and
+`busstream off` stops it. Injecting a panel button with `btn a|b|c` is a clean way
+to provoke a panel-expander transaction and watch the corresponding `@BUS` line
+appear.
 
 `-icount shift=N,sleep=on` runs the guest in wall-clock-aligned slow motion
 (higher N = slower); `QMP stop`/`cont` freezes it outright. That is what keeps a
@@ -150,13 +170,9 @@ digital capture → the same sigrok decode.
 `tools/trace_to_sigrok.py` is that virtual tap. It reads the QEMU I²C controller's
 own `esp32_i2c_observe` trace — the complete byte-level bus traffic
 (START / address / repeated-start / data / ACK-NACK / STOP, with `virtual_ns`
-timing) — and reconstructs the SDA/SCL into a VCD:
-
-```bash
-qemu-system-xtensa ... --trace enable=esp32_i2c_observe -D trace.log
-python3 tools/trace_to_sigrok.py trace.log --bus i2c0 --out bus
-sigrok-cli -i bus.vcd -P i2c:scl=SCL:sda=SDA -A i2c    # decodes like a bench capture
-```
+timing) — and reconstructs the SDA/SCL into a VCD. You run it through `tools/twin_tap.sh` (the
+one-command virtual tap below), not by invoking QEMU and the reconstructor by
+hand.
 
 Validated: it recovers register-pointer writes, data reads, repeated starts, and
 the firmware's board-probe **NACKs** — exactly what a bench analyzer sees. The
@@ -165,6 +181,10 @@ source. Bench students clip on a cheap sigrok-supported LA (fx2lafw / Pico) at t
 same bus; the capture format and the answers match. Analog-only effects (rise
 times, noise) live below the logic-analyzer abstraction and are the one thing a
 scope — not this — would add, bench-only.
+
+You don't drive QEMU or `trace_to_sigrok.py` by hand: the **one-command virtual
+tap** below (`tools/twin_tap.sh`) launches the traced twin and runs the
+reconstruction for you, writing `bus.vcd` + `bus.json`.
 
 ## One-command virtual tap → analyzer / PulseView
 

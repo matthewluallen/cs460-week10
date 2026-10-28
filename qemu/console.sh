@@ -13,6 +13,15 @@ set -euo pipefail
 SOCK="${SERIAL_SOCK:-/tmp/plc-serial}"
 [ -S "$SOCK" ] || { echo "No serial socket at $SOCK — is the twin running?  (./qemu/run.sh)"; exit 1; }
 
+echo "This is the StampLC plc> console — the SAME interface you'd get over USB on the"
+echo "real device. Everything you do to the twin here, you'd do identically on hardware."
+echo
+echo "  Control:   mode run|prog|remote   io   force <tag> <0|1>   points"
+echo "  Observe:   status   busstream on|off   bustrace on   clk   log"
+echo "  Services:  cwe   proto   svcinfo                      (what this image exposes)"
+echo "  Access:    login operator <pass>   passwd <new>       (secure build: enroll first)"
+echo "  Panel:     btn a|b|c                                  (drive the on-device buttons/LCD)"
+echo
 echo "+ nc -U $SOCK"
 echo "  (quit the console with:  Ctrl-C , or close the pane)"
 echo

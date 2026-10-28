@@ -1,5 +1,26 @@
 # QEMU twin — run the firmware with no hardware
 
+The quick start below uses the **historical classroom image**. For newly built
+generic-runtime artifacts, use the separate lifecycle and plant gates described in
+[the current QEMU guide](../docs/QEMU-Twin.md). Both `m5stamplc` and
+`m5stamplc_secure` remain required; `ENABLE_CWE_DEMOS` remains the teaching switch.
+The loaded application and its plant model are independent of that build choice.
+
+The new [reservoir experiment](plants/reservoir.plant.json) has a separate
+[prepared application](plants/reservoir.csco), a deterministic source model and
+model-specific QMP qualification. Its host checks run with:
+
+```bash
+python3 qemu/test_plant_model.py
+```
+
+The exact-artifact `model_probe.py` and `plant_smoke.py` commands, evidence scopes,
+and offline `replay_plant.py` command are in the guide. The final plant gate also
+requires the current firmware's `execution json` endpoint. These checks use the
+pinned Linux x86_64 model; they do not qualify physical expansion modules.
+
+## Historical classroom quick start
+
 Runs the *real*, de‑branded StampLC firmware — the same `plc>` console and the same
 vulnerable Modbus / HMI / OTA services you'd meet on the bench — entirely in software.
 **Parts 6 and 7 use this.** (It's also fair game as enrichment for the earlier parts.)
@@ -16,8 +37,8 @@ vulnerable Modbus / HMI / OTA services you'd meet on the bench — entirely in s
 > Homebrew `qemu-system-xtensa` can't model the StampLC's I²C / LCD / W5500, so it stalls
 > at boot). Run the twin in a **Codespace**, or open this repo in a **local VS Code Dev
 > Container** (*Dev Containers: Reopen in Container*) — that's Linux arm64, so
-> `fetch-qemu.sh` pulls the matching `qemu-twin-linux-arm64` build and everything works.
-> (`run.sh`/`fetch-qemu.sh` stop with this message if you run them straight on macOS.)
+> `fetch-qemu.sh` pulls the matching `qemu-twin-linux-arm64` build and everything below
+> works unchanged.
 
 ## Helper scripts (short to type, annotated inside)
 
@@ -43,14 +64,14 @@ bridge binds that same port on the host. Port 80 is *privileged* (< 1024), and a
 Codespace runs as a normal user — so the bind would be refused. We don't lower the
 privileged-port boundary (Codespaces makes that sysctl read-only) and we **don't run
 the emulator as root**. Instead `fetch-qemu.sh` grants the qemu binary exactly one
-Linux capability:
+Linux capability (shown so you can read it — **you never type this**, the scripts run it):
 
 ```bash
 sudo setcap cap_net_bind_service=+ep  qemu/twin/qemu-twin-linux-*/qemu-system-xtensa
 ```
 
 That's the whole fix — the single capability "may bind low ports," nothing else.
-`run.sh` re-applies it automatically if it's ever missing. (This is itself a nice
+`fetch-qemu.sh` applies it on setup and `run.sh` re-applies it automatically if it's ever missing. (This is itself a nice
 least-privilege example for the course: the narrowest grant that makes the thing work.)
 
 ## Under the hood
@@ -58,6 +79,8 @@ least-privilege example for the course: the narrowest grant that makes the thing
 The prebuilt binary is a **patched** Espressif QEMU (a stock `qemu-system-xtensa`
 can't model the StampLC's I²C sensors, LCD, or W5500, so the firmware stalls at
 startup). Prebuilt bundles + the firmware images are hosted on the repo's
-`qemu-twin-*` release. For the full build‑from‑source recipe, the live interfaces
-(`plc>`, Modbus/TCP, HTTP‑HMI, QMP I/O injection), dated provenance, and the
-gotchas, read **[../docs/QEMU-Twin.md](../docs/QEMU-Twin.md)**.
+`qemu-twin-*` release. The referenced custom patch source is not in the inspected
+release or repository branches, so a reproducible model build remains a provenance
+gap. The current guide records observed binary interfaces, ownership/deadline
+qualification and the limits of the source/model evidence:
+**[../docs/QEMU-Twin.md](../docs/QEMU-Twin.md)**.

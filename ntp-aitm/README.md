@@ -5,7 +5,7 @@ at all. The device asks the network "what time is it?", **trusts the answer with
 authentication**, and stores that time in a **signed 32-bit field**. An adversary on the
 time path answers with a date past **2038-01-19 03:14:07 UTC**, the 32-bit value wraps,
 and the controller's clock jumps to **1902** — and the audit trail that says *who did
-what, when* is now dated to the Taft administration.
+what, when* is now dated to the Roosevelt administration.
 
 The protocol is the attack surface — the same thesis as the unauthenticated-Modbus write
 in Part 1, now applied to time.
@@ -75,27 +75,43 @@ Real devices don't sync once; they keep asking. Turn that on, then play the atta
 plc> ntpsync auto 127.0.0.1 3         # re-sync every 3 s (port carried from Exercise 1)
 ```
 
-In your shell, flip the server from benign to the trigger:
+### Active learning
 
-```bash
-./ntp-aitm/arm.sh                     # serve a time past 2038-01-19 (echo arm > /tmp/ntp_state)
+- **Predict:** before you arm anything, write down the exact year `clk` will show after
+  the wrap. The armed server returns **2038-06-03** on the wire; the firmware stores the
+  epoch in a *signed 32-bit* field. Will it read 1901, 1902, or something else?
+- **Run:** `./ntp-aitm/arm.sh` (serve a post-2038 time), watch the `ntp_server` log flip
+  `benign -> ARMED`, then at the console: `plc> clk`.
+- **Reconcile:** `clk` reads **1902-04-27 ~17:31 UTC** — the `(int32_t)` truncation of
+  the 2038-06-03 epoch (`-2135831296`), plus a few seconds of monotonic drift. If you
+  predicted 1901, note *why* the exact date is 1902 (it is the wrapped epoch, not a round
+  number). This establishes that unauthenticated time + a 32-bit store rewrites the clock;
+  it does **not** show the audit log was corrupted — that is the next observation.
+- **Pair check:** tell a partner the one-line chain that got the clock to 1902 without
+  anything connecting *to* the device.
+
 ```
-
-Watch the `ntp_server` log flip `benign -> ARMED`, then:
-
-```
-plc> clk                              # the clock has WRAPPED
+plc> clk                              # the clock has WRAPPED to 1902
 ```
 
 ![Codespace: ntp_server log benign then ARMED, and clk now reads 1902](img/08-detonate.png)
+<!-- SHOT: part 8 — clk after arm.sh + ntpsync showing "WRAPPED! 32-bit overflow" and the 1902-04-27 date -->
 
 The next beacon after you armed it returned **2038-06-03** on the wire (a perfectly valid
 64-bit time), but the firmware truncates it into a signed 32-bit field, so it wrapped to
-**1902** — and `clk` now flags `WRAPPED! 32-bit overflow`. Reset with `./ntp-aitm/benign.sh`.
+**1902-04-27 17:31:44 UTC** — and `clk` now flags `WRAPPED! 32-bit overflow`. Reset with
+`./ntp-aitm/benign.sh`.
 
 **Do:** capture `clk` before and after, plus the `ntp_server` log line that armed it. Note
 that **nothing connected *to* the device** — the trigger rode the device's own outbound
 "what time is it?", which no inbound firewall rule would see.
+
+**Then observe the subtle part (graded):** run `plc> log` while the clock reads 1902. The
+audit entries are still stamped with a **monotonic `millis()` uptime counter**
+(`plc_core.cpp` stamps every line with `millis()`), not the wall clock — so the log never
+shows 1902 even though `clk` does. Record that the wall-clock wrap did **not** move the
+audit timestamps: that is the evidence that makes the monotonic-clock fix (below)
+concrete, and it is the subtlest observation for your finding.
 
 ---
 
@@ -106,11 +122,14 @@ it ships the **documented default `admin:openplc`**, unchanged. Anyone who read 
 can reconfigure the device, including **which time server it trusts**.
 
 ```bash
-curl -s http://127.0.0.1:8080/api/config                               # 401 - it needs auth
-curl -s -u admin:openplc http://127.0.0.1:8080/api/config              # the default works
-curl -s -u admin:openplc -X POST \
-     'http://127.0.0.1:8080/api/config?ntp=127.0.0.1&ntp_port=1123'    # repoint the time source
+curl -s http://127.0.0.1:8080/api/config                   # 401 - it needs auth
+curl -s -u admin:openplc http://127.0.0.1:8080/api/config  # the default works (never returns the pw)
+./ntp-aitm/pivot.sh                                        # repoint NTP -> 127.0.0.1:1123 (wraps the long POST)
 ```
+
+> `pivot.sh` wraps the one long `curl -s -u admin:openplc -X POST '…/api/config?ntp=…'`
+> repoint command and prints it before running, so you see the request without typing it.
+> Point it elsewhere with `./ntp-aitm/pivot.sh <host> <port>`.
 
 ![Codespace terminal: 401, then the config JSON, then a remote repoint of the NTP source](img/08-config-pivot.png)
 
@@ -148,10 +167,8 @@ observation — and what you would need (a lab segment with a rogue DHCP server)
 ## Static meets dynamic — where the bug lives
 
 ```bash
-grep -n "int32_t s_epoch32\|(int32_t)unix64\|settimeofday" sbom/firmware/src/time_sync.cpp
+./ntp-aitm/show-bug.sh        # greps the deciding cast in time_sync.cpp and explains it
 ```
-
-> **Shortcut:** `./ntp-aitm/show-bug.sh` runs that grep and points at the deciding line.
 
 The weakness is one cast: the 64-bit network time is stored as `(int32_t)` (`time_sync.cpp`).
 The runtime `WRAPPED` is its consequence. Note what is **not** corrupted: the
@@ -183,7 +200,9 @@ One finding, same standard as every part: **what the evidence shows, what it doe
 establish, your uncertainty, and the next observation that would decide a competing
 explanation.** Concretely:
 
-1. `clk` before/after plus the `ntp_server` log line that armed it (Exercise 2 evidence).
+1. `clk` before/after (the **1902-04-27** wrap) plus the `ntp_server` log line that armed
+   it, **and** the `log` readout showing the audit timestamps stayed monotonic (`millis()`)
+   while `clk` read 1902 — the wall-clock wrap did not move them (Exercise 2 evidence).
 2. The remote-pivot evidence: the 401, the authenticated GET, the repoint, and the lock-out
    after you changed the default (Exercise 3).
 3. The quoted truncation line (`time_sync.cpp`) and a sentence on static-vs-dynamic: what

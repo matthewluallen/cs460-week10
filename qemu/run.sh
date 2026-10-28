@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Run the StampLC firmware in the prebuilt QEMU twin — no hardware.
+# Run the StampLC firmware in the prebuilt (de-branded) QEMU twin — no hardware.
 # First run ./qemu/fetch-qemu.sh once to download the binary + firmware image.
 # See ../docs/QEMU-Twin.md for the full story.
 #
-# ─ TIME / THROUGHPUT KNOB (icount) ────────────────────────────────────────────
-# The twin runs on QEMU's instruction-counting virtual clock (-icount). A higher
-# shift makes virtual time pass SLOWER relative to the host — deterministic and
-# ideal for bus analysis and QMP stop-time. A lower shift (or OFF) runs FASTER —
-# use it for throughput, e.g. pushing a whole firmware image to the OTA endpoint.
-#   ICOUNT=shift=3,align=off,sleep=off   (default — near-interactive, deterministic)
-#   ICOUNT=shift=5,sleep=on              (slow-motion: I2C/bus capture, stop-time)
-#   ICOUNT=off                           (fastest, non-deterministic: big OTA uploads)
+# ─ VIRTUAL TIME (icount) ─────────────────────────────────────────────────────
+# A fixed shift=N assigns 2^N guest nanoseconds per instruction. It is not a
+# simple wall-clock speed knob or cycle-accurate timing. With sleep=off, an idle
+# CPU can jump to the next virtual timer. Host throughput depends on the workload.
+#   ICOUNT=shift=3,align=off,sleep=off   (default fixed instruction-count mapping)
+#   ICOUNT=shift=5,sleep=on             (different virtual-time/idle policy)
+#   ICOUNT=off                          (host-driven timing; no fixed-deadline gate)
+# The separate plant runner qualifies its exact clock/deadline behavior.
 # Other knobs:
 #   FLASH_IMG=<path>   8MB merged image (default: ./qemu/twin/stamplc-flash-8MB.bin)
 #   W5_BIND=<ip>       host address the W5500 TCP bridge binds (default 127.0.0.1)
@@ -24,15 +24,39 @@ OS=$(uname -s); ARCH=$(uname -m)
 case "$OS/$ARCH" in
   Linux/x86_64)  BDIR="$HERE/twin/qemu-twin-linux-x86_64" ;;
   Linux/aarch64) BDIR="$HERE/twin/qemu-twin-linux-arm64" ;;   # local Dev Container on Apple Silicon
-  Darwin/arm64)  echo "No native macOS twin — run the twin in a Codespace or a local Linux/arm64 Dev Container (see qemu/README.md)." >&2; exit 2 ;;
+  Darwin/arm64)  BDIR="$HERE/twin/qemu-twin-macos-arm64" ;;
   *) echo "Unsupported platform $OS/$ARCH — build from source (see ../docs/QEMU-Twin.md)."; exit 1 ;;
 esac
-IMG="${FLASH_IMG:-$HERE/twin/stamplc-flash-8MB.bin}"
+# ── which firmware version to boot ──────────────────────────────────────────
+# The QEMU twin is your test environment — no hardware needed. The physical
+# StampLC is reference only (it validated all of this on real silicon); every
+# console command you use here also works over USB on the real device.
+# First argument picks the profile; or set FLASH_IMG=<path> to boot any image.
+#   ./qemu/run.sh            # vulnerable teaching build (default)
+#   ./qemu/run.sh secure     # hardened build (Part 9) — build it first: ./qemu/build-twin.sh secure
+#   ./qemu/run.sh malicious  # supply-chain image (Part 7)
+PROFILE="${1:-vuln}"
+case "$PROFILE" in
+  vuln|vulnerable|teaching) IMGDEF="$HERE/twin/stamplc-flash-8MB.bin";           WHICH="vulnerable teaching build";;
+  secure|hardened)          IMGDEF="$HERE/twin/stamplc-secure-8MB.bin";          WHICH="hardened secure build";;
+  malicious|evil)           IMGDEF="$HERE/twin/stamplc-flash-8MB-MALICIOUS.bin"; WHICH="supply-chain malicious image";;
+  *) echo "usage: ./qemu/run.sh [vuln|secure|malicious]   (or set FLASH_IMG=<path>)"; exit 2;;
+esac
+IMG="${FLASH_IMG:-$IMGDEF}"
 QEMU="$BDIR/qemu-system-xtensa"
-if [ ! -x "$QEMU" ] || [ ! -f "$IMG" ]; then
+if [ ! -x "$QEMU" ]; then
   echo "Twin not fetched yet (or wrong platform). Run:  ./qemu/fetch-qemu.sh"
   exit 1
 fi
+if [ ! -f "$IMG" ]; then
+  case "$PROFILE" in
+    secure|hardened) echo "No secure image at $IMG — build it once:  ./qemu/build-twin.sh secure";;
+    malicious|evil)  echo "No malicious image at $IMG — run ./qemu/fetch-qemu.sh (Part 7 notes the fallback if unpublished).";;
+    *)               echo "No twin image at $IMG — run:  ./qemu/fetch-qemu.sh";;
+  esac
+  exit 1
+fi
+echo "booting the $WHICH:  $(basename "$IMG")"
 
 # ── virtual-clock throttle ──
 ICOUNT="${ICOUNT:-shift=3,align=off,sleep=off}"

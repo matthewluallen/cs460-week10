@@ -68,20 +68,29 @@ again here, now with the whole device around it.)
 
 ## Exercise 2 — the unsigned update
 
-The firmware exposes a firmware-update endpoint on port **80**. Ask it what it is, then
-push a file to it:
+The firmware exposes a firmware-update endpoint on port **80**. Ask it what it is:
 
 ```bash
 curl -s http://127.0.0.1:80/                       # the endpoint advertises itself
-printf 'MALICIOUS-UNSIGNED-OTA' > /tmp/evil.bin     # not the vetted image
-curl -s -X POST --data-binary @/tmp/evil.bin http://127.0.0.1:80/api/upload
 ```
 
-> **Shortcut:** `./qemu/ota-push.sh` does exactly the `printf` + `curl … POST` above
-> (with a demo payload), and prints the command as it runs. Pass your own file with
-> `./qemu/ota-push.sh my-image.bin`.
+### Active learning
+
+- **Predict** — write down, *before* you push: will the server **accept** a 22-byte
+  unsigned blob that is obviously not a real image? If it reports `verified=NO`, does
+  `NO` mean the upload was *rejected*, or that it was *stored without being verified*?
+- **Run** — `./firmware-ota/push-unsigned.sh   # POST the 22-byte unsigned blob`
+- **Reconcile** — the response states the bytes **accepted** plus `verified=NO`. That
+  establishes the write was *unauthenticated and unsigned* (an observation). It does
+  **not** establish that this particular blob would *boot* — the 2nd-stage loader
+  format-checks it, so 22 bytes won't run. "Accepted 22 bytes" is the observation; "a
+  well-formed malicious image would boot" is the inference.
+- **Pair check** — tell a partner, in one sentence, why `verified=NO` is worse than a
+  rejection, not better.
 
 ![Codespace terminal: the OTA endpoint accepting an unsigned image](img/06-ota.png)
+
+<!-- SHOT: part 6 — push-unsigned.sh output showing bytes accepted + verified=NO -->
 
 Read the response carefully. The firmware **accepted** an unauthenticated, unsigned
 upload and reports `verified=NO`. The 2nd-stage loader still *format-checks* the image
@@ -99,12 +108,18 @@ every weakness class you can justify **from what you observed in this exchange**
 
 CWE-22 (path traversal) is **not** established by this upload — the OTA log path is built
 from the client's numeric IP, which can't contain `../`. The weakness lives elsewhere: the
-HMI **log viewer** builds a file path straight from your input with no sanitization
-(`config.h`: `#define LOG_VIEWER_PATH_SANITIZE 0`; `web_hmi.cpp`: `filepath = String(LOG_DIR) + "/" + filename`). You can read it
-in the source, and watch the device accept an un-sanitized traversal path:
+HMI **log viewer** builds a file path straight from your input with no sanitization. The
+sanitizer is switched off by a build flag, and the path is then concatenated raw:
+
+- **Define:** `sbom/firmware/src/config.h:133` — `#define LOG_VIEWER_PATH_SANITIZE 0`
+- **Bad build:** `sbom/firmware/src/web_hmi.cpp:86` — `String filepath = String(LOG_DIR) + "/" + filename;`
+  (`LOG_DIR` is `"/logs"`; `filename` comes straight from `?file=`, so `../` is kept verbatim)
+
+You can read those two lines in the source, and watch the device accept an un-sanitized
+traversal path:
 
 ```bash
-curl -s 'http://127.0.0.1:8080/logs?file=../../config.txt'   # accepted; the server builds /logs/../../config.txt
+./firmware-ota/show-log-traversal.sh   # GET /logs?file=../../config.txt (un-sanitized path)
 ```
 
 On the twin this returns *File not found* — the emulated log store is empty, so there is
@@ -125,11 +140,8 @@ The firmware source is in the SBOM part you already have (`sbom/firmware/`). Ope
 OTA handler and read the "verification" step:
 
 ```bash
-grep -rn "verify_firmware\|verified\|Update.begin" sbom/firmware/src/ | head
+./firmware-ota/show-bug.sh   # grep the OTA source for the verification step
 ```
-
-> **Shortcut:** `./firmware-ota/show-bug.sh` runs that grep (easy to mistype) and
-> points you at the deciding line.
 
 You'll find a `verify_firmware()` that returns a constant — it never checks a signature
 or hash. That single line is the vulnerability; the runtime `verified=NO` is its

@@ -5,6 +5,20 @@ toggle the input, and watch the output. The browser never touches a device direc
 it calls a Netlify Function that checks the code and (when configured) forwards to that
 team's StampLC through the gateway.
 
+## Portable projects in Logic Studio
+
+Use [Logic Studio](public/logic_studio.html) with the
+[generic runtime guide](../docs/GENERIC-RUNTIME.md) and
+[operating modes and host permissions guide](../docs/OPERATING-MODES-AND-ACCESS.md).
+The [reboot RUN project](public/projects/reboot-run-indicator.csco) and
+[matching Studio ST](public/projects/reboot-run-indicator.st) demonstrate an explicit
+startup request. Reboot defaults to PROGRAM; a new project load always stays PROGRAM.
+
+A gateway forwarding commands over USB or RS-485 crosses the runtime's trusted
+serial boundary, which is outside its IP host rules. Enforce user/host permissions
+at that gateway; forwarding a serial stream does not preserve the original network
+client's identity for controller authorization.
+
 ## It already runs with no device (mock mode)
 
 With no environment variables set, the Function runs in **mock mode**: it validates the
@@ -41,5 +55,17 @@ needs to expose those three POST routes; keep Modbus/telnet/OTA off the public p
 Local development:
 
 ```bash
-netlify dev    # serves the page + functions at http://localhost:8888
+netlify dev    # serves the page + the Netlify Function at http://localhost:8888
 ```
+
+Use `netlify dev` only when you need the **Function** — team-code gating and the
+`apply`/`trigger`/`status` forwarding. To just **view the browser tools** (Logic Studio,
+Protocol Studio, Operator panel, Team Console) as static pages, you don't need Netlify:
+
+```bash
+./tools/serve-web.sh   # serves web/public on :8000 (same tool Parts 1/4/5 use)
+```
+
+Served statically the Team Console page loads, but its `apply`/`trigger`/`status` calls hit
+the Netlify Function path, which only exists under `netlify dev` or a deploy — so use
+`netlify dev` when you want the gated flow, `serve-web.sh` when you just want the pages.

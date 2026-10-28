@@ -5,12 +5,8 @@ a build pulls in. Security teams use it to answer "do we ship anything with a kn
 CVE?" You'll generate SBOMs in two standard formats, compare them, scan one for
 vulnerabilities, and — the honest part — see where an SBOM's view stops.
 
-Tools (installed for you): **syft** (generates SBOMs), **grype** (scans an SBOM for
-CVEs), **cve-bin-tool** (scans a *compiled binary* for embedded components + CVEs —
-Exercise 3), and **flawfinder** + **cppcheck** (source-code SAST — Exercise 4). **trivy**
-(does SBOM + scan in one) is installed when available as an optional second opinion.
-The point of using several is that each has a *different blind spot* — that contrast is
-the lesson, not any one tool's output.
+Tools (installed for you): **syft** (generates SBOMs) and **grype** (scans an SBOM
+for CVEs).
 
 ---
 
@@ -43,27 +39,38 @@ if so — whether a fix would be a firmware patch or a library bump. Note your u
 
 ## Exercise 2 — generate, compare, scan
 
-Run the helper (or the commands by hand):
+Run the helper — it generates the same component set as **SPDX** and as
+**CycloneDX**, scans the SBOM with grype, and (step 4) runs the CWE bridge:
 
 ```bash
-bash sbom/run_sbom.sh
+bash sbom/run_sbom.sh   # SPDX + CycloneDX via syft, grype scan, CWE bridge -> sbom/out/
 ```
 
-It generates the same component set as **SPDX** and as **CycloneDX**, then scans with
-grype. In your notebook, record:
+In your notebook, record:
 
 1. **SPDX vs CycloneDX** — one concrete difference you see (a field name, how components
    are identified, the component count). They describe the same thing in different schemas.
 2. **Top 5 CVEs** from the grype table (CVE, severity, component, version) for the report.
 3. Pick **one** CVE, find it in the NVD, and summarize its cause in a sentence.
 
-By hand, the key commands are:
+The script writes `out/sbom.spdx.json`, `out/sbom.cdx.json`, `out/grype.txt`,
+`out/grype.json` and `out/cwe-bridge.txt` — read those rather than re-typing the
+raw `syft`/`grype` commands.
 
-```bash
-syft dir:vuln-sample -o spdx-json      > out/sbom.spdx.json   # SPDX
-syft dir:vuln-sample -o cyclonedx-json > out/sbom.cdx.json    # CycloneDX
-grype sbom:out/sbom.spdx.json -o table                        # CVEs
-```
+### Active learning
+- **Predict** — before scanning, look at the component list from Exercise 1 and
+  write down which of the CVEs you expect to top the grype table are
+  **firmware-resident** (code that actually runs on the microcontroller) vs
+  **build-host / toolchain-only** (present in the scanned tree but never shipped
+  to the chip). This "scope" call is the graded insight.
+- **Run** — `bash sbom/run_sbom.sh`
+- **Reconcile** — compare your prediction against the grype table. Being listed
+  establishes only that a *component version* carries a known CVE; it does **not**
+  establish that the weak code path runs on the device or is reachable. Mark each
+  top CVE as firmware-resident or build-host-only, and note what the scan could
+  not have told you (reachability).
+- **Pair check** — tell a partner, for one CVE, whether it would survive onto the
+  StampLC and why.
 
 ---
 
@@ -75,14 +82,9 @@ Try scanning the firmware source itself:
 syft dir:firmware        # what does it find?
 ```
 
-Look hard at what comes back — this is the trap. On a **clean** `firmware/` you get
-**almost nothing**, because a `platformio.ini` of C/C++ library pins is not a package
-ecosystem syft catalogs. But if you've **built** it (so `firmware/.pio/` exists), syft
-cheerfully reports **dozens of "components" — all GitHub Actions** like `actions/checkout`.
-Those aren't the firmware: they're the **CI workflows of the vendored libraries** PlatformIO
-downloaded into `.pio/libdeps/`. The scanner found a layer it *can* parse (workflow YAML) and
-confidently listed the wrong thing. Neither view is the device's real dependency set. That's
-the real-world catch:
+You'll get **almost nothing** — a `platformio.ini` of C/C++ library pins is not a
+package ecosystem the scanner catalogs, and there's no compiled tree here. That's the
+real-world catch:
 
 - **Build-host / toolchain SBOM** (what Exercise 2 scans) finds plenty and is where
   supply-chain attacks like *XZ* and *SolarWinds* live — but those components don't all
@@ -94,92 +96,6 @@ the real-world catch:
 Say clearly in your finding **which scope** your SBOM covered, and what it therefore
 could not have caught.
 
-## Exercise 3 — scan the *compiled binary* (the firmware-resident view)
-
-Exercise 2 read build *manifests*. Now read the shipped artifact itself. **cve-bin-tool**
-(installed for you) scans a compiled binary for the version fingerprints of well-known
-components and maps them to CVEs. The interesting part is what it does — and does **not** —
-find in this firmware.
-
-```bash
-bash sbom/run_cve_bin_tool.sh        # scans firmware/prebuilt/stamplc-factory-8MB.bin
-```
-
-The script uses cve-bin-tool's **json-mirror** data source (a public CVE snapshot pulled with
-`gsutil`), so it needs **no NVD API key** and works even when `nvd.nist.gov` is down or
-rate-limited. The dev container installs `gsutil` and pre-caches the mirror on build, so the
-first scan is quick. (If you have an NVD key and want the live feed instead:
-`cve-bin-tool <bin> --nvd-api-key <key>`.)
-
-Even with no network, you can confirm the components are really in there:
-
-```bash
-strings sbom/firmware/prebuilt/stamplc-factory-8MB.bin | grep -iE 'mbedtls|lwip|wpa_supplicant|esp-idf'
-```
-
-You'll see `mbedTLS`, `lwIP` and `wpa_supplicant` paths — the crypto and TCP/IP stacks the
-note above said "most *embedded* CVEs actually live" in.
-
-**Now compare that to what cve-bin-tool reports: on this image it finds `0 products with known
-CVEs`.** That is not a bug and not a clean bill of health — it *is* the lesson. cve-bin-tool
-matches by *version fingerprints*, and the ESP-IDF monolithic build does not expose the bundled
-libraries' versions in a form its checkers recognize — even though `strings` proves the code is
-right there. So:
-
-- **Source SBOM** (syft on `firmware/`) → the build's library *pins*, little CVE signal.
-- **Binary scan** (cve-bin-tool on the `.bin`) → here, **0 detections** — a dedicated binary
-  scanner still misses firmware-resident components when their versions aren't fingerprintable.
-- **The real firmware-resident view** comes from mapping the **framework version → the libraries
-  it bundles → the NVD** by hand (the Exercise-1 method), not from any one-shot scan.
-
-**Finding to keep:** report cve-bin-tool's result for this binary (how many products / CVEs it
-detected — likely **0**), reconcile it against the `strings` evidence that the components ARE
-present, and state the lesson in one sentence: **absent from the scan is not absent from the
-device.** Then take one component you know is in the firmware (from Exercise 1), look its version
-up in the NVD yourself, and say whether a fix would be a firmware rebuild or an architecture
-control (detected ≠ exploitable — and *not*-detected ≠ *not*-present).
-
-## Exercise 4 — scan the *source code* (SAST), and watch it miss the point
-
-Exercises 1–3 asked **"which *components* carry known CVEs?"** (SBOM + CVE matching). A different
-tool class — **SAST** (static application security testing) — asks **"which *code patterns* are
-weak?"** Run two on the firmware source (installed for you):
-
-```bash
-flawfinder --minlevel=2 sbom/firmware/src          # CWE-tagged risky C/C++ calls
-cppcheck  --enable=all --inconclusive --suppress=missingIncludeSystem sbom/firmware/src
-```
-
-On this firmware you'll get a **flood** — roughly **330 flawfinder hits** (almost all `CWE-120`/
-`CWE-119` buffer calls, plus `CWE-134` format, `CWE-190` integer, `CWE-362` race) and **~150
-cppcheck findings** (`cstyleCast`, `functionStatic`, uninitialized members, style). Nearly **500
-findings between them.**
-
-Now the point: **not one of them is the vulnerability this lab is about.** SAST finds *code-pattern*
-weaknesses (memory safety, format strings, style). It does **not** find the firmware's actual
-security story — which is **missing-control / architectural** weaknesses:
-
-| The lab's real CWE | Where it lives | Found by |
-|---|---|---|
-| `CWE-798` default/hardcoded creds | `serial_config.h` — `cfg_pass` defaults to `openplc`, unchanged in the field | reading the code |
-| `CWE-306/319` no-auth, cleartext Modbus/HTTP | `modbus_tcp_server.cpp`, `eth_http.cpp` | design review + the analyzer capture |
-| `CWE-494` unsigned/unauth OTA | `eth_ota.cpp`, `ota_handler.cpp` | design review + the twin's `/api/upload` |
-| `CWE-78` command injection | `vulnerabilities.cpp` — shell metacharacters reach a command | reading the code |
-| `CWE-330` weak PRNG token | `vulnerabilities.cpp` — an LCG with `esp_random()` commented out | reading the code |
-
-A quick way to see the gap yourself:
-
-```bash
-grep -rinE 'password|secret|token *=' sbom/firmware/src      # CWE-798/330 — SAST flagged none of these
-grep -rinE 'EthernetServer|WebServer|http://|Modbus'  sbom/firmware/src   # CWE-306/319
-```
-
-**Finding to keep:** report the SAST totals (≈330 + ≈150) and then state plainly that the lab's
-headline CWEs appear in **none** of them. SAST answers a real but *different* question; architectural
-and missing-control weaknesses need **design review plus runtime evidence** — which is exactly what
-the analyzer and the QEMU twin provide in the next section. (This is why no single scanner "passes"
-a device: composition, CVE, binary, and SAST each have a different blind spot.)
-
 ## The connection:  analyzer ↔ SBOM ↔ CWE ↔ CVE
 
 A scanner finding is a *library* fact: "this component has CVE‑X." Whether it is an
@@ -187,14 +103,10 @@ A scanner finding is a *library* fact: "this component has CVE‑X." Whether it 
 weak path, and can you **see the result**. The **CWE** is what joins the scanner's CVE
 to the firmware's code and to the analyzer's evidence.
 
-`cwe_bridge.py` makes that join from the real scan:
-
-```bash
-grype dir:vuln-sample -o json > out/grype.json
-python3 cwe_bridge.py out/grype.json --all
-```
-
-It splits the scanner's CWE classes into two groups:
+`cwe_bridge.py` makes that join from the real scan. `run_sbom.sh` (Exercise 2,
+step 4) already produced `out/grype.json` and wrote the bridge output to
+`out/cwe-bridge.txt` — read that, or re-run `bash sbom/run_sbom.sh` to regenerate
+it. It splits the scanner's CWE classes into two groups:
 
 - **Observable in the twin** — the SBOM found the weakness class in a library *and*
   the firmware has code that reaches it, so the analyzer can show the outcome. From

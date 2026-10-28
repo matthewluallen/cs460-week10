@@ -31,16 +31,27 @@ You should see the legitimate `stamplc-flash-8MB.bin` and `stamplc-flash-8MB-MAL
 ## Exercise 1 — the minimal diff
 
 An attacker who can replace the update wants the smallest, quietest change that works.
-Measure it:
+Measure it.
 
-```bash
-ls -l qemu/twin/stamplc-flash-8MB.bin qemu/twin/stamplc-flash-8MB-MALICIOUS.bin
-```
+### Active learning
 
-> **Shortcut:** `./supply-chain/diff-images.sh` runs that `ls` and does the
-> subtraction for you, so the payload size is spelled out.
+- **Predict** — write down, *before* you run it: the compiled payload is ~**624 bytes**.
+  Roughly how many of the 8,388,608 bytes in the shipped image do you expect to **differ**
+  between the clean and malicious builds — hundreds, or millions? And: could a byte-diff of
+  the deployed image, with no trusted reference, pin down the 624-byte payload?
+- **Run** — `./supply-chain/diff-images.sh   # same-size check + how many bytes differ`
+- **Reconcile** — the two images are the **same size** (file-size check: 0 delta) and
+  **millions** of bytes differ, because adding a few source lines relaid out the whole app
+  partition. So diffing alone **cannot** isolate the ~624-byte payload — the differing-byte
+  count is the observation; "the diff would reveal the payload" is an inference it *refutes*.
+  Provenance (a reproducible reference build or signed attestation) beats diffing here.
+- **Pair check** — tell a partner what you *would* need to find the payload, given the diff.
 
 ![Codespace terminal: the two 8 MB images are the same size and differ in millions of bytes](img/07-diff.png)
+
+<!-- SHOT: part 7 — diff-images.sh output: 0 size delta, millions of differing bytes -->
+
+
 
 Here's the twist, and it's the whole lesson: the two flash images are the **same size**
 (both padded to 8 MB), and a naive byte-diff shows **millions** of differing bytes —
@@ -68,10 +79,8 @@ python3 supply-chain/c2_server.py        # mock "update check" server on :9000
 **Terminal B — the victim PLC**, running the malicious image at full speed:
 
 ```bash
-ICOUNT=off FLASH_IMG=qemu/twin/stamplc-flash-8MB-MALICIOUS.bin ./qemu/run.sh
+./supply-chain/run-malicious.sh   # boot the TROJANED image in the twin (full-speed clock)
 ```
-
-> **Shortcut:** `./supply-chain/run-malicious.sh` is exactly that line.
 
 Watch Terminal A. The device **beacons outbound** to the update server every few seconds.
 While the server answers normally, the switch stays dormant:
@@ -83,10 +92,13 @@ While the server answers normally, the switch stays dormant:
 Now play the attacker: flip the server's answer.
 
 ```bash
-echo ARM > /tmp/c2_state                 # the compromised source now replies with the trigger
+./supply-chain/arm.sh      # the compromised source now replies with the trigger
 ```
 
-> **Shortcut:** `./supply-chain/arm.sh` arms it; `./supply-chain/benign.sh` resets it.
+> `./supply-chain/benign.sh` resets the server's reply. Note that `benign.sh` only changes
+> what the *server* sends — once the switch has fired, `relay0` stays **latched in the
+> running image until you reboot the twin**. To re-run the detonation cleanly, stop
+> Terminal B and `./supply-chain/run-malicious.sh` again.
 
 The next beacon arms the switch:
 
@@ -99,14 +111,16 @@ The next beacon arms the switch:
 Confirm the physical effect — on the HMI (`:8080`) `relay0` is now ON, and:
 
 ```bash
-curl -s http://127.0.0.1:8080/api/points | grep -o '"n":"relay0"[^}]*'   # "v":1
+./supply-chain/show-relay.sh   # read relay0 back from the HMI ("v":1 = energized)
 ```
 
-> **Shortcut:** `./qemu/relay.sh` prints that (default `relay0`); `./qemu/relay.sh relay2` for another point.
+> `./supply-chain/show-relay.sh relay2` reads a different point. (It delegates to the
+> canonical `./qemu/relay.sh`, so there is one source of truth for the readback.)
 
 **Do:** capture the C2 log (benign → ARMED) and `relay0` before and after you armed it.
-Note that **nothing connected inbound** — the trigger rode the device's own outbound
-"update check," which no inbound firewall rule would see.
+Then write, as a **graded sentence** in your finding: *"nothing inbound; it rode the
+outbound update check."* The trigger rode the device's own outbound "update check," which
+no inbound firewall rule would see — **nothing connected inbound at all**.
 
 ---
 
@@ -142,6 +156,10 @@ break *every* link in this chain are the same ones from Part 6:
 Reproducible builds close the last gap: with a trusted reference image, the 624-byte diff
 is trivial to find.
 
+Those controls are not hypothetical here: the **hardened `m5stamplc_secure` build**
+refuses the unsigned OTA that Part 6 pushed, so this kill switch never reaches the device.
+You'll run exactly these attacks against that build and watch them fail in **Part 9**.
+
 ---
 
 ## Your finding (what you hand in for Part 7)
@@ -149,7 +167,8 @@ is trivial to find.
 One finding, same standard:
 
 1. The image sizes and delta (Exercise 1), and your answer on finding the diff without a reference.
-2. The detonation evidence: the C2 log (benign → ARMED) and `relay0` before/after (Exercise 2).
+2. The detonation evidence: the C2 log (benign → ARMED) and `relay0` before/after (Exercise 2),
+   **including the graded sentence** *"nothing inbound; it rode the outbound update check."*
 3. The four-lens table (Exercise 3), with one sentence on which lens you trust most for *this* attack and why.
 4. One sentence: the single control you would mandate before shipping this device, and the attack step it stops.
 

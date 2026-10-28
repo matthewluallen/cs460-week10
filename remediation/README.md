@@ -1,164 +1,257 @@
-# Part 9 — Remediation: the secure build
+# Part 9 — Direct remediation and compensating controls
 
-Parts 6–8 (and the firmware console throughout) demonstrated how this controller gets
-owned: a hardcoded login, an unsigned OTA, a dormant supply-chain payload, an
-unauthenticated clock. This part closes the loop — **how each weakness is fixed**, and
-how you *prove* the fix without trusting a changelog.
+The vulnerable and secure firmware variants are both core teaching features.
+Students can investigate a weakness, change its implementation, or contain its
+exposure with a compensating control. The prepared application project is shared
+between those experiments. A project cannot turn `ENABLE_CWE_DEMOS` on or off.
 
-The whole firmware flips between the teaching image and a hardened one with **one
-compile switch**. Every intentional weakness is wrapped:
+The two existing build environments remain. Build either one with the wrapper (it prints
+the exact `pio run -e …` line and where the artifact lands) instead of typing it:
+
+```bash
+./remediation/build.sh vuln      # pio run -e m5stamplc        (ENABLE_CWE_DEMOS present: teaching behavior)
+./remediation/build.sh secure    # pio run -e m5stamplc_secure (ENABLE_CWE_DEMOS absent; SECURE_BUILD present)
+```
+
+Many demonstration paths select a different implementation with this guard:
 
 ```c
 #ifdef ENABLE_CWE_DEMOS
-    ... the vulnerable teaching code ...     // the default build
+    // Intentional teaching weakness.
 #else
-    ... the hardened counterpart ...         // the secure build
+    // The particular remediation branch described below.
 #endif
 ```
 
-- **Teaching build** (`pio run -e m5stamplc`) — `ENABLE_CWE_DEMOS` on. The weaknesses are
-  present; this is the image Parts 6–8 attack.
-- **Secure build** (`pio run -e m5stamplc_secure`) — the env drops `-DENABLE_CWE_DEMOS`
-  and defines `-DSECURE_BUILD`, so every weakness compiles out and its fix compiles in.
+**The secure environment selects those branches; it does not establish that every
+weakness, transport or deployment is secure.** Other examples use independent
+macros, and some controls are mode gates or service removal rather than peer
+authentication. The matrix describes what the current source does and how to test
+its limits. It is not a record of successful device tests.
+
+## Re-run the Part 6-8 attacks against the secure build
+
+The sharpest evidence that a fix works is the attack that *stops* working. Build and boot
+the secure profile, then replay the earlier parts' attacks and watch each one be refused:
 
 ```bash
-cd sbom/firmware
-pio run -e m5stamplc            # teaching image (weaknesses present)
-pio run -e m5stamplc_secure     # hardened image (weaknesses fixed)
+./remediation/build.sh secure                        # build the hardened profile
+# merge/flash per ../docs/QEMU-Twin.md, then:
+FLASH_IMG=<your-secure-8MB-image> ./qemu/run.sh      # boot it, leave it running
+./remediation/verify-secure.sh                       # re-run Part 6-8 attacks; each should be REFUSED
 ```
 
-The secure image announces itself at boot (`✓ SECURE BUILD — intentional weaknesses
-compiled out`) instead of the teaching image's CWE list.
+`verify-secure.sh` drives the live console and HTTP services (it does not read a banner)
+and checks, for each attack, that the *effect* is gone: unauthenticated OTA upload → `401`;
+`login admin openplc` backdoor → refused; default `operator:1234` → refused; six bad logins
+→ lockout; the Part-8 NTP step → `clk` does **not** wrap; the Part-9 `/api/tag` overflow →
+relay0 stays OFF.
 
----
+### Active learning
 
-## What was fixed, where, and how to prove it
+- **Predict:** before you boot the secure image, list each attack from Parts 6-8 (plus the
+  `/api/tag` overflow) and write down (a) whether it will still work, and (b) *why it is
+  stopped* — a **line-of-code** fix (e.g. the Y2038 `int32`→`int64` store, the overflow's
+  bounds-checked copy) or an **architecture** change (e.g. no default credential ships, OTA
+  now requires auth + HMAC, a new lockout state machine). They are not all the same kind.
+- **Run:** `./remediation/verify-secure.sh`
+- **Reconcile:** compare your two columns to the PASS/FAIL lines. A refusal proves *that
+  path* is closed on *this build with this project*; it does **not** prove the transport is
+  encrypted, the HMAC key is secret (it is a repo constant), or that every other route is
+  safe. Note any attack you expected to fail that still worked.
+- **Pair check:** have your partner name one attack and state whether it died to a single
+  line or to a design change — then swap.
 
-Each row is a weakness you met earlier, the hardened behaviour in the `#else`, and the
-observation that distinguishes the two builds. File paths are under `sbom/firmware/src/`.
+### New secure-build capabilities to verify (behaviorally)
 
-### Credentials & sessions — `plc_auth.cpp`
+The hardened build adds operator-lifecycle controls that the vulnerable build does not have.
+Verify each by its behavior, not by its help text:
 
-| CWE | Teaching weakness | Secure build | Prove it |
-|---|---|---|---|
-| 798 / 259 / 1392 | `admin:openplc`, a `service` password derived from the device MAC, and `operator:1234` all log in | no hardcoded, default, or MAC-derived account — only a **provisioned** operator password | `login admin openplc` is rejected on the secure build, accepted on the teaching build |
-| 256 / 257 | user password stored and shown in plaintext (recoverable) | stored only as a **salted SHA-256** hash; never recoverable | `svcinfo` / the user-pw readout shows `(hashed - not recoverable)` |
-| 521 | policy *accepts* weak (≤8, A–Z0–9) and *refuses* strong | requires **≥12 chars and ≥3 character classes** | try to set a 20-char mixed password — refused on teaching, accepted on secure |
-| 307 | no lockout — brute-forceable | **30 s lockout after 5** failed logins | 6 bad logins → the 6th is refused even with the right password on the secure build |
-| 330 | session token = `millis() ^ constant` (predictable) | **128-bit token from the hardware CSPRNG** (`esp_random`) | two tokens on the teaching build are correlated in time; on secure they are not |
+- **First-run enrollment.** On a secure image with blank storage no credential ships, so the
+  first `passwd <new>` at the `plc>` prompt sets the operator password **without a prior
+  login** (policy: ≥12 chars and ≥3 of lower/upper/digit/symbol). Verify: a short/weak
+  password is rejected, a compliant one is accepted (`[AUTH] operator enrolled …`), and
+  `login operator <that>` then succeeds. Changing it later requires being logged in.
+- **Button-A-at-boot recovery.** Holding button A through boot clears the operator password
+  and returns the device to the unenrolled state (`[AUTH] button A held at boot - operator
+  password cleared`). Verify: after recovery, `login operator <old>` fails and `passwd
+  <new>` re-enrolls. This is a physical-presence maintainer escape hatch, not a remote one.
+- **Login lockout.** Five failed logins arm a 30-second lockout (`plc_auth.cpp`); a valid
+  credential is refused during the window and accepted after it expires. The state is global
+  and volatile — it does not persist across reboot or protect non-console transports.
 
-### Update path — `eth_ota.cpp`
+### Caution: a string grep is not a hardening check
 
-| CWE | Teaching weakness | Secure build | Prove it |
-|---|---|---|---|
-| 494 | `verify_firmware()` is a no-op (`return true`) — any binary boots | the image must carry a valid **HMAC-SHA256 signature** (`X-Firmware-HMAC`) over the whole upload, keyed by a provisioning secret; a bad/absent signature is **aborted, never flashed** | POST an image with no/der wrong `X-Firmware-HMAC` → `403`, no reboot (Part 6's push boots on teaching, is refused on secure) |
-| 306 | no authentication on the upload endpoint | upload requires **HTTP Basic auth**; `401` otherwise | POST without `Authorization` → `401` on secure |
+The `cwe`, `svcinfo`, and `proto` command output prints the **same weakness list in both
+builds** — `cmd_cwe()`/`cmd_svcinfo()` in `plc_console.cpp` have no build guard, so the text
+is a shared teaching reference, not proof a weakness is active. Likewise, grepping the source
+for `CWE-` strings or for an `#ifdef ENABLE_CWE_DEMOS` tells you a branch *exists*, not which
+branch this image *compiled*. Establish hardening **behaviorally** (admin login refused,
+lockout fires on the 5th attempt, `clk` does not wrap, the overflow leaves relay0 off) or by
+the secure-only salt prefix `stamplc-secure-v2:` used by `hash_pw()` — never by the presence
+of a CWE string.
 
-### Protocol writes — `modbus_tcp_server.cpp`
+## Controlled comparison experiments
 
-| CWE | Teaching weakness | Secure build | Prove it |
-|---|---|---|---|
-| 306 | any peer can write coils/registers on `:502` — including the e-stop coil — with no check | network writes (FC 5/6/15/16) are **refused unless the controller is in the supervised `REMOTE` position** (the key-switch control); the write is dropped and audited | an unauthenticated FC5 write in RUN mode changes a coil on teaching; on secure the audit log shows `REFUSED ... not in REMOTE mode (CWE-306)` and the coil is unchanged |
+Use this pattern for the weakness assigned by your instructor or chosen for your
+finding. It does not add a requirement to complete every row of the matrix.
 
-### Services & input handling — `debug_telnet.cpp`, `eth_http.cpp`
+| Arm | Firmware and project | Change being evaluated |
+|---|---|---|
+| **A — Vulnerable baseline** | Teaching firmware and prepared project P. | Establish the intended normal operation and reproduce the selected weakness. |
+| **B — External compensating control** | The **exact same firmware and project hashes** as A. | Add an external control, such as a network access rule or a restricted gateway. Repeat the normal-operation and attack probes through the relevant paths. |
+| **B-device — Built-in configuration control** | The same firmware as A, with project P-policy. | Enable the optional host point policy. Retain P and P-policy and verify that only the intended configuration changed. The project/payload hash changes; this is a separate comparison from B. |
+| **C — Direct remediation** | Secure comparison firmware, or the student's targeted patch, with the same project P. | Exercise the specific changed implementation and its failure behavior. A build label alone is insufficient. |
 
-| CWE | Teaching weakness | Secure build | Prove it |
-|---|---|---|---|
-| 489 | unauthenticated debug console on telnet `:23` | the telnet service is **never started** | connect to `:23` → refused on secure, open on teaching |
-| 78 | `ping <target>` passes unsanitized input to `system()` | ping **validates the target is a bare IPv4** before use (and the only caller, telnet, is off) | `ping 8.8.8.8; reboot` injects on teaching; rejected on secure |
-| 22 | log viewer builds a path straight from `?file=` (`../` escapes the dir) | path **rejects separators and `..`** — a bare filename only | `/logs?file=../../etc/x` reads out on teaching, `rejected` on secure |
-| 200 / 1273 | every HTTP response leaks `X-Device-MAC` (the value the service password derives from) | the MAC header is **not emitted** | `curl -i` the HMI — `X-Device-MAC` present on teaching, gone on secure |
+The unchanged firmware hash in A and B demonstrates that the compensating control
+was not a hidden firmware patch. A compensating control can reduce reachability or
+consequences while the underlying weakness remains. Name the boundary that enforces
+it: device, network, gateway, host, or a supervised operating procedure.
 
-### Wall-clock — `time_sync.cpp`
+The optional [host point policy](../docs/OPERATING-MODES-AND-ACCESS.md) is available
+in **both** profiles and is disabled by default. When enabled it defaults to denial
+for unlisted host/point/operation combinations and enforces independent `r`, `w`
+and `rw` permissions on supported paths. It is an application-layer exposure
+control, not peer authentication, encrypted transport or a replacement for the
+underlying remediation. Trusted USB/RS-485 paths are outside IP rules; forwarded
+serial access needs a policy at the gateway. Unscoped network management and
+diagnostics are blocked while this policy is enabled. Check the operating guide's
+transport matrix before selecting a probe.
 
-| CWE | Teaching weakness | Secure build | Prove it |
-|---|---|---|---|
-| 197 | the SNTP time is stored in a **signed 32-bit** field; a value past 2038-01-19 wraps to 1902 | the epoch is stored as **64-bit** end-to-end; no wrap | arm the rogue NTP (Part 8) and `ntpsync` → teaching `clk` reads **1902 WRAPPED**, secure `clk` reads the real **2038** date, Y2038-safe |
+For C, choose and record the same project as its comparison baseline. Do not
+silently compare A with ACL disabled to C with ACL enabled and attribute every
+difference to the build switch. For a direct authentication fix, a permitted IP
+still needs the new credential/session check and its own positive/negative tests.
 
-### Memory safety — `plc_core.cpp`, `eth_http.cpp`
+For each arm, retain:
 
-| CWE | Teaching weakness | Secure build | Prove it |
-|---|---|---|---|
-| 787 / 120 | an unauthenticated `/api/tag` write copies attacker-controlled bytes into a fixed scratch buffer with **no bound**; that buffer sits immediately before the I/O force image, so an overlong write **corrupts the force masks and energizes a relay** — bypassing the audited force API, so the force has **no source in the log** | `plc_tag_write()` **bounds-checks** the copy into a standalone buffer; the force image has no adjacent attacker-writable buffer, so the overflow cannot occur | the derive tool emits a 48-byte payload; on the teaching build `GET /api/tag?data=…` drives `relay0` ON with **no `FORCE` audit entry**, on the secure build the same request does nothing |
+- Source commit and effective build profile; firmware artifact hash and running
+  runtime/boot identity; exported project hash and independent `project json`
+  readback. An artifact hash and the runtime's ELF identity have different meanings;
+  record both rather than treating them as interchangeable.
+- Starting mode, loaded project, volatile parameter values, observed logical word
+  values, relevant I/O baseline, force masks, latched faults, credential provisioning
+  state, network route and whether this was a fresh or resumed twin.
+- A **positive control** proving the intended service still works, followed by the
+  narrowly scoped attack or invalid request and its expected rejection/effect.
+- Actual response, audit and state readback, including outputs where relevant.
+  A timeout, closed unrelated port, or failed login is not evidence that a later
+  validation gate worked.
+- The residual risk and a way around the compensating control that remains in
+  scope, if one exists. Restore the controlled starting state before comparison.
 
-**The overflow, and the "memory map" lesson.** The scratch buffer and the force masks live
-in one struct (`ForceImage`), so the overflow offset is a fact of *that build*.
-`tools/derive-force-offset.py` reads the ELF's symbols, confirms the layout still fits, and
-prints the exact bytes and URL:
+The same payload hash identifies the same program/configuration and parameter
+defaults; it does **not** prove that live state is identical. Reestablish and record
+the parameter values, input scenario, force state and fault state for each arm.
+Loading a project resets its VM/live parameters and clears forces; do not assume
+that it also clears a latched fault or repairs the cause. Confirm observed word
+values and output state after any reset before running the next probe.
 
-```bash
-pio run -e m5stamplc
-python3 tools/derive-force-offset.py            # -> PAYLOAD_HEX=… and the /api/tag URL
-```
+Include the saved startup declaration in that baseline. Default reboot returns to
+PROGRAM; an opt-in project can request RUN after validated restoration and module
+readiness. That changes the consequence of power cycling or a reachable reboot
+operation. Observe both the startup state and actual controller mode. Test a
+cancelled or blocked startup as well as the allowed case; stopping one boot does
+not remove the saved declaration for the next boot.
 
-Change the struct and you must re-derive — the tool and the CI smoke-leg (`overflow.*`) both
-fail loudly if the layout moves, instead of a silently-dead exploit. Run the same tool
-against the **secure** ELF and it reports *"no overflow target"*: that build has no such
-struct, so there is nothing to corrupt. This is the capstone of **build-break-and-secure** —
-the attack, the fix, and the tooling that keeps both honest across rebuilds, in one switch.
+The full build switch changes several paths at once. Make a separate claim and
+targeted probe for each CWE you discuss; do not attribute every change to a single
+probe. There are no new per-CWE build flags in this project.
 
----
+The repository's profile/source checks preserve the distributed teaching baseline.
+A student's direct patch can intentionally change an assertion about that baseline.
+Explain that changed expectation and supply a targeted regression test for the fix;
+do not restore the weakness merely to obtain a green baseline-preservation check.
+The build-profile label can remain `vulnerable` after a targeted patch because it
+describes the selected build switch, not a grade or an audit of every code path.
 
-## What the secure build does *not* fix (and why)
+## Weakness → direct fix → compensating control → evidence → limitation
 
-Two weaknesses the course names are **transport / trust** problems a compile switch can't
-close on the twin — call them out in your finding rather than pretending they're gone:
+Source links below refer to `sbom/firmware/src/`. **Current** means visible in the
+source. **Proposed** means the named direct fix has not been implemented here.
+Compensating controls are experiment options, not claims about an existing deployment.
 
-- **CWE-319 cleartext (Modbus `:502`, HTTP)** — the real control is TLS / an encrypted
-  transport (or a segmented OT network), not a firmware flag. Out of scope for the twin.
-- **CWE-345 unauthenticated time source** — the 64-bit store (CWE-197) stops the *wrap*,
-  but the device still *trusts whoever answers* the time query. The full control is
-  authenticated time (NTS) or a disciplined local clock; the 64-bit fix only removes the
-  catastrophic truncation, not the AiTM itself.
+### Credentials and sessions
 
-This is the Part-6/7 lesson restated: some fixes are a line of code, and some are an
-architecture (signing, TLS, network segmentation, secure boot).
+| Weakness and source | Direct fix / current secure branch | Compensating control to evaluate | Evidence to collect | Residual limitation |
+|---|---|---|---|---|
+| CWE-798 / 259 / 1392 / 1393: hardcoded, derived and default console accounts — [plc_auth.cpp](../sbom/firmware/src/plc_auth.cpp) | **Current:** console login excludes hardcoded admin and MAC-derived service acceptance; operator requires a stored password hash. | Restrict access to the device console and management gateway to the assigned operator. | Rejected legacy credentials, plus a successful login to an already provisioned operator account. | This is console login only. Blank secure storage has no operator hash; first-use account provisioning remains unresolved. `serial_config.cpp` has separate default HTTP configuration credentials. |
+| CWE-256 / 257: plaintext and recoverable operator password — [plc_auth.cpp](../sbom/firmware/src/plc_auth.cpp) | **Current:** new secure operator passwords are stored as SHA-256 with a fixed prefix; the readout no longer returns that password. | Restrict flash/NVS access and custody of test images. | With disposable fixtures, compare `userpw` and `userpwh` storage and the password readout after a controlled set operation. | The fixed prefix is not a random per-user salt or a slow password KDF. Existing teaching `userpw` is not erased by selecting secure firmware; configuration credentials remain a separate plaintext store. |
+| CWE-521: deliberately weak password policy — [plc_auth.cpp](../sbom/firmware/src/plc_auth.cpp) | **Current:** secure policy requires at least 12 characters and three character classes; teaching policy accepts at most 8 uppercase letters/digits. | Use a controlled provisioning procedure and restrict who can change credentials. | Test accepted and rejected boundaries, including a strong password rejected by the teaching policy and accepted by the secure policy. | Policy acceptance does not prove secure storage, uniqueness, provisioning or resistance to offline guessing. |
+| CWE-307: unlimited console login attempts — [plc_auth.cpp](../sbom/firmware/src/plc_auth.cpp) | **Current:** five failed attempts set a 30-second console lockout. | Apply gateway rate limits and limit console exposure. | After five failures, a valid provisioned credential is refused during the lockout and succeeds after it expires. | The state is global and volatile; it does not protect every transport or demonstrate persistence across reboot. Consider availability and clock-wrap behavior in further work. |
+| CWE-330 / 337: predictable session-token examples — [plc_auth.cpp](../sbom/firmware/src/plc_auth.cpp), [vulnerabilities.cpp](../sbom/firmware/src/vulnerabilities.cpp) | **Current:** `plc_auth_issue_token()` uses four `esp_random()` words in the secure branch instead of the millisecond-derived teaching value. | Restrict access to the interface using the token and shorten its exposure window. | Verify the selected implementation and the consumer that actually validates the token; record issuance and rejection of a fabricated token if that consumer exists. | Different-looking samples do not prove entropy or session enforcement. Other token demonstration helpers are separate code paths; this change is not transport-wide authentication. |
 
----
+### Updates and protocol writes
 
-## Verify it yourself — the honest way
+| Weakness and source | Direct fix / current secure branch | Compensating control to evaluate | Evidence to collect | Residual limitation |
+|---|---|---|---|---|
+| CWE-494: W5500 OTA accepts an image without authenticity verification — [eth_ota.cpp](../sbom/firmware/src/eth_ota.cpp) | **Current:** secure branch computes HMAC-SHA256 and aborts the update when the supplied MAC differs. **Proposed:** establish a deployment trust/key-provisioning model. | Block OTA from untrusted peers or allow updates only through a controlled maintenance path. | Use valid uploader credentials, then test missing/wrong HMAC and a known valid update separately; record response, active image identity and reboot/boot selection. | The HMAC key is a repository constant, so this demonstrates verification mechanics without excluding a reader of the source. Bytes may be staged before verification; "never written to flash" is not the claim. Boot authenticity, rollback and the Wi-Fi OTA path are not established. |
+| CWE-306: unauthenticated W5500 OTA — [eth_ota.cpp](../sbom/firmware/src/eth_ota.cpp), [serial_config.cpp](../sbom/firmware/src/serial_config.cpp) | **Current:** secure W5500 upload checks HTTP Basic credentials against configuration credentials. | Restrict access to the update listener; use a protected management route. | Unauthenticated request gets `401`; correct credentials reach the next validation stage. A `401` does not prove HMAC verification. | Default configuration credentials and cleartext HTTP remain. Console operator credentials are a different store. [ota_handler.cpp](../sbom/firmware/src/ota_handler.cpp) is a separate Wi-Fi implementation without the same guard. |
+| CWE-306: unauthenticated Modbus writes — [modbus_tcp_server.cpp](../sbom/firmware/src/modbus_tcp_server.cpp) | **Proposed direct fix:** authorize each peer/write through a defined secure control path. The current branch adds a `REMOTE`-mode prerequisite to FC5/6/15/16; it does not authenticate the writer. | **Current built-in control:** refuse those writes outside `REMOTE`. **External experiment:** allow only the assigned peer/network path. | Use an assigned writable point; compare actual image state and the `REFUSED` audit outside `REMOTE`, then test the allowed case in supervised `REMOTE`. | A refused write may receive a normal Modbus echo: verify state and audit. Reachable peers remain unauthenticated in `REMOTE`; trusted console mode changes are not proof of per-team isolation. |
+| Part 7: untrusted build or replacement artifact — [supply-chain](../supply-chain/README.md) | **Proposed:** review and reproduce the exact source-to-artifact path and establish an authenticated release identity. | Restrict build/publishing authority and stage candidate images for review. | Match source, profile, artifact and runtime identities; test a deliberately mismatched artifact manifest in a disposable exercise. | A hash alone does not establish a trusted origin; an authentically signed malicious application can still be unsafe. No commercial update or certification claim follows from this lab. |
 
-**Run the overflow yourself (teaching image, twin up).** The payload is the 48 bytes the
-derive tool emits — 32 zero bytes, then two little-endian `0x02` words that land on the
-relay-force mask. No login, no force API:
+### Services, input handling and memory safety
 
-```bash
-# in the plc> console (./qemu/console.sh):
-plc> unforce di0_start      # relay0 logic-OFF baseline
-plc> io                     # confirm relay0 act=0
-# in your shell — one unauthenticated, overlong tag write:
-curl -s 'http://127.0.0.1:8080/api/tag?data=000000000000000000000000000000000000000000000000000000000000000002000000000000000200000000000000'
-plc> io                     # relay0 act=1 — energized by memory corruption, not a force
-plc> log                    # NO "FORCE coil 1" line — a phantom force, no audit trail
-```
+| Weakness and source | Direct fix / current secure branch | Compensating control to evaluate | Evidence to collect | Residual limitation |
+|---|---|---|---|---|
+| CWE-489: unauthenticated debug telnet — [debug_telnet.cpp](../sbom/firmware/src/debug_telnet.cpp) | **Current:** secure branch does not start the telnet listener and returns from its handler. | Block that service at the device's network boundary while leaving the teaching image unchanged. | Teaching listener is reachable in A; the relevant external route is blocked in B; secure listener is absent in C. Include a positive check of an intended management service. | Removing this listener does not authorize HTTP, Modbus or a forwarded USB console. |
+| CWE-78: unsafe diagnostic command construction — [debug_telnet.cpp](../sbom/firmware/src/debug_telnet.cpp), [vulnerabilities.cpp](../sbom/firmware/src/vulnerabilities.cpp) | **Current:** secure telnet caller filters length/characters and the telnet service is disabled. **Proposed direct API fix:** avoid shell construction and validate at every reachable entry point. | Restrict or disable diagnostic access. | Record input rejection or the simulated diagnostic log on the appropriate path; inspect the independently selected helper branch. | This ESP32 example logs/simulates the injection pattern; it does not execute a host shell. The digit/dot filter is not complete IPv4 validation, and the helper uses a separate macro. |
+| CWE-22: unrestricted log-viewer path — [eth_http.cpp](../sbom/firmware/src/eth_http.cpp) | **Current:** secure Ethernet viewer rejects separators and `..` in the filename. | Restrict the viewer or route it through an allowlist of authorized log names. | A known permitted harmless fixture is readable; separator/traversal probes are rejected rather than merely returning "file not found". | Bare filenames are still resolved from the filesystem root. This is not a complete log-directory/authorization policy, and the Wi-Fi HMI is a separate implementation. |
+| CWE-200 / 1273: MAC response header disclosure — [eth_http.cpp](../sbom/firmware/src/eth_http.cpp) | **Current:** secure branch omits `X-Device-MAC` from this response builder. | Limit who can query the HMI; remove unnecessary metadata at a controlled proxy. | Compare the same endpoint's headers, plus a successful response body in all arms. | The MAC is also observable elsewhere and is not a secret. Removing one header does not fix a credential derived from an identifier. |
+| CWE-787 / 120: tag-label copy overwrites the adjacent force image — [plc_core.cpp](../sbom/firmware/src/plc_core.cpp), [eth_http.cpp](../sbom/firmware/src/eth_http.cpp) | **Current:** secure branch clamps the copy into a separate 32-byte buffer and does not instantiate the teaching `ForceImage` layout. | Restrict `/api/tag` at the reachable boundary while retaining the exact teaching image. | Derive the offset from the exact teaching ELF, load a known project and establish its output baseline; record force/output/audit effects. Repeat with the secure ELF and a harmless label positive control. | The endpoint still exists. Bounds checking this copy does not prove that all memory operations or routes are safe. An unconfigured/stopped runtime is not a valid positive baseline for showing application actuation. |
 
-On the **secure** build the same request leaves `relay0` OFF and the log empty —
-`plc_tag_write()` bounds-checks the copy. (`tools/derive-force-offset.py` regenerates the
-payload if the `ForceImage` layout changes.) This is the overflow Part 9 asks you to re-run
-against both builds.
+The offset for the overflow lesson belongs to the particular teaching build.
+`sbom/firmware/tools/derive-force-offset.py` inspects the ELF; do not copy an old
+payload or rely on process tag names from the previous fixed application. Use the
+loaded project's symbols and the new build's layout. The secure ELF should have no
+such overflow target; establish the result from that ELF rather than from a banner.
 
-A changelog that says "fixed" is not evidence. You have the two images; establish the
-difference the way you established the attacks.
+### Time and transport
 
-```bash
-# build both
-cd sbom/firmware && pio run -e m5stamplc && pio run -e m5stamplc_secure
+| Weakness and source | Direct fix / current secure branch | Compensating control to evaluate | Evidence to collect | Residual limitation |
+|---|---|---|---|---|
+| CWE-197: 64-bit time truncated into signed 32-bit storage — [time_sync.cpp](../sbom/firmware/src/time_sync.cpp) | **Current:** secure branch stores and returns a 64-bit epoch. | Reject implausible time jumps at a controlled time gateway or constrain the allowed source. | Apply the same post-2038 timestamp to both profiles; teaching wraps while secure retains the supplied 64-bit value. | The supplied date is not necessarily true. This is an arithmetic fix, not authenticated time or full time-service validation. |
+| CWE-345: unauthenticated time source — [time_sync.cpp](../sbom/firmware/src/time_sync.cpp) | **Proposed:** authenticated time or a separately validated trusted local clock. No such direct fix is selected by the build flag. | Restrict time traffic to a managed source and monitor drift/jumps. | Prove approved synchronization still works and an out-of-policy source cannot alter the clock through the controlled route. | Source filtering does not cryptographically authenticate time and does not remove every on-path threat. The firmware still trusts accepted replies. |
+| CWE-319: cleartext HTTP/Modbus — [eth_http.cpp](../sbom/firmware/src/eth_http.cpp), [eth_ota.cpp](../sbom/firmware/src/eth_ota.cpp), [modbus_tcp_server.cpp](../sbom/firmware/src/modbus_tcp_server.cpp) | **Proposed:** authenticated encrypted transport appropriate to the service. The flag does not add TLS or encrypt Modbus. | Use an authenticated encrypted gateway/tunnel and restrict direct device access, or demonstrate the narrower protection of segmentation. | In the controlled lab, verify the protected route and test that direct bypass is blocked; distinguish confidentiality from reachability. | Segmentation alone does not encrypt traffic. Gateway termination leaves the remaining device hop in scope. |
 
-# boot each in the twin and run the same probe (example: the NTP wrap from Part 8)
-#   teaching -> clk WRAPS to 1902 ;  secure -> clk stays in 2038
-```
+## Validation levels and the current boundary
 
-The twin smoke test (`qemu/smoke-test.py`) boots the **teaching** image and asserts the
-lab's invariants still hold — a clean run prints `16/16 checks passed` (the weaknesses are
-deliberately *present* there, so e.g. the OTA, the overflow, and the NTP wrap all fire).
-Run it yourself: `python3 qemu/smoke-test.py`.
-The secure image is validated separately: it boots, announces the hardened banner, and
-the Part-6/7/8 attacks are refused (NTP no-wrap, Modbus write refused, telnet closed).
+[Build instructions](../sbom/firmware/BUILD.md) describe the profile/preprocessor
+checks, host application tests and CI compilation of both variants. Those checks
+establish selected source branches and buildability. They do not prove the expected
+runtime observations in the matrix.
 
-> **Do (your Part 9 finding):** pick **one** CWE above. Build both images, trigger the
-> attack from its earlier Part against each, and record the *observation* that
-> distinguishes them (e.g. "`clk` read `1902` on `-e m5stamplc`, `2038` on
-> `-e m5stamplc_secure`, same armed NTP"). Then one sentence: is this fix a *line of code*
-> or an *architecture*, and what would a reviewer need to trust that the shipped image is
-> actually the secure one? (Back to Part 7: a reproducible build or a signed attestation —
-> not a glance at the source.)
+The host loader tests inject NVS write/readback failures and model reboot using a
+storage seam. They do not exercise the ESP32 flash journal, physical power loss or
+flash durability. Verify the persisted project identity after an actual restart;
+retain separate evidence for recovery from an interrupted write.
+
+The existing `twin-smoke` workflow (`.github/workflows/twin-smoke.yml`) runs
+`qemu/smoke-test.py`, which asserts **nine lab invariant categories** — boot, i2cscan,
+di0→relay0/1 control, e-stop interlock, OTA :80, HMI :8080, sigrok bus decode, NTP/Y2038
+wrap, and the CWE-787 `/api/tag` overflow. Counted individually those are **16 `check()`
+assertions** in CI (where `sigrok-cli` is installed and the bus leg contributes three),
+dropping to 14 if the bus-decode leg cannot run. Invariant #9 is the overflow: on the
+*teaching* image the unauthenticated overlong `/api/tag` write energizes relay0 by memory
+corruption, and the secure build's bounds-checked copy stops it — the same effect
+`verify-secure.sh` re-checks, so "the overflow no longer moves a relay" is a runnable step,
+not a claim. (Count the `check(...)` calls in `qemu/smoke-test.py` yourself rather than
+quoting a fixed number.)
+
+The workflow boots a **committed historical teaching image**.
+It preserves evidence for that earlier classroom release; it does not boot the two
+newly compiled generic-runtime images. New-image twin and physical-bench results must
+identify the exact image, project, reset state and observations separately. The twin's
+embedded course-process physics also needs separation from the generic hardware
+model; its implementation is not verified by these source changes.
+
+The current trusted USB/console route supports project mode changes and loading in
+both profiles. That is a deployment trust assumption, not proof that shared gateways
+or teams have isolated authority. Secure first-use operator provisioning, old-secret
+cleanup, common authorization across transports, update-key custody and image
+release provenance remain separate work.
+
+**Your finding should state the demonstrated boundary:** what failed in A, what
+changed in B or C, which positive control still passed, and what remains possible.
+A build named "secure", an HTTP error from the wrong gate, or a list of intended
+fixes is not a substitute for that evidence.
