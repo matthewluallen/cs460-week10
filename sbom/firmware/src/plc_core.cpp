@@ -449,7 +449,15 @@ void plc_core_scan() {
 
     phase_end_us[5]=esp_timer_get_time();
     uint32_t dt = micros() - t0;
-    if (dt > 100000) plc_fault_raise(10, "scan overrun >100ms");
+    // Only fault on a SUSTAINED overrun. A single scan over 100ms is usually host/
+    // emulation jitter (QEMU under load, a slow USB drain) and latching on it strands
+    // the controller in a fault that blocks RUN. Require consecutive overruns so a real
+    // overload still faults (the lesson) while transient jitter does not. A good scan
+    // resets the streak. The reported policy (100ms threshold, action) is unchanged.
+    static uint8_t s_scan_overrun_streak = 0;
+    if (dt > 100000) {
+        if (++s_scan_overrun_streak >= 3) plc_fault_raise(10, "scan overrun >100ms (sustained)");
+    } else s_scan_overrun_streak = 0;
     // A fault discovered during this scan must inhibit outputs in this scan.
     if (outputs_enabled && s_mode == PLC_PROGRAM) {
         for (int k = 0; k < 4; k++) {

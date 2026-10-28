@@ -3569,8 +3569,9 @@ function renderControllerStatus(){
   document.getElementById('bReadProject').disabled=!conn||busBusy;document.getElementById('bExportProjectReadback').disabled=!lastProjectEvidence;
   document.getElementById('bDownload').disabled=!PROJECT||projectNeedsReview||busBusy||!!stDraftState?.dirty||MODE!=='edit'||!modeKnown||controllerStatus?.mode!=='PROGRAM';
   document.getElementById('bDownload').title='Requires Author, validated project settings, and fresh PROGRAM readback. Loading never starts RUN.';
-  document.querySelectorAll('#modeChips button').forEach(button=>{const executes=button.dataset.m!=='program';button.disabled=MODE!=='edit'||busBusy||!modeKnown||(executes&&(!matched||!projectFresh||projectReadback?.run_ready!==true));button.title=button.dataset.m==='remote'?'Explicit USB REMOTE request: executes logic and relaxes remote-download acceptance and the secure Modbus write gate; it does not authenticate clients. Requires matching project and readiness.':executes?'Requires matching application readback and controller readiness; RUN is sent separately.':'Explicit PROGRAM request; cancels the current pending startup request. Future reboot behavior follows the installed declaration.';});
-  const mh=document.getElementById('modeHint'); if(mh){ let r=''; if(MODE!=='edit') r='Switch to Author to change controller mode.'; else if(!conn) r='Connect USB to change mode.'; else if(busBusy) r='Working - wait for the current read.'; else if(!modeKnown) r='Reading controller status...'; else if(!matched||!projectFresh) r='PROGRAM ready. Load + read back the application to enable RUN/REMOTE.'; else if(projectReadback?.run_ready!==true) r='RUN/REMOTE blocked: '+(projectReadback?.readiness_reason||'controller not ready')+'.'; else r='Ready: PROGRAM, RUN and REMOTE available.'; mh.textContent=r; }
+  document.querySelectorAll('#modeChips button[data-m]').forEach(button=>{const executes=button.dataset.m!=='program';button.disabled=MODE!=='edit'||busBusy||!modeKnown||(executes&&(!matched||!projectFresh||projectReadback?.run_ready!==true));button.title=button.dataset.m==='remote'?'Explicit USB REMOTE request: executes logic and relaxes remote-download acceptance and the secure Modbus write gate; it does not authenticate clients. Requires matching project and readiness.':executes?'Requires matching application readback and controller readiness; RUN is sent separately.':'Explicit PROGRAM request; cancels the current pending startup request. Future reboot behavior follows the installed declaration.';});
+  {const cf=document.getElementById('bClearFault'); if(cf){const clearable=conn&&MODE==='edit'&&!busBusy&&modeKnown&&matched&&projectFresh&&projectReadback&&projectReadback.run_ready!==true&&/fault/i.test(projectReadback.readiness_reason||''); cf.style.display=clearable?'':'none'; cf.disabled=!clearable;}}
+  const mh=document.getElementById('modeHint'); if(mh){ let r=''; if(MODE!=='edit') r='Switch to Author to change controller mode.'; else if(!conn) r='Connect USB to change mode.'; else if(busBusy) r='Working - wait for the current read.'; else if(!modeKnown) r='Reading controller status...'; else if(!matched||!projectFresh) r='PROGRAM ready. Load + read back the application to enable RUN/REMOTE.'; else if(projectReadback?.run_ready!==true){ const rr=projectReadback?.readiness_reason||'controller not ready'; r='RUN/REMOTE blocked: '+rr+'.'+(/fault/i.test(rr)?' Clear fault to retry.':''); } else r='Ready: PROGRAM, RUN and REMOTE available.'; mh.textContent=r; }
   renderWorkflow();try{renderHero();}catch(e){}
   renderBusControls();updateForceBanner();renderExecutionDiagnostics();
 }
@@ -3802,13 +3803,22 @@ function autosave(){if(!PROJECT||projectNeedsReview)return;try{localStorage.setI
 function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('s3theme',t);}catch(e){}}
 function initTheme(){let t;try{t=localStorage.getItem('s3theme');}catch(e){}setTheme(t||'dark');}
 function modeChips(){
-  const el=document.getElementById('modeChips');el.innerHTML='<span style="font-size:10px;color:var(--ink2)">Controller commands</span> '+['PROGRAM','RUN','REMOTE'].map(mode=>`<button class="btn" style="padding:3px 9px;font-size:11px" data-m="${mode.toLowerCase()}" disabled>${mode}</button>`).join('')+'<span id="modeHint" style="font-size:10px;color:var(--muted);margin-left:8px"></span>';
-  el.querySelectorAll('button').forEach(button=>button.onclick=async()=>{
+  const el=document.getElementById('modeChips');el.innerHTML='<span style="font-size:10px;color:var(--ink2)">Controller commands</span> '+['PROGRAM','RUN','REMOTE'].map(mode=>`<button class="btn" style="padding:3px 9px;font-size:11px" data-m="${mode.toLowerCase()}" disabled>${mode}</button>`).join('')+'<button class="btn" id="bClearFault" style="padding:3px 9px;font-size:11px;display:none" title="Clear a latched controller fault (e.g. a transient scan overrun under load), then re-read readiness so RUN can proceed">Clear fault</button>'+'<span id="modeHint" style="font-size:10px;color:var(--muted);margin-left:8px"></span>';
+  el.querySelectorAll('button[data-m]').forEach(button=>button.onclick=async()=>{
     if(MODE!=='edit'||busBusy||!modeFresh())return;
     try{if(button.dataset.m!=='program'){await readProjectIdentity();if(!projectMatchesWorkspace()||!projectReplyFresh())throw Error('Readback does not match the current application. Load and verify it before RUN or REMOTE.');if(projectReadback.run_ready!==true)throw Error('Controller not ready: '+(projectReadback.readiness_reason||'readiness unavailable'));}
       controllerModeAt=null;renderControllerStatus();if(await send('mode '+(button.dataset.m==='program'?'prog':button.dataset.m))){await send('status');await readProjectIdentity();}
     }catch(e){log('Mode request refused or unverified: '+e.message,'er');}
   });
+  const cf=document.getElementById('bClearFault');
+  if(cf)cf.onclick=async()=>{
+    if(!conn||busBusy||MODE!=='edit')return;
+    busBusy=true;renderControllerStatus();
+    try{ await send('clrflt',true); await new Promise(r=>setTimeout(r,200)); await readProjectIdentity(true);
+      log('Cleared controller faults; re-read readiness.','ok'); }
+    catch(e){ log('Clear fault failed: '+e.message,'er'); }
+    finally{ busBusy=false; renderControllerStatus(); }
+  };
 }
 
 /* ===== wire up ===== */
