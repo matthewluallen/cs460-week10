@@ -43,10 +43,13 @@ services:
     # binds the controller's own Modbus :502 and HTTP :80 on the plant network (W5_BIND=0.0.0.0)
 
   hmi:
+    # Node-RED HMI (replaces the old hmi.py page): students see the HMI *wiring* (the flow
+    # editor on :1880) and the *UI design* (the dashboard on :1880/ui). node-red-contrib-modbus
+    # polls the StampLC twin over Modbus/TCP; node-red-dashboard renders the gauges + LEDs.
     build:
-      context: .                # the stations/ dir, so lib/ and hmi/ are both in context
-      dockerfile: hmi/Dockerfile
-    image: cs460/hmi-station
+      context: ./hmi-nodered     # flows.json + settings.js + Dockerfile all in this dir
+      dockerfile: Dockerfile
+    image: cs460/hmi-nodered
     environment:
       - PLC_HOST=10.20.30.10
     depends_on: [plc]
@@ -54,7 +57,7 @@ services:
       plant:
         ipv4_address: 10.20.30.20
     ports:
-      - "8800:8800"              # the HMI dashboard
+      - "8800:1880"              # host 8800 -> Node-RED editor (/ ) and dashboard (/ui)
 
   engineer:
     build:
