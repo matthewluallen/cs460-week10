@@ -24,14 +24,14 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
  // 1) Bus analyzer (now served from the Studio port)
  await shot(ctx,'bus-analyzer → part1-i2c-analyzer.png', async p=>{
-   await p.goto(BASE+'/i2c-analyzer.html',{waitUntil:'networkidle'});
+   await p.goto(BASE+'/i2c-analyzer.html',{waitUntil:'domcontentloaded'});
    await sleep(1500);
    await p.screenshot({path:OUT+'part1-i2c-analyzer.png'});
  });
 
  // Shared Logic Studio session: connect twin, load an example, drive it
  const drive=async(p)=>{
-   await p.goto(BASE+'/logic_studio.html',{waitUntil:'networkidle'});
+   await p.goto(BASE+'/logic_studio.html',{waitUntil:'domcontentloaded'});
    await sleep(1500);
    await p.evaluate(()=>{try{connectTwin(twinDefaultUrl());}catch(e){}});
    await sleep(2500);
@@ -63,7 +63,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
  // 4) Protocol Studio
  await shot(ctx,'protocol → part5-05-protocol-live.png', async p=>{
-   await p.goto(BASE+'/protocol_studio.html',{waitUntil:'networkidle'});
+   await p.goto(BASE+'/protocol_studio.html',{waitUntil:'domcontentloaded'});
    await sleep(2000);
    await p.screenshot({path:OUT+'part5-05-protocol-live.png'});
  });
