@@ -2,7 +2,9 @@
 # *UI design* (the dashboard), not just a finished page. node-red-contrib-modbus polls the
 # PLC over Modbus/TCP; node-red-dashboard renders the gauges. Flow editor on :1880, the
 # operator dashboard on :1880/ui .
-FROM nodered/node-red:4.0.9
+# node-red 3.1.x — the legacy node-red-dashboard (3.6.5) is fully compatible here; node-red 4.x
+# mis-detects the dashboard's ui_base as a circular config-node dependency and won't start the UI.
+FROM nodered/node-red:3.1.9
 
 # Modbus I/O nodes + the dashboard UI nodes, installed into the Node-RED app.
 RUN npm install --no-audit --no-fund --save \

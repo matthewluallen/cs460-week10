@@ -37,7 +37,7 @@
         "showLogs": false
     },
     {
-        "id": "ui_base",
+        "id": "uib0",
         "type": "ui_base",
         "theme": {
             "name": "theme-dark",
@@ -61,7 +61,52 @@
                 "baseColor": "#3b6b35",
                 "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"
             },
-            "themeState": {},
+            "themeState": {
+                "base-color": {
+                    "default": "#097479",
+                    "value": "#097479",
+                    "edited": false
+                },
+                "page-titlebar-backgroundColor": {
+                    "value": "#097479",
+                    "edited": false
+                },
+                "page-backgroundColor": {
+                    "value": "#111827",
+                    "edited": false
+                },
+                "page-sidebar-backgroundColor": {
+                    "value": "#1b2330",
+                    "edited": false
+                },
+                "group-textColor": {
+                    "value": "#d9e2ec",
+                    "edited": false
+                },
+                "group-borderColor": {
+                    "value": "#2b3648",
+                    "edited": false
+                },
+                "group-backgroundColor": {
+                    "value": "#1b2330",
+                    "edited": false
+                },
+                "widget-textColor": {
+                    "value": "#eaf6ff",
+                    "edited": false
+                },
+                "widget-backgroundColor": {
+                    "value": "#097479",
+                    "edited": false
+                },
+                "widget-borderColor": {
+                    "value": "#1b2330",
+                    "edited": false
+                },
+                "base-font": {
+                    "value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"
+                }
+            },
             "angularTheme": {
                 "primary": "indigo",
                 "accents": "blue",
@@ -89,7 +134,7 @@
         }
     },
     {
-        "id": "ui_tab",
+        "id": "uitab0",
         "type": "ui_tab",
         "name": "Plant HMI",
         "icon": "dashboard",
@@ -101,7 +146,7 @@
         "id": "g_proc",
         "type": "ui_group",
         "name": "Process",
-        "tab": "ui_tab",
+        "tab": "uitab0",
         "order": 1,
         "disp": true,
         "width": 6,
@@ -111,7 +156,7 @@
         "id": "g_stat",
         "type": "ui_group",
         "name": "Controller status",
-        "tab": "ui_tab",
+        "tab": "uitab0",
         "order": 2,
         "disp": true,
         "width": 6,
@@ -121,7 +166,7 @@
         "id": "g_relay",
         "type": "ui_group",
         "name": "Relays & outputs",
-        "tab": "ui_tab",
+        "tab": "uitab0",
         "order": 3,
         "disp": true,
         "width": 6,
@@ -131,7 +176,7 @@
         "id": "g_in",
         "type": "ui_group",
         "name": "Inputs (incl. phone buttons)",
-        "tab": "ui_tab",
+        "tab": "uitab0",
         "order": 4,
         "disp": true,
         "width": 6,
@@ -141,7 +186,7 @@
         "id": "g_phone",
         "type": "ui_group",
         "name": "Phone sensors -> %IW",
-        "tab": "ui_tab",
+        "tab": "uitab0",
         "order": 5,
         "disp": true,
         "width": 6,
@@ -265,7 +310,7 @@
         "id": "fn_stat",
         "type": "function",
         "name": "status",
-        "func": "const r = msg.payload;\nconst mode = ['BOOT','IDLE','RUN','FAULT'][r[20]] || r[20];\nreturn [\n  {payload: mode},\n  {payload: r[25]},                 // heartbeat\n  {payload: r[22] + ' us'},         // scan max\n  {payload: r[23]},                 // fault count\n  {payload: r[24]}                  // forces active\n];",
+        "func": "const r = msg.payload;\nconst n = v => (v==null ? 0 : v);   // Modbus may return a short array before RUN\nconst mode = ['BOOT','IDLE','RUN','FAULT'][n(r[20])] || ('mode '+n(r[20]));\nreturn [\n  {payload: mode},\n  {payload: n(r[25])},              // heartbeat\n  {payload: n(r[22]) + ' us'},      // scan max\n  {payload: n(r[23])},              // fault count\n  {payload: n(r[24])}               // forces active\n];",
         "outputs": 5,
         "timeout": 0,
         "noerr": 0,
@@ -402,7 +447,7 @@
         "id": "fn_phone",
         "type": "function",
         "name": "phone -> IW",
-        "func": "const r = msg.payload;\n// plc_core maps phone sensors to Modbus regs 50/51/52 when fresh\nconst lux  = {payload: r[50]||0};          // ambient light (lux)\nconst acc  = {payload: (r[51]||0)/100};    // |a| m/s^2 (stored x100)\nconst tilt = {payload: r[52]||0};          // tilt beta (deg, signed)\nreturn [lux, acc, tilt];",
+        "func": "const r = msg.payload;\n// plc_core writes regs 50/51/52 only while a phone is live (mqtt_sensors_fresh).\n// Plausibility-gate each one so the HMI shows 0 ('no phone') instead of stale junk.\nconst g = (v, lo, hi) => (v >= lo && v <= hi) ? v : 0;\nconst lux  = {payload: g(r[50]||0, 0, 2000)};     // ambient light (lux)\nconst acc  = {payload: g((r[51]||0)/100, 0, 40)}; // |a| m/s^2 (stored x100)\nconst tilt = {payload: g(r[52]||0, -180, 180)};   // tilt beta (deg, signed)\nreturn [lux, acc, tilt];",
         "outputs": 3,
         "timeout": 0,
         "noerr": 0,

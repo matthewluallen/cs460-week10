@@ -6,7 +6,7 @@ import json
 
 PLC_HOST = "10.20.30.10"
 TAB = "f_hmi"
-BASE = "ui_base"
+BASE = "uib0"
 
 nodes = []
 
@@ -24,25 +24,40 @@ nodes.append({
 })
 
 # ---- dashboard config ----
+# node-red-dashboard (legacy angular, 3.6.5) requires exactly one ui_base and runs cleanly on
+# node-red 3.1.x (the Dockerfile pins that; node-red 4.x's config-node resolver mis-flags the
+# dashboard's ui_base<->ui_tab link as a circular dependency).
 nodes.append({
     "id": BASE, "type": "ui_base", "theme": {
-        "name": "theme-dark", "lightTheme": {"default": "#0094CE", "baseColor": "#0094CE",
+        "name": "theme-dark",
+        "lightTheme": {"default": "#0094CE", "baseColor": "#0094CE",
             "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif", "edited": True, "reset": False},
         "darkTheme": {"default": "#097479", "baseColor": "#00b3b3",
             "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif", "edited": True, "reset": False},
         "customTheme": {"name": "Untitled Theme 1", "default": "#4B7930", "baseColor": "#3b6b35",
             "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"},
-        "themeState": {}, "angularTheme": {"primary": "indigo", "accents": "blue", "warn": "red", "background": "grey"}},
+        "themeState": {"base-color": {"default": "#097479", "value": "#097479", "edited": False},
+            "page-titlebar-backgroundColor": {"value": "#097479", "edited": False},
+            "page-backgroundColor": {"value": "#111827", "edited": False},
+            "page-sidebar-backgroundColor": {"value": "#1b2330", "edited": False},
+            "group-textColor": {"value": "#d9e2ec", "edited": False},
+            "group-borderColor": {"value": "#2b3648", "edited": False},
+            "group-backgroundColor": {"value": "#1b2330", "edited": False},
+            "widget-textColor": {"value": "#eaf6ff", "edited": False},
+            "widget-backgroundColor": {"value": "#097479", "edited": False},
+            "widget-borderColor": {"value": "#1b2330", "edited": False},
+            "base-font": {"value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"}},
+        "angularTheme": {"primary": "indigo", "accents": "blue", "warn": "red", "background": "grey"}},
     "site": {"name": "CS460 Plant HMI", "hideToolbar": "false", "allowSwipe": "false",
-        "lockMenu": "false", "allowTempTheme": "true", "dateFormat": "DD/MM/YYYY", "sizes":
-        {"sx": 48, "sy": 48, "gx": 6, "gy": 6, "cx": 6, "cy": 6, "px": 0, "py": 0}},
+        "lockMenu": "false", "allowTempTheme": "true", "dateFormat": "DD/MM/YYYY",
+        "sizes": {"sx": 48, "sy": 48, "gx": 6, "gy": 6, "cx": 6, "cy": 6, "px": 0, "py": 0}},
 })
-nodes.append({"id": "ui_tab", "type": "ui_tab", "name": "Plant HMI", "icon": "dashboard", "order": 1, "disabled": False, "hidden": False})
-nodes.append({"id": "g_proc",  "type": "ui_group", "name": "Process",          "tab": "ui_tab", "order": 1, "disp": True, "width": 6, "collapse": False})
-nodes.append({"id": "g_stat",  "type": "ui_group", "name": "Controller status","tab": "ui_tab", "order": 2, "disp": True, "width": 6, "collapse": False})
-nodes.append({"id": "g_relay", "type": "ui_group", "name": "Relays & outputs",  "tab": "ui_tab", "order": 3, "disp": True, "width": 6, "collapse": False})
-nodes.append({"id": "g_in",    "type": "ui_group", "name": "Inputs (incl. phone buttons)", "tab": "ui_tab", "order": 4, "disp": True, "width": 6, "collapse": False})
-nodes.append({"id": "g_phone", "type": "ui_group", "name": "Phone sensors -> %IW", "tab": "ui_tab", "order": 5, "disp": True, "width": 6, "collapse": False})
+nodes.append({"id": "uitab0", "type": "ui_tab", "name": "Plant HMI", "icon": "dashboard", "order": 1, "disabled": False, "hidden": False})
+nodes.append({"id": "g_proc",  "type": "ui_group", "name": "Process",          "tab": "uitab0", "order": 1, "disp": True, "width": 6, "collapse": False})
+nodes.append({"id": "g_stat",  "type": "ui_group", "name": "Controller status","tab": "uitab0", "order": 2, "disp": True, "width": 6, "collapse": False})
+nodes.append({"id": "g_relay", "type": "ui_group", "name": "Relays & outputs",  "tab": "uitab0", "order": 3, "disp": True, "width": 6, "collapse": False})
+nodes.append({"id": "g_in",    "type": "ui_group", "name": "Inputs (incl. phone buttons)", "tab": "uitab0", "order": 4, "disp": True, "width": 6, "collapse": False})
+nodes.append({"id": "g_phone", "type": "ui_group", "name": "Phone sensors -> %IW", "tab": "uitab0", "order": 5, "disp": True, "width": 6, "collapse": False})
 
 def mbread(nid, name, dtype, adr, qty, y, wires):
     return {"id": nid, "type": "modbus-read", "name": name, "topic": "", "showStatusActivities": False,
@@ -81,13 +96,14 @@ nodes.append(gauge("ui_sp",   "g_proc", 2, "Setpoint",    "°C", 0, 80, 160))
 
 nodes.append(func("fn_stat", "status", (
     "const r = msg.payload;\n"
-    "const mode = ['BOOT','IDLE','RUN','FAULT'][r[20]] || r[20];\n"
+    "const n = v => (v==null ? 0 : v);   // Modbus may return a short array before RUN\n"
+    "const mode = ['BOOT','IDLE','RUN','FAULT'][n(r[20])] || ('mode '+n(r[20]));\n"
     "return [\n"
     "  {payload: mode},\n"
-    "  {payload: r[25]},                 // heartbeat\n"
-    "  {payload: r[22] + ' us'},         // scan max\n"
-    "  {payload: r[23]},                 // fault count\n"
-    "  {payload: r[24]}                  // forces active\n"
+    "  {payload: n(r[25])},              // heartbeat\n"
+    "  {payload: n(r[22]) + ' us'},      // scan max\n"
+    "  {payload: n(r[23])},              // fault count\n"
+    "  {payload: n(r[24])}               // forces active\n"
     "];"), 5, 260, [["ui_mode"], ["ui_hb"], ["ui_scan"], ["ui_flt"], ["ui_frc"]]))
 nodes.append(text("ui_mode", "g_stat", 1, "Mode", 240))
 nodes.append(text("ui_hb",   "g_stat", 2, "Heartbeat", 300))
@@ -97,10 +113,12 @@ nodes.append(text("ui_frc",  "g_stat", 5, "Forces active", 480))
 
 nodes.append(func("fn_phone", "phone -> IW", (
     "const r = msg.payload;\n"
-    "// plc_core maps phone sensors to Modbus regs 50/51/52 when fresh\n"
-    "const lux  = {payload: r[50]||0};          // ambient light (lux)\n"
-    "const acc  = {payload: (r[51]||0)/100};    // |a| m/s^2 (stored x100)\n"
-    "const tilt = {payload: r[52]||0};          // tilt beta (deg, signed)\n"
+    "// plc_core writes regs 50/51/52 only while a phone is live (mqtt_sensors_fresh).\n"
+    "// Plausibility-gate each one so the HMI shows 0 ('no phone') instead of stale junk.\n"
+    "const g = (v, lo, hi) => (v >= lo && v <= hi) ? v : 0;\n"
+    "const lux  = {payload: g(r[50]||0, 0, 2000)};     // ambient light (lux)\n"
+    "const acc  = {payload: g((r[51]||0)/100, 0, 40)}; // |a| m/s^2 (stored x100)\n"
+    "const tilt = {payload: g(r[52]||0, -180, 180)};   // tilt beta (deg, signed)\n"
     "return [lux, acc, tilt];"), 3, 560, [["ui_lux"], ["ui_acc"], ["ui_tilt"]]))
 nodes.append(gauge("ui_lux",  "g_phone", 1, "Light", "lux",   0, 1000, 540))
 nodes.append(gauge("ui_acc",  "g_phone", 2, "Accel", "m/s²", 0, 30, 620))
