@@ -40,8 +40,8 @@ xz -dkf "$DEST/stamplc-flash-8MB.bin.xz"
 
 if [ "$OS" = Linux ] && command -v apt-get >/dev/null 2>&1; then
   echo "==> Installing QEMU runtime libraries + libcap2-bin…"
-  sudo apt-get update -qq && sudo apt-get install -y -qq libglib2.0-0 libpixman-1-0 libslirp0 libgcrypt20 libcap2-bin \
-    || echo "   (install libglib2.0-0 libpixman-1-0 libslirp0 libgcrypt20 libcap2-bin manually if run fails)"
+  sudo apt-get update -qq && sudo apt-get install -y -qq libglib2.0-0 libpixman-1-0 libslirp0 libgcrypt20 libcap2-bin libpng16-16 \
+    || echo "   (install libglib2.0-0 libpixman-1-0 libslirp0 libgcrypt20 libcap2-bin libpng16-16 manually if run fails)"
 
   # Least privilege: let the unprivileged emulator bind the OTA port (80).
   # The W5500 bridge binds the guest's listen ports on the host; 80 is privileged,
