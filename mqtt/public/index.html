@@ -8,136 +8,183 @@
  :root{color-scheme:dark}
  *{box-sizing:border-box}
  body{margin:0;background:#0b0e14;color:#e7eef6;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-      padding:22px 16px calc(22px + env(safe-area-inset-bottom));max-width:680px;margin:0 auto}
+      padding:22px 16px calc(28px + env(safe-area-inset-bottom));max-width:680px;margin:0 auto}
  h1{font-size:19px;margin:0 0 2px}
- .sub{color:#8aa0ba;font:12px ui-monospace,monospace;margin-bottom:18px}
- .card{background:#121a28;border:1px solid #1e2a38;border-radius:14px;padding:16px;margin-bottom:14px}
+ .sub{color:#8aa0ba;font:12px ui-monospace,monospace;margin-bottom:16px;word-break:break-all}
+ .card{background:#121a28;border:1px solid #1e2a38;border-radius:14px;padding:15px;margin-bottom:12px}
  .qr{display:flex;gap:16px;align-items:center}
- .qr img{width:150px;height:150px;border-radius:10px;background:#fff;padding:6px}
+ .qr img{width:140px;height:140px;border-radius:10px;background:#fff;padding:6px;flex:none}
  .qr .t{font-size:13px;color:#9fb4cc}
- button{appearance:none;border:0;border-radius:11px;padding:14px 18px;font-size:16px;font-weight:650;
-        background:#4d9fff;color:#05121f;width:100%;cursor:pointer}
- button.stop{background:#ff7a7a}
- button:disabled{opacity:.5}
- .status{display:flex;align-items:center;gap:9px;font:13px ui-monospace,monospace;margin:4px 0 2px}
+ button{appearance:none;border:0;border-radius:11px;padding:12px 16px;font-size:15px;font-weight:650;
+        background:#4d9fff;color:#05121f;cursor:pointer}
+ button.ghost{background:#22314a;color:#cfe0f5}
+ button.on{background:#1f6f4d;color:#d6ffe9}
+ button:disabled{opacity:.45}
+ .bigbtn{width:100%;font-size:16px;padding:14px}
+ .status{display:flex;align-items:center;gap:9px;font:13px ui-monospace,monospace;margin:10px 0 0}
  .dot{width:11px;height:11px;border-radius:50%;background:#2a3650;flex:none}
  .dot.on{background:#5ff0b0;box-shadow:0 0 10px #5ff0b0}
- .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
- .s{background:#0e1622;border:1px solid #1e2a38;border-radius:11px;padding:11px}
- .s .k{font:11px ui-monospace,monospace;color:#8aa0ba;text-transform:uppercase;letter-spacing:.06em}
- .s .v{font:17px/1.35 ui-monospace,monospace;color:#5ff0b0;margin-top:5px;word-break:break-all}
- .s.na .v{color:#6b7f99}
- .tp{font:11px ui-monospace,monospace;color:#6b7f99;margin-top:3px}
- .note{color:#8aa0ba;font-size:12.5px;margin-top:6px}
+ .note{color:#8aa0ba;font-size:12.5px;margin-top:8px}
  code{color:#ffd166;font-family:ui-monospace,monospace}
+ .sensor{display:flex;flex-direction:column;gap:9px}
+ .srow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+ .sname{font-weight:650}.sdesc{color:#8aa0ba;font-size:12px}
+ .sval{font:13px/1.4 ui-monospace,monospace;color:#5ff0b0;background:#0e1622;border:1px solid #1e2a38;
+       border-radius:9px;padding:9px 11px;word-break:break-all;min-height:38px}
+ .sval.na{color:#6b7f99}
+ .tp{font:11px ui-monospace,monospace;color:#6b7f99}
+ .pill{font:10px ui-monospace,monospace;color:#8aa0ba;border:1px solid #28364a;border-radius:999px;padding:2px 7px}
 </style>
 </head>
 <body>
 <h1>CS460 Phone Sensor Bridge <span style="color:#4d9fff">· MQTT</span></h1>
 <div class="sub" id="where">connecting…</div>
 
-<div class="card qr" id="qrcard">
+<div class="card qr">
   <img src="/qr.png" alt="QR to this page">
-  <div class="t"><b>On a laptop?</b> Scan this with a phone to open this page there, then tap
-  <b>Start sensors</b>. The phone streams its sensors to the broker; the M5StampLC in QEMU
-  subscribes to the ones it wants and maps them to <code>%IW</code> input registers.</div>
+  <div class="t"><b>On a laptop?</b> Scan with a phone to open this page there. Then
+  <b>Connect</b> and <b>Share</b> the sensors you want. The M5StampLC in QEMU subscribes to the
+  ones it wants and maps them to <code>%IW</code> input registers.</div>
 </div>
 
 <div class="card">
-  <button id="go">Start sensors</button>
-  <div class="status" style="margin-top:12px"><span class="dot" id="bdot"></span><span id="bstat">broker: not connected</span></div>
-  <div class="status"><span class="dot" id="pdot"></span><span id="pstat">sensors: idle</span> · <span id="cnt">0 msgs</span></div>
-  <div class="note">Client id <code id="cid">—</code> · topics <code>phone/&lt;id&gt;/{accel,orient,light}</code></div>
+  <button id="go" class="bigbtn">Connect to broker</button>
+  <div class="status"><span class="dot" id="bdot"></span><span id="bstat">broker: not connected</span> · <span id="cnt">0 msgs</span></div>
+  <div class="note">Client id <code id="cid">—</code>. Each sensor is shared only after you grant its
+  permission below. Topics: <code>phone/&lt;id&gt;/&lt;sensor&gt;</code>.</div>
 </div>
 
-<div class="grid" id="readout">
-  <div class="s na" id="s-accel"><div class="k">Accelerometer</div><div class="v">—</div><div class="tp">phone/…/accel</div></div>
-  <div class="s na" id="s-orient"><div class="k">Orientation</div><div class="v">—</div><div class="tp">phone/…/orient</div></div>
-  <div class="s na" id="s-light"><div class="k">Light</div><div class="v">—</div><div class="tp">phone/…/light</div></div>
-  <div class="s na" id="s-gyro"><div class="k">Rotation</div><div class="v">—</div><div class="tp">phone/…/gyro</div></div>
-</div>
+<!-- sensor cards are generated by JS so each has its own permission/share button -->
+<div id="sensors"></div>
 
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <script>
 const cid = 'ph-' + Math.random().toString(36).slice(2, 7);
 document.getElementById('cid').textContent = cid;
 const base = 'phone/' + cid;
-let client = null, count = 0, running = false;
+let client = null, count = 0;
 const el = id => document.getElementById(id);
 
-fetch('/whoami').then(r=>r.json()).then(j=>{ el('where').textContent = 'server: ' + j.url; }).catch(()=>{});
+fetch('/whoami').then(r=>r.json()).then(j=> el('where').textContent = 'server: ' + j.url).catch(()=>{});
 
-function setCard(id, text, ok){ const c=el(id); c.querySelector('.v').textContent=text; c.classList.toggle('na',!ok); }
 function pub(topic, obj){
   if(!client || !client.connected) return;
   client.publish(base + '/' + topic, JSON.stringify(obj), {qos:0});
   count++; el('cnt').textContent = count + ' msgs';
 }
-let lastPub = 0;
-function throttled(fn){ const now=Date.now(); if(now-lastPub>120){ lastPub=now; fn(); } } // ~8 Hz cap
+let lastPub = {};
+function throttled(topic, fn, hz=8){ const now=Date.now(); if(now-(lastPub[topic]||0) > 1000/hz){ lastPub[topic]=now; fn(); } }
 
-async function requestPerms(){
-  // iOS 13+ requires an explicit permission request from a user gesture.
-  try{ if(typeof DeviceMotionEvent!=='undefined' && DeviceMotionEvent.requestPermission)
-        await DeviceMotionEvent.requestPermission(); }catch(e){}
-  try{ if(typeof DeviceOrientationEvent!=='undefined' && DeviceOrientationEvent.requestPermission)
-        await DeviceOrientationEvent.requestPermission(); }catch(e){}
+// ---- sensor registry: each entry renders a card with its own Share (permission) button ----
+const SENSORS = [
+ { id:'motion', name:'Motion', desc:'accelerometer (m/s²) + gyroscope (°/s)', topics:'accel, gyro', start:startMotion },
+ { id:'orient', name:'Orientation', desc:'compass heading α + tilt β,γ (attitude — not the gyro)', topics:'orient', start:startOrientation },
+ { id:'geo',    name:'Geolocation', desc:'latitude, longitude, accuracy, speed, heading', topics:'geo', start:startGeo },
+ { id:'sound',  name:'Microphone level', desc:'RMS loudness 0–100 (no audio is sent)', topics:'sound', start:startSound },
+ { id:'light',  name:'Ambient light', desc:'illuminance in lux (Android Chrome only)', topics:'light', start:startLight },
+ { id:'battery',name:'Battery', desc:'charge level % and charging state', topics:'battery', start:startBattery },
+];
+const host = document.getElementById('sensors');
+for(const s of SENSORS){
+  const c = document.createElement('div'); c.className='card sensor'; c.id='card-'+s.id;
+  c.innerHTML = `<div class="srow">
+     <div><div class="sname">${s.name}</div><div class="sdesc">${s.desc}</div></div>
+     <button class="ghost" id="btn-${s.id}" disabled>Share</button></div>
+    <div class="sval na" id="val-${s.id}">connect to the broker first</div>
+    <div class="tp">topic phone/…/${s.topics}</div>`;
+  host.appendChild(c);
+  el('btn-'+s.id).onclick = async () => {
+    el('btn-'+s.id).disabled = true; el('btn-'+s.id).textContent = 'Requesting…';
+    try { const ok = await s.start(); el('btn-'+s.id).textContent = ok ? 'Sharing' : 'Unavailable';
+          el('btn-'+s.id).className = ok ? 'on' : 'ghost'; if(!ok) setVal(s.id,'not available on this device',false); }
+    catch(e){ el('btn-'+s.id).textContent='Denied'; el('btn-'+s.id).className='ghost'; setVal(s.id,'permission denied',false); }
+  };
 }
+function setVal(id, text, ok=true){ const v=el('val-'+id); v.textContent=text; v.classList.toggle('na',!ok); }
+function enableShares(){ for(const s of SENSORS){ const b=el('btn-'+s.id); b.disabled=false; if(b.textContent==='Share') setVal(s.id,'tap Share to grant permission',false);} }
 
-function startSensors(){
-  // --- motion: accelerometer (incl. gravity) + rotation rate ---
+// ---- individual sensor starters (each requests its OWN permission) ----
+async function iosPerm(Evt){ try{ if(typeof Evt!=='undefined' && Evt.requestPermission){ return (await Evt.requestPermission())==='granted'; } }catch(e){ return false; } return true; }
+
+async function startMotion(){
+  if(!(await iosPerm(window.DeviceMotionEvent))) return false;
+  let got=false;
   window.addEventListener('devicemotion', e=>{
-    const a=e.accelerationIncludingGravity||e.acceleration;
-    if(a && a.x!=null){
+    const a=e.accelerationIncludingGravity||e.acceleration, r=e.rotationRate;
+    if(a && a.x!=null){ got=true;
       const mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
-      setCard('s-accel', `x ${a.x.toFixed(2)}  y ${a.y.toFixed(2)}  z ${a.z.toFixed(2)}  |${mag.toFixed(2)}|`, true);
-      throttled(()=>pub('accel', {x:+a.x.toFixed(3),y:+a.y.toFixed(3),z:+a.z.toFixed(3),mag:+mag.toFixed(3)}));
-    }
-    const r=e.rotationRate;
-    if(r && r.alpha!=null){
-      setCard('s-gyro', `α ${(r.alpha||0).toFixed(1)}  β ${(r.beta||0).toFixed(1)}  γ ${(r.gamma||0).toFixed(1)}`, true);
-      throttled(()=>pub('gyro', {alpha:+(r.alpha||0).toFixed(2),beta:+(r.beta||0).toFixed(2),gamma:+(r.gamma||0).toFixed(2)}));
+      setVal('motion', `accel x ${a.x.toFixed(2)} y ${a.y.toFixed(2)} z ${a.z.toFixed(2)} |${mag.toFixed(2)}|\n`+
+        (r&&r.alpha!=null?`gyro  α ${(r.alpha||0).toFixed(1)} β ${(r.beta||0).toFixed(1)} γ ${(r.gamma||0).toFixed(1)} °/s`:'gyro  n/a'));
+      throttled('accel',()=>pub('accel',{x:+a.x.toFixed(3),y:+a.y.toFixed(3),z:+a.z.toFixed(3),mag:+mag.toFixed(3)}));
+      if(r&&r.alpha!=null) throttled('gyro',()=>pub('gyro',{alpha:+(r.alpha||0).toFixed(2),beta:+(r.beta||0).toFixed(2),gamma:+(r.gamma||0).toFixed(2)}));
     }
   });
-  // --- orientation (tilt / compass) ---
+  setTimeout(()=>{ if(!got) setVal('motion','no motion events (sensor may be blocked)',false); }, 2500);
+  return true;
+}
+async function startOrientation(){
+  if(!(await iosPerm(window.DeviceOrientationEvent))) return false;
   window.addEventListener('deviceorientation', e=>{
     if(e.alpha==null && e.beta==null) return;
-    setCard('s-orient', `α ${(e.alpha||0).toFixed(1)}  β ${(e.beta||0).toFixed(1)}  γ ${(e.gamma||0).toFixed(1)}`, true);
-    throttled(()=>pub('orient', {alpha:+(e.alpha||0).toFixed(2),beta:+(e.beta||0).toFixed(2),gamma:+(e.gamma||0).toFixed(2)}));
+    setVal('orient', `compass α ${(e.alpha||0).toFixed(1)}°   tilt β ${(e.beta||0).toFixed(1)}° γ ${(e.gamma||0).toFixed(1)}°`);
+    throttled('orient',()=>pub('orient',{alpha:+(e.alpha||0).toFixed(2),beta:+(e.beta||0).toFixed(2),gamma:+(e.gamma||0).toFixed(2)}));
   });
-  // --- ambient light (Chrome/Android w/ Generic Sensor; often unavailable — graceful) ---
-  try{
-    if('AmbientLightSensor' in window){
-      const als=new AmbientLightSensor({frequency:5});
-      als.addEventListener('reading',()=>{ setCard('s-light', als.illuminance.toFixed(0)+' lux', true);
-        throttled(()=>pub('light', {lux:+als.illuminance.toFixed(1)})); });
-      als.addEventListener('error',()=> setCard('s-light','sensor blocked',false));
-      als.start();
-    } else {
-      window.addEventListener('devicelight', e=>{ setCard('s-light', e.value.toFixed(0)+' lux', true);
-        throttled(()=>pub('light',{lux:+e.value.toFixed(1)})); });
-      setTimeout(()=>{ const c=el('s-light'); if(c.classList.contains('na')) c.querySelector('.v').textContent='not available on this device'; }, 2500);
-    }
-  }catch(e){ setCard('s-light','not available',false); }
-  el('pdot').classList.add('on'); el('pstat').textContent='sensors: streaming';
+  return true;
+}
+function startGeo(){
+  return new Promise(res=>{
+    if(!navigator.geolocation) return res(false);
+    navigator.geolocation.watchPosition(p=>{
+      const c=p.coords;
+      setVal('geo', `lat ${c.latitude.toFixed(5)}  lon ${c.longitude.toFixed(5)}\nacc ${Math.round(c.accuracy)} m  spd ${c.speed==null?'—':c.speed.toFixed(1)} m/s  hdg ${c.heading==null?'—':Math.round(c.heading)+'°'}`);
+      throttled('geo',()=>pub('geo',{lat:+c.latitude.toFixed(6),lon:+c.longitude.toFixed(6),acc:+c.accuracy.toFixed(1),alt:c.altitude,spd:c.speed,hdg:c.heading}),2);
+      res(true);
+    }, err=>{ setVal('geo','permission denied / unavailable',false); res(false); }, {enableHighAccuracy:true, maximumAge:1000});
+  });
+}
+async function startSound(){
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});   // throws if denied
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  const src = ctx.createMediaStreamSource(stream);
+  const an = ctx.createAnalyser(); an.fftSize=512; src.connect(an);
+  const buf = new Uint8Array(an.fftSize);
+  function tick(){
+    an.getByteTimeDomainData(buf);
+    let sum=0; for(const v of buf){ const d=(v-128)/128; sum+=d*d; }
+    const level = Math.min(100, Math.round(Math.sqrt(sum/buf.length)*300));
+    setVal('sound', `level ${level} / 100  ${'█'.repeat(Math.round(level/5))}`);
+    throttled('sound',()=>pub('sound',{level}),6);
+    requestAnimationFrame(tick);
+  }
+  tick(); return true;
+}
+async function startLight(){
+  if(!('AmbientLightSensor' in window)) {
+    window.addEventListener('devicelight', e=>{ setVal('light', e.value.toFixed(0)+' lux'); throttled('light',()=>pub('light',{lux:+e.value.toFixed(1)})); });
+    return false; // Generic Sensor not present; iOS has no web light sensor
+  }
+  const als = new AmbientLightSensor({frequency:5});
+  als.addEventListener('reading',()=>{ setVal('light', als.illuminance.toFixed(0)+' lux'); throttled('light',()=>pub('light',{lux:+als.illuminance.toFixed(1)})); });
+  als.addEventListener('error',()=> setVal('light','sensor blocked',false));
+  als.start(); return true;
+}
+async function startBattery(){
+  if(!navigator.getBattery) return false;
+  const b = await navigator.getBattery();
+  const upd=()=>{ setVal('battery', `${Math.round(b.level*100)} %  ${b.charging?'charging':'on battery'}`);
+    pub('battery',{level:Math.round(b.level*100),charging:b.charging}); };
+  b.addEventListener('levelchange',upd); b.addEventListener('chargingchange',upd); upd(); return true;
 }
 
 el('go').onclick = async () => {
-  if(running){ // stop
-    running=false; el('go').textContent='Start sensors'; el('go').classList.remove('stop');
-    el('pdot').classList.remove('on'); el('pstat').textContent='sensors: stopped';
-    if(client) client.end(true); el('bdot').classList.remove('on'); el('bstat').textContent='broker: not connected';
-    return;
-  }
-  el('go').disabled=true;
-  await requestPerms();
+  el('go').disabled = true; el('go').textContent = 'Connecting…';
   const url=(location.protocol==='https:'?'wss://':'ws://')+location.host;
   client = mqtt.connect(url, {clientId:cid, reconnectPeriod:2000, keepalive:30});
   client.on('connect', ()=>{ el('bdot').classList.add('on'); el('bstat').textContent='broker: connected ('+location.host+')';
-    el('go').disabled=false; running=true; el('go').textContent='Stop'; el('go').classList.add('stop');
-    pub('hello',{ua:navigator.userAgent.slice(0,60),ts:Date.now()}); startSensors(); });
+    el('go').textContent='Connected — share sensors below'; el('go').className='bigbtn on';
+    pub('hello',{ua:navigator.userAgent.slice(0,80),ts:Date.now()}); enableShares(); });
   client.on('reconnect', ()=> el('bstat').textContent='broker: reconnecting…');
-  client.on('error', e=>{ el('bstat').textContent='broker error: '+(e.message||e); el('go').disabled=false; });
+  client.on('error', e=>{ el('bstat').textContent='broker error: '+(e.message||e); el('go').disabled=false; el('go').textContent='Retry connect'; });
 };
 </script>
 </body>
