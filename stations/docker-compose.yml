@@ -1,0 +1,83 @@
+# CS460 — StampLC as separate real-world stations on one OT network.
+#
+# Four nodes on a real Docker network (the "plant"), speaking real protocols you can
+# capture with Wireshark — the multi-station model from the wind-turbine lab, applied to
+# the StampLC. No wind farm here; this stack stands alone.
+#
+#   plc       10.20.30.10   the controller — the QEMU twin + bridge (Modbus :502, HTTP :80, Studio :8080)
+#   hmi       10.20.30.20   a SCADA HMI that polls the controller over Modbus (dashboard :8800)
+#   engineer  10.20.30.30   an engineering/attacker workstation — a Modbus master
+#   capture                 a passive sniffer (Wireshark/tshark) watching the plant network
+#
+# First (once, in the repo root, so the twin is present for the mounted plc station):
+#   ./qemu/fetch-qemu.sh
+# Then:
+#   docker compose -f stations/docker-compose.yml up --build
+#
+# In a Codespace, forward ports 8800 (HMI) and 8080 (Studio) from the Ports tab.
+
+name: cs460-stations
+
+networks:
+  plant:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.20.30.0/24
+
+services:
+  plc:
+    build:
+      context: ./plc
+    image: cs460/plc-station
+    working_dir: /work
+    volumes:
+      - ..:/work                 # the repo (with the fetched twin) — the controller's software
+    environment:
+      - PROFILE=vuln             # vuln | secure | malicious
+    networks:
+      plant:
+        ipv4_address: 10.20.30.10
+    ports:
+      - "8080:8080"              # Logic Studio + /modbus proxy + console (same-origin)
+    # binds the controller's own Modbus :502 and HTTP :80 on the plant network (W5_BIND=0.0.0.0)
+
+  hmi:
+    build:
+      context: ..               # repo root, so stations/lib + stations/hmi are both in context
+      dockerfile: stations/hmi/Dockerfile
+    image: cs460/hmi-station
+    environment:
+      - PLC_HOST=10.20.30.10
+    depends_on: [plc]
+    networks:
+      plant:
+        ipv4_address: 10.20.30.20
+    ports:
+      - "8800:8800"              # the HMI dashboard
+
+  engineer:
+    build:
+      context: ..
+      dockerfile: stations/engineer/Dockerfile
+    image: cs460/engineer-station
+    environment:
+      - PLC_HOST=10.20.30.10
+    depends_on: [plc]
+    networks:
+      plant:
+        ipv4_address: 10.20.30.30
+    # default command polls the controller; to command it over the network, run e.g.:
+    #   docker compose -f stations/docker-compose.yml run --rm engineer python3 /app/engineer.py write-coil relay2 1
+    #   docker compose -f stations/docker-compose.yml run --rm engineer python3 /app/engineer.py write-setpoint 321
+
+  capture:
+    build:
+      context: ..
+      dockerfile: stations/capture/Dockerfile
+    image: cs460/capture-station
+    network_mode: host           # see unicast traffic BETWEEN containers on the plant bridge
+    cap_add: [NET_ADMIN, NET_RAW]
+    volumes:
+      - ./captures:/captures
+    depends_on: [plc, hmi]
