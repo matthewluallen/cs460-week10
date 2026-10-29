@@ -38,6 +38,10 @@ constexpr uint16_t SCAN_MAX_US = 22;
 constexpr uint16_t FAULT_COUNT = 23;
 constexpr uint16_t FORCES_ACTIVE = 24;
 constexpr uint16_t HEARTBEAT = 25;
+// Scan-boundary arbiter telemetry (P3): the Studio reads these to show the concurrency state.
+constexpr uint16_t TAG_CONFLICT_COUNT = 27;   // cumulative two-master conflicts since boot
+constexpr uint16_t TAG_CONFLICT_KEY   = 28;    // key of the most recent contested tag
+constexpr uint16_t TAG_CONFLICT_SRC   = 29;    // Source bitmask of the most recent conflict
 constexpr uint16_t SETPOINT_TEMPX10 = 30;
 constexpr uint16_t ALARM_TEMPX10 = 31;
 constexpr uint16_t CYCLE_MS = 32;

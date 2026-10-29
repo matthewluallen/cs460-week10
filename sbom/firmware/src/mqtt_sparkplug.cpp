@@ -7,6 +7,7 @@
 #include "net_types.h"
 #include "mqtt_runtime.h"
 #include "mqtt_sensors.h"
+#include "tag_arbiter.h"
 #include <string.h>
 
 // ---------------------------------------------------------------------------
@@ -103,7 +104,13 @@ static void on_message(const char* t, const uint8_t* payload, size_t len) {
     // build would require broker auth + ACLs + Sparkplug host/state before acting.
     for (unsigned int i = 0; i + 1 < len; i++) {
         if (payload[i] == 0x70) {                                     // boolean_value [14] key
-            modbus_server.set_coil(0, payload[i + 1] ? true : false);
+            // P3 arbiter: MQTT runs on core 1; take the image lock so note+apply are atomic
+            // vs. the core-0 Modbus writer. A Modbus client writing coil 0 in the same scan
+            // now raises TAG_CONFLICT instead of silently last-writer-wins.
+            plc_image_lock();
+            if (arb::note_write(arb::coil_key(pointmap::ESTOP), arb::SRC_MQTT))
+                modbus_server.set_coil(0, payload[i + 1] ? true : false);
+            plc_image_unlock();
             break;
         }
     }

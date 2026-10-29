@@ -6,6 +6,7 @@
 #include "io_expansion.h"
 #include "m5stamplc_io.h"
 #include "plc_core.h"
+#include "tag_arbiter.h"
 #include "plc_tags.h"
 #ifdef ENABLE_ETHERNET
 #include <utility/w5100.h>
@@ -275,6 +276,14 @@ bool ModbusTCPServer::fc_write_single_coil(const uint8_t* req, uint8_t* resp, ui
         return true;
     }
 #endif
+    // P3 arbiter: record the source for conflict detection, and refuse if another protocol
+    // owns this tag. Runs inside the frame's ImageLock, so note + apply are atomic (the
+    // secure, TOCTOU-free path). Untracked coils are a no-op fast path.
+    if (!arb::note_write(arb::coil_key(coil_addr), arb::SRC_MODBUS)) {
+        plc_log(SRC_MODBUS, source, "REFUSED coil %u write - tag owned by another protocol (arbiter)", coil_addr);
+        resp[0]=req[1]; resp[1]=req[2]; resp[2]=req[3]; resp[3]=req[4]; resp_len=4;
+        return true;
+    }
     // CWE-306: Missing authentication for critical function
     // E-stop coil (0) can be written by anyone without permission check
     if (value == 0xFF00) {
@@ -315,6 +324,11 @@ bool ModbusTCPServer::fc_write_single_register(const uint8_t* req, uint8_t* resp
         return true;
     }
 #endif
+    if (!arb::note_write(arb::reg_key(reg_addr), arb::SRC_MODBUS)) {   // P3 arbiter (see fc_write_single_coil)
+        plc_log(SRC_MODBUS, source, "REFUSED reg %u write - tag owned by another protocol (arbiter)", reg_addr);
+        resp[0]=req[1]; resp[1]=req[2]; resp[2]=req[3]; resp[3]=req[4]; resp_len=4;
+        return true;
+    }
     registers[reg_addr] = value;
     {
         const TagDef* t = plc_tag_for(TK_REG, reg_addr);

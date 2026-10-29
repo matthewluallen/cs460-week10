@@ -8,6 +8,7 @@
 #include "plc_engine.h"
 #include "process_bindings.h"
 #include "mqtt_sensors.h"
+#include "tag_arbiter.h"
 #include "loop_timing.h"
 #include <stdarg.h>
 #include <cstring>
@@ -282,6 +283,14 @@ void plc_core_begin() {
     s_fault_n = 0;
     g_engine.reset();
     for (const auto& p : pointmap::PARAMETERS) modbus_server.set_register(p.address, p.value);
+    // P3: the arbiter governs the command tags external protocols write and the ladder reads.
+    // (The base relays are ladder-driven and overwritten each scan, so they are not tracked.)
+    arb::reset();
+    arb::track(arb::coil_key(pointmap::ESTOP));            // the Sparkplug DCMD writes this coil
+    arb::track(arb::reg_key(pointmap::SETPOINT_TEMPX10));
+    arb::track(arb::reg_key(pointmap::ALARM_TEMPX10));
+    arb::track(arb::coil_key(pointmap::SOFT_ESTOP));
+    arb::track(arb::coil_key(pointmap::CMD_RUN));
     s_first_scan = true;
     s_scan_min = 0; s_scan_max = 0; s_scan_count = 0;
     plc_log(SRC_SYSTEM, "", "PLC core start, mode=PROGRAM (outputs inhibited)");
@@ -313,6 +322,15 @@ void plc_publication_inputs_end() {
 #endif
 
 void plc_core_scan() {
+    // P3: resolve the previous window's contested writes and publish arbiter telemetry so the
+    // Studio (and any Modbus client) can see the concurrency state. One lock = atomic publish.
+    {
+        CoreGuard guard;
+        arb::scan_boundary();
+        modbus_server.set_register(pointmap::TAG_CONFLICT_COUNT, (uint16_t)arb::conflict_count());
+        modbus_server.set_register(pointmap::TAG_CONFLICT_KEY,   arb::last_conflict_key());
+        modbus_server.set_register(pointmap::TAG_CONFLICT_SRC,   arb::last_conflict_sources());
+    }
 #ifdef OPENPLC_GENERATED_CONTROLLER
     // Only acquisition remains in the Arduino loop; no generated solve or output.
     plc_bindings_refresh();
