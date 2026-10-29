@@ -285,6 +285,98 @@ def raw_console(conn, hub):
     print("[bridge] console unsubscribed", flush=True)
 
 
+# ───────────────────────── Modbus/TCP proxy (real frames on :502) ─────────────────────────
+# The browser can't open a raw TCP Modbus socket, so the bridge issues the transaction to the
+# twin's real W5500-bridged Modbus server (127.0.0.1:502) and returns the request + response
+# bytes. The transaction is a GENUINE packet on `lo` — capturable with `tshark -i lo port 502`.
+import json as _json, time as _time, urllib.parse as _up
+
+MODBUS_TARGET = os.environ.get("MODBUS_TARGET", "127.0.0.1:502")
+_mb_tid = [0]
+
+def _modbus_txn(target, pdu, timeout=3.0):
+    host, port = target.rsplit(":", 1)
+    _mb_tid[0] = (_mb_tid[0] + 1) & 0xFFFF
+    tid = _mb_tid[0]
+    adu = struct.pack(">HHHB", tid, 0, len(pdu) + 1, 1) + pdu
+    s = socket.create_connection((host, int(port)), timeout=timeout)
+    try:
+        s.sendall(adu)
+        hdr = b""
+        while len(hdr) < 6:
+            c = s.recv(6 - len(hdr))
+            if not c: raise ConnectionError("short MBAP header")
+            hdr += c
+        ln = struct.unpack(">HHH", hdr)[2]
+        body = b""
+        while len(body) < ln:
+            c = s.recv(ln - len(body))
+            if not c: raise ConnectionError("short MBAP body")
+            body += c
+    finally:
+        s.close()
+    return adu, hdr + body
+
+def _modbus_query(qs):
+    """qs: parsed query dict. Returns a JSON-able result dict."""
+    def g(k, d=None): return qs.get(k, [d])[0]
+    fc = int(g("fc", "3"))
+    addr = int(g("addr", "0"))
+    count = int(g("count", "1"))
+    value = int(g("value", "0"))
+    if fc in (1, 2):      # read coils / discrete inputs
+        pdu = struct.pack(">BHH", fc, addr, count)
+    elif fc in (3, 4):    # read holding / input registers
+        pdu = struct.pack(">BHH", fc, addr, count)
+    elif fc == 5:         # write single coil
+        pdu = struct.pack(">BHH", 5, addr, 0xFF00 if value else 0x0000)
+    elif fc == 6:         # write single register
+        pdu = struct.pack(">BHH", 6, addr, value & 0xFFFF)
+    else:
+        return {"ok": False, "error": "unsupported function code %d" % fc}
+    t0 = _time.time()
+    try:
+        req, resp = _modbus_txn(MODBUS_TARGET, pdu)
+    except Exception as e:
+        return {"ok": False, "fc": fc, "addr": addr, "error": "modbus transaction failed: %s" % e,
+                "target": MODBUS_TARGET}
+    ms = round((_time.time() - t0) * 1000, 1)
+    rpdu = resp[7:]   # after MBAP(6)+unit(1)
+    out = {"ok": True, "fc": fc, "addr": addr, "count": count, "target": MODBUS_TARGET,
+           "req_hex": req.hex(), "resp_hex": resp.hex(), "ms": ms, "values": [], "exception": None}
+    if rpdu and (rpdu[0] & 0x80):          # modbus exception
+        out["ok"] = False
+        out["exception"] = rpdu[1] if len(rpdu) > 1 else None
+    elif fc in (1, 2):
+        nb = rpdu[1] if len(rpdu) > 1 else 0
+        bits = []
+        for i in range(count):
+            byte = rpdu[2 + (i // 8)] if 2 + (i // 8) < len(rpdu) else 0
+            bits.append((byte >> (i % 8)) & 1)
+        out["values"] = bits
+    elif fc in (3, 4):
+        nb = rpdu[1] if len(rpdu) > 1 else 0
+        regs = []
+        for i in range(nb // 2):
+            regs.append(struct.unpack(">H", rpdu[2 + i*2:4 + i*2])[0])
+        out["values"] = regs
+    elif fc in (5, 6):
+        out["values"] = [value]
+        out["wrote"] = True
+    return out
+
+def _serve_modbus(conn, path):
+    qs = _up.parse_qs(_up.urlparse(path).query)
+    try:
+        result = _modbus_query(qs)
+    except Exception as e:
+        result = {"ok": False, "error": str(e)}
+    body = _json.dumps(result).encode()
+    conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                 b"Cache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\n"
+                 b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body)
+
+
 def handle(conn, hub, root):
     try:
         req = recv_http_request(conn)
@@ -293,6 +385,8 @@ def handle(conn, hub, root):
         method, path, headers = req
         if headers.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in headers:
             ws_relay(conn, headers, hub)
+        elif method in ("GET", "HEAD") and path.split("?", 1)[0] == "/modbus":
+            _serve_modbus(conn, path); conn.close()
         elif method in ("GET", "HEAD"):
             serve_static(conn, path, root)
             conn.close()
@@ -330,10 +424,14 @@ def main(argv=None):
                     help="localhost raw TCP console port for ./qemu/console.sh (0 disables)")
     ap.add_argument("--serial", default=os.environ.get("SERIAL_SOCK", "/tmp/plc-serial"),
                     help="twin console: a unix socket path, or host:port for TCP")
+    ap.add_argument("--modbus", default=os.environ.get("MODBUS_TARGET", "127.0.0.1:502"),
+                    help="twin Modbus/TCP endpoint the /modbus proxy talks to (host:port)")
     ap.add_argument("--dir", default=os.environ.get("STUDIO_DIR", os.path.join(here, "..", "web", "public")),
                     help="static web root to serve (default ../web/public)")
     a = ap.parse_args(argv)
     root = os.path.realpath(a.dir)
+    global MODBUS_TARGET
+    MODBUS_TARGET = a.modbus
 
     hub = TwinHub(a.serial)
 

@@ -183,6 +183,44 @@ textarea#stl{flex:1;border:0;resize:none;padding:12px 14px 40px;font-family:var(
 .fl-led.on{fill:var(--live);stroke:var(--live);filter:drop-shadow(0 0 10px var(--live))}
 .fl-lane{font:700 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;fill:var(--muted)}
 @media(prefers-reduced-motion:reduce){.fl-wire.live{animation:none;stroke-dasharray:none}}
+.fl-net.live{opacity:1;stroke:var(--accent);stroke-width:3;stroke-dasharray:10 6;animation:flflow .6s linear infinite;filter:drop-shadow(0 0 5px var(--accent))}
+/* ===== Protocol workspace ===== */
+#viewProtocol{display:none;flex:1;min-height:0;flex-direction:column;background:var(--bg)}
+.app.proto-active main,.app.proto-active #palette,.app.proto-active .controller-status,
+.app.proto-active #controllerModeHelp,.app.proto-active #executionPanel,.app.proto-active #logicInspector,
+.app.proto-active #forceBanner,.app.proto-active .hero,.app.proto-active #heroStrip,.app.proto-active #workflowGuide,
+.app.proto-active #viewFlow{display:none!important}
+.app.proto-active #viewProtocol{display:flex}
+.proto-head{display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.proto-poll{font:600 11.5px/1 var(--mono);color:var(--ink2);display:inline-flex;align-items:center;gap:5px;cursor:pointer}
+.proto-body{flex:1;min-height:0;display:grid;grid-template-columns:1.1fr 1fr;gap:0}
+.proto-col{min-height:0;overflow:auto;padding:14px 16px;border-right:1px solid var(--line)}
+.proto-frames{border-right:0}
+.proto-sect{font:700 11px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.proto-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.proto-tbl td{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.proto-tbl .pt-reg{font-family:var(--mono);font-size:11px;color:var(--violet);width:62px}
+.proto-tbl .pt-name{color:var(--ink)}
+.proto-tbl .pt-desc{color:var(--muted);font-size:11px}
+.proto-tbl .pt-val{font-family:var(--mono);font-weight:700;text-align:right;color:var(--live);white-space:nowrap}
+.proto-tbl .pt-val.pulse{animation:ptpulse .6s ease-out}
+@keyframes ptpulse{0%{color:var(--warn)}100%{color:var(--live)}}
+.proto-wr{display:flex;align-items:center;gap:8px;margin:7px 0;flex-wrap:wrap;font-size:12.5px}
+.proto-wr input[type=number]{width:70px;font-family:var(--mono);font-size:12px;padding:4px 7px;border:1px solid var(--line2);border-radius:6px;background:var(--panel2);color:var(--ink)}
+.proto-wr .wrlbl{min-width:150px}
+.proto-note{font:500 11.5px/1.5 var(--sans);color:var(--ink2);margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
+.proto-note b{color:var(--ink)}
+#protoFrames{font-family:var(--mono);font-size:11px;display:flex;flex-direction:column;gap:7px}
+.pf{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:7px;padding:7px 10px;background:var(--panel)}
+.pf.wr{border-left-color:var(--force)}
+.pf.err{border-left-color:var(--danger)}
+.pf-top{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.pf-fc{font-weight:700;color:var(--accent)}
+.pf.wr .pf-fc{color:var(--force)}
+.pf-pt{color:var(--ink2)}
+.pf-ms{margin-left:auto;color:var(--muted);font-size:10px}
+.pf-hex{color:var(--muted);word-break:break-all;margin-top:3px;font-size:10.5px}
+.pf-dec{color:var(--ink);margin-top:3px}
 .console-head{display:flex;align-items:center;gap:10px;padding:6px 13px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--ink2)}
 #log{flex:1;overflow:auto;padding:7px 13px;font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink2);white-space:pre-wrap}
 #log .tx{color:var(--accent)}#log .ok{color:var(--live)}#log .er{color:var(--danger)}#log .rx{color:var(--muted)}#log .fc{color:var(--force)}
@@ -424,7 +462,7 @@ body.hero-collapsed #heroStrip{display:flex}
 <div class="app">
   <header>
     <div class="brand"><span class="mark">S3</span><div>TBD Logic Studio <small>TBD · StamPLC</small></div></div>
-    <span class="seg" id="appViewSeg" title="Logic authoring vs the end-to-end signal Flow"><button type="button" data-appview="logic" class="on">Logic</button><button type="button" data-appview="flow">Flow ⚡</button></span>
+    <span class="seg" id="appViewSeg" title="Logic authoring · the end-to-end signal Flow · the network (Modbus) view"><button type="button" data-appview="logic" class="on">Logic</button><button type="button" data-appview="flow">Flow ⚡</button><button type="button" data-appview="protocol">Protocol ⇄</button></span>
     <span class="seg" id="modeSeg" title="Author edits the project; Monitor observes controller replies without changing outputs">
       <button data-mode="edit" class="on">✎ Author</button><button data-mode="online">◉ Monitor</button>
     </span>
@@ -593,6 +631,29 @@ body.hero-collapsed #heroStrip{display:flex}
     </div>
     <div class="flow-canvas"><svg id="flowSvg" preserveAspectRatio="xMidYMid meet"></svg></div>
     <div class="flow-foot" id="flowFoot"></div>
+  </section>
+
+  <section id="viewProtocol" aria-label="Network / Modbus HMI">
+    <div class="proto-head">
+      <div class="flow-title">Protocol ⇄ <span class="flow-sub">an HMI / SCADA master reads &amp; writes the controller over <b>Modbus/TCP :502</b> — the network plane of the Flow view</span></div>
+      <span class="spacer" style="flex:1"></span>
+      <label class="proto-poll"><input type="checkbox" id="protoPoll"> Poll 1 s</label>
+      <button class="btn" id="protoReadBtn" style="padding:4px 10px;font-size:12px">Read now</button>
+      <span class="flow-hint" id="protoHint"></span>
+    </div>
+    <div class="proto-body">
+      <div class="proto-col">
+        <div class="proto-sect">HMI read — live process &amp; I/O (FC3 registers, FC1 coils)</div>
+        <table class="proto-tbl"><tbody id="protoReadRows"></tbody></table>
+        <div class="proto-sect" style="margin-top:14px">HMI write — command the controller over the network</div>
+        <div id="protoWriteRows"></div>
+        <p class="proto-note" id="protoSecNote"></p>
+      </div>
+      <div class="proto-col proto-frames">
+        <div class="proto-sect">Live Modbus frames <span style="font-weight:400;color:var(--muted)">· real packets on <code>lo:502</code> — capture with <code>tshark -i lo -f "port 502"</code></span></div>
+        <div id="protoFrames"></div>
+      </div>
+    </div>
   </section>
 
   <section class="console" id="studioConsole">
@@ -819,6 +880,8 @@ body.hero-collapsed #heroStrip{display:flex}
     const coilOn = n.coil.io==='QX'?!!live.relay[n.coil.idx]:(typeof evalCoil==='function'?evalCoil(n,lm)===true:false);
     const connNow=(typeof conn!=='undefined')&&conn;
 
+    const netLive = window.__netPulse && (performance.now()-window.__netPulse < 1800);
+    const NL = netLive ? ' live' : '';
     const VB_W=1220, VB_H=430; svg.setAttribute('viewBox',`0 0 ${VB_W} ${VB_H}`);
     const yB=300, h=78, nodeW=168;
     const xs=[40,290,540,840,1012];           // input, read, logic, write, output
@@ -827,12 +890,12 @@ body.hero-collapsed #heroStrip{display:flex}
     // network lane (top) — the same points, read/written over the network by an HMI/SCADA master
     const yN=96;
     s+=`<text class="fl-lane" x="40" y="${yN-30}">Network plane — how an HMI / SCADA master reads &amp; writes these same points</text>`;
-    s+=node(40,yN-20,nodeW,64,'HMI / SCADA','Modbus-TCP client','');
-    s+=`<path class="fl-net" d="M ${40+nodeW} ${yN+12} H ${xs[4]+nodeW/2} "/>`;
-    s+=`<text class="fl-badge" x="${(40+nodeW+xs[4]+nodeW/2)/2}" y="${yN-2}" text-anchor="middle">Modbus/TCP :502 · FC3 read / FC16 write · DNP3 :20000</text>`;
+    s+=node(40,yN-20,nodeW,64,'HMI / SCADA',netLive?'● polling :502':'Modbus-TCP client',netLive?'fl-node live':'');
+    s+=`<path class="fl-net${NL}" d="M ${40+nodeW} ${yN+12} H ${xs[4]+nodeW/2} "/>`;
+    s+=`<text class="fl-badge" x="${(40+nodeW+xs[4]+nodeW/2)/2}" y="${yN-2}" text-anchor="middle">Modbus/TCP :502 · FC3 read / FC6 write · DNP3 :20000</text>`;
     // down-arrow to the input point and up from the output point
-    s+=`<path class="fl-net" d="M ${xs[0]+nodeW/2} ${yN+44} V ${yB-4}"/>`;
-    s+=`<path class="fl-net" d="M ${xs[4]+nodeW/2} ${yB-4} V ${yN+44}"/>`;
+    s+=`<path class="fl-net${NL}" d="M ${xs[0]+nodeW/2} ${yN+44} V ${yB-4}"/>`;
+    s+=`<path class="fl-net${NL}" d="M ${xs[4]+nodeW/2} ${yB-4} V ${yN+44}"/>`;
     // bus/logic lane (main)
     s+=`<text class="fl-lane" x="40" y="${yB-56}">Field / bus plane — the real signal path on the device</text>`;
     // wires (energized segment by segment)
@@ -863,8 +926,11 @@ body.hero-collapsed #heroStrip{display:flex}
     try{rawSend('force IX'+idx+' '+(want?1:0));}catch(e){}
     setTimeout(()=>{try{rawSend('io');}catch(e){}},120);
   }
-  function startPoll(){ if(pollTimer)return; pollTimer=setInterval(()=>{ if((typeof conn!=='undefined')&&conn){try{rawSend('io');}catch(e){}} },600); }
-  function stopPoll(){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
+  let netTimer=null;
+  function startPoll(){ if(pollTimer)return; pollTimer=setInterval(()=>{ if((typeof conn!=='undefined')&&conn){try{rawSend('io');}catch(e){}} },600);
+    // light the network lane: a real Modbus heartbeat read over :502 via the bridge (no-op over USB)
+    if(!netTimer)netTimer=setInterval(()=>{ fetch('/modbus?fc=3&addr=25&count=1',{cache:'no-store'}).then(r=>r.json()).then(j=>{if(j&&j.ok)window.__netPulse=performance.now();}).catch(()=>{}); },1300); }
+  function stopPoll(){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} if(netTimer){clearInterval(netTimer);netTimer=null;} }
   function clearOurForces(){ Object.keys(forcedByFlow).forEach(i=>{ if(forcedByFlow[i]&&(typeof conn!=='undefined')&&conn){try{rawSend('force IX'+i+' 0');}catch(e){}} forcedByFlow[i]=false; }); }
 
   function loop(){ if(!active)return; render(); requestAnimationFrame(()=>setTimeout(loop,140)); }
@@ -882,6 +948,114 @@ body.hero-collapsed #heroStrip{display:flex}
   // rung selector (delegated)
   document.getElementById('flowRungSel').addEventListener('click',e=>{const b=e.target.closest('button[data-ni]');if(b){selNetIdx=+b.getAttribute('data-ni');render();}});
   setView('logic');
+})();
+</script>
+<script>
+// ===== Protocol workspace: HMI ↔ real Modbus/TCP :502 ↔ logic/point map =====
+(function(){
+  const seg=document.getElementById('appViewSeg'), app=document.querySelector('.app');
+  if(!seg||!app)return;
+  let active=false, pollTimer=null;
+  const MODE_NAMES=['PROGRAM','RUN','REMOTE'];
+  // point map (addresses from sbom/firmware/point_map.json)
+  const READS=[
+    {k:'reg',a:0, name:'vin_mv',     label:'Supply voltage',  fmt:v=>(v/1000).toFixed(2)+' V'},
+    {k:'reg',a:1, name:'current_ma', label:'Output current',  fmt:v=>v+' mA'},
+    {k:'reg',a:2, name:'temp_c_x10', label:'Temperature',     fmt:v=>(v/10).toFixed(1)+' °C'},
+    {k:'reg',a:25,name:'heartbeat',  label:'PLC heartbeat',   fmt:v=>String(v)},
+    {k:'reg',a:20,name:'plc_mode',   label:'Controller mode', fmt:v=>MODE_NAMES[v]||v},
+    {k:'reg',a:21,name:'scan_last',  label:'Scan time',       fmt:v=>(v/1000).toFixed(1)+' ms'},
+    {k:'coil',a:1,name:'relay0',     label:'Relay 0 · motor contactor', fmt:v=>v?'ON':'off'},
+    {k:'coil',a:2,name:'relay1',     label:'Relay 1 · run light (green LED)', fmt:v=>v?'ON':'off'},
+    {k:'coil',a:3,name:'relay2',     label:'Relay 2 · warning', fmt:v=>v?'ON':'off'},
+    {k:'coil',a:4,name:'relay3',     label:'Relay 3 · fault',   fmt:v=>v?'ON':'off'},
+  ];
+  const vals={}, prev={};
+  const el=id=>document.getElementById(id);
+  const fmtHex=h=>(h||'').replace(/(..)/g,'$1 ').trim();
+  function setHint(t){const h=el('protoHint');if(h)h.textContent=t||'';}
+  function netPulse(){window.__netPulse=performance.now();}
+
+  async function mb(q){ const r=await fetch('/modbus?'+q,{cache:'no-store'}); return await r.json(); }
+
+  function logFrame(r,kind,label){
+    const host=el('protoFrames'); if(!host)return;
+    const fcName={1:'FC1 read coils',2:'FC2 read discrete',3:'FC3 read holding',4:'FC4 read input',5:'FC5 write single coil',6:'FC6 write single register'}[r.fc]||('FC'+r.fc);
+    const dec = r.exception!=null ? ('⚠ exception '+r.exception) : (Array.isArray(r.values)? ('values: '+r.values.join(', ')) : '');
+    const d=document.createElement('div'); d.className='pf'+(kind==='write'?' wr':'')+((!r.ok&&r.exception==null)?' err':'');
+    d.innerHTML='<div class="pf-top"><span class="pf-fc">'+fcName+'</span><span class="pf-pt">'+(label||('addr '+r.addr))+'</span><span class="pf-ms">'+(r.ms!=null?r.ms+' ms':'')+'</span></div>'
+      +'<div class="pf-hex">req&nbsp;&nbsp;'+fmtHex(r.req_hex)+'<br>resp '+fmtHex(r.resp_hex)+'</div>'
+      +'<div class="pf-dec">'+dec+'</div>';
+    host.insertBefore(d,host.firstChild);
+    while(host.children.length>40)host.removeChild(host.lastChild);
+  }
+
+  async function readAll(logit){
+    try{
+      const r=await mb('fc=3&addr=0&count=26');
+      if(r.ok){ for(const it of READS) if(it.k==='reg') vals[it.name]=r.values[it.a]; netPulse(); if(logit)logFrame(r,'read','FC3 regs 0–25 (process image)'); }
+      else if(logit)logFrame(r,'read','FC3 regs');
+      const c=await mb('fc=1&addr=1&count=4');
+      if(c.ok){ for(const it of READS) if(it.k==='coil') vals[it.name]=c.values[it.a-1]; netPulse(); if(logit)logFrame(c,'read','FC1 coils 1–4 (relays)'); }
+      const hv=el('protoHint'); if(hv&&hv.textContent.indexOf('not reachable')>=0)setHint('');  // clear only the error, keep write results
+      renderReads();
+    }catch(e){ setHint('Modbus proxy not reachable — run the twin with ./qemu/studio.sh (the bridge proxies :502). Over USB there is no network plane.'); }
+  }
+
+  function renderReads(){
+    const host=el('protoReadRows'); if(!host)return; host.innerHTML='';
+    READS.forEach(it=>{
+      const v=vals[it.name]; const show=(v==null)?'—':it.fmt(v);
+      const pulsed=(v!=null&&prev[it.name]!=null&&v!==prev[it.name]);
+      prev[it.name]=v;
+      const tr=document.createElement('tr');
+      tr.innerHTML='<td class="pt-reg">'+(it.k==='reg'?('4'+String(it.a).padStart(4,'0')):('coil '+it.a))+'</td>'
+        +'<td class="pt-name">'+it.label+'</td>'
+        +'<td class="pt-val'+(pulsed?' pulse':'')+'">'+show+'</td>';
+      host.appendChild(tr);
+    });
+  }
+
+  function renderWrites(){
+    const host=el('protoWriteRows'); if(!host)return;
+    host.innerHTML=
+      '<div class="proto-wr"><span class="wrlbl">Command a relay coil (FC5)</span>'
+      +'<select id="pwCoil"><option value="1">relay0 · motor</option><option value="2">relay1 · run light</option><option value="3" selected>relay2 · warning</option><option value="4">relay3 · fault</option><option value="0">estop (coil 0)</option></select>'
+      +'<button class="btn" data-wv="1" style="padding:3px 10px;font-size:12px">Write ON</button>'
+      +'<button class="btn" data-wv="0" style="padding:3px 10px;font-size:12px">Write OFF</button></div>'
+      +'<div class="proto-wr"><span class="wrlbl">Write setpoint (reg 30 → IW4)</span>'
+      +'<input type="number" id="pwReg" value="250" min="0" max="65535">'
+      +'<button class="btn" id="pwRegBtn" style="padding:3px 10px;font-size:12px">Write register</button>'
+      +'<span class="flow-hint">feeds the authored program as %IW4</span></div>';
+    host.querySelectorAll('button[data-wv]').forEach(b=>b.addEventListener('click',async()=>{
+      const coil=el('pwCoil').value, val=b.getAttribute('data-wv');
+      const r=await mb('fc=5&addr='+coil+'&value='+val);
+      logFrame(r,'write','write coil '+coil+' = '+val);
+      setHint(r.ok?(r.exception!=null?('Refused (exception '+r.exception+')'):'Accepted — no authentication was required (CWE-306).'):'Write failed.');
+      setTimeout(()=>readAll(false),150);
+    }));
+    const rb=el('pwRegBtn'); if(rb)rb.addEventListener('click',async()=>{
+      const v=Math.max(0,Math.min(65535,parseInt(el('pwReg').value||'0',10)));
+      const r=await mb('fc=6&addr=30&value='+v);
+      logFrame(r,'write','write reg 30 (setpoint) = '+v);
+      setHint(r.ok?'Setpoint written over the network — it persists and feeds the logic as %IW4.':'Write failed.');
+      setTimeout(()=>readAll(false),150);
+    });
+    const note=el('protoSecNote');
+    if(note)note.innerHTML='<b>Network plane vs bus plane.</b> These are real Modbus/TCP frames to the controller — the same points the ladder drives over I²C. The <b>vulnerable</b> build accepts these writes with <b>no authentication (CWE-306)</b>; the <b>secure</b> build refuses them unless an operator has turned the key-switch to REMOTE. Capture the frames with <code>tshark -i lo -f "port 502"</code>.';
+  }
+
+  function setView(v){
+    active=(v==='protocol');
+    app.classList.toggle('proto-active',active);
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-appview')===v));
+    if(active){ renderWrites(); readAll(true);
+      const chk=el('protoPoll'); if(chk&&chk.checked&&!pollTimer)pollTimer=setInterval(()=>readAll(false),1000);
+    } else { if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
+  }
+  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setView(b.getAttribute('data-appview'))));
+  const chk=el('protoPoll'); if(chk)chk.addEventListener('change',()=>{ if(chk.checked){ if(!pollTimer)pollTimer=setInterval(()=>readAll(false),1000); } else if(pollTimer){clearInterval(pollTimer);pollTimer=null;} });
+  const rnow=el('protoReadBtn'); if(rnow)rnow.addEventListener('click',()=>readAll(true));
 })();
 </script>
 <script src="operator/vendor/three-r180.js"></script>
