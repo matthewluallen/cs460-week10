@@ -224,7 +224,7 @@ def serve_static(conn, path, root):
     rel = urllib.parse.urlparse(path).path
     rel = urllib.parse.unquote(rel)
     if rel in EXTRA_FILES:
-        repo_root = os.path.realpath(os.path.join(root, ".."))
+        repo_root = os.path.realpath(os.path.join(root, "..", ".."))   # root is web/public → repo root
         full = os.path.realpath(os.path.join(repo_root, EXTRA_FILES[rel]))
         if full.startswith(repo_root + os.sep) and os.path.isfile(full):
             ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
