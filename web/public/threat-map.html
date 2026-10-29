@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CS460 Threat Map · MITRE taxonomies</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --edge:#273145; --ink:#e7ecf5; --dim:#90a0bd;
+    --accent:#4f8cff; --on:#2fbf71; --off:#38425a; --warn:#e0b341; --danger:#e5484d;
+    --radius:14px; font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --f-emb3d:#8b5cf6; --f-cwe:#e0b341; --f-capec:#e5844d; --f-attack:#e5484d;
+    --f-d3fend:#2fbf71; --f-caldera:#4f8cff; --f-atlas:#36c3d1;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);min-height:100vh;padding:22px 16px;line-height:1.45}
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 2px;letter-spacing:.2px}
+  .sub{color:var(--dim);font-size:13px;margin:0 0 16px;max-width:780px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .tabs{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+  .tab{cursor:pointer;border:1px solid var(--edge);background:#222c42;color:var(--ink);
+       border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600}
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:0 0 14px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .matrix-scroll{overflow-x:auto;border:1px solid var(--edge);border-radius:var(--radius)}
+  table{border-collapse:collapse;width:100%;min-width:940px;font-size:12.5px}
+  th,td{border:1px solid var(--edge);padding:9px 10px;text-align:left;vertical-align:top}
+  thead th{background:#0c1220;position:sticky;top:0;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim)}
+  tbody th{background:#131b2b;font-weight:600;max-width:210px}
+  tbody th .atk{display:block;font-size:11px;color:var(--dim);font-weight:400;margin-top:3px}
+  td code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--ink)}
+  td .t{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+  .col-emb3d{border-top:3px solid var(--f-emb3d)} .col-cwe{border-top:3px solid var(--f-cwe)}
+  .col-capec{border-top:3px solid var(--f-capec)} .col-attack{border-top:3px solid var(--f-attack)}
+  .col-d3fend{border-top:3px solid var(--f-d3fend)} .col-caldera{border-top:3px solid var(--f-caldera)}
+  .col-atlas{border-top:3px solid var(--f-atlas)}
+  .pickrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  select{background:#0c1220;color:var(--ink);border:1px solid var(--edge);border-radius:10px;padding:10px 12px;font-size:14px;min-width:300px}
+  .chip{font-size:11px;padding:3px 9px;border-radius:999px;background:#222c42;color:var(--dim)}
+  .steps{display:grid;gap:10px}
+  .step{background:var(--panel);border:1px solid var(--edge);border-left:4px solid var(--edge);border-radius:12px;padding:14px 16px}
+  .step h3{margin:0 0 2px;font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .step .fw{font-size:10px;text-transform:uppercase;letter-spacing:.6px;padding:2px 8px;border-radius:999px;color:#0a0f1b;font-weight:700}
+  .step .idline{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--dim);margin:2px 0 8px}
+  .step p{margin:6px 0;font-size:13px}
+  .ev{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:#0a0f1b;border:1px solid var(--edge);border-radius:8px;padding:9px 11px;color:var(--dim);white-space:pre-wrap;overflow-x:auto}
+  .step.offense{border-left-color:var(--f-attack)} .step.weakness{border-left-color:var(--f-cwe)}
+  .step.emulate{border-left-color:var(--f-caldera)} .step.defense{border-left-color:var(--f-d3fend)}
+  .fixnote{font-size:12px;color:var(--on);margin-top:6px}
+  .foot{color:var(--dim);font-size:11px;margin-top:18px;max-width:860px}
+  @media (prefers-color-scheme: light){
+    :root{--bg:#eef1f7;--panel:#fff;--edge:#d7deea;--ink:#182030;--dim:#5c6b86}
+    thead th,.ev,select{background:#f4f7fc} tbody th{background:#eef2f9}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Threat Map — connecting the lab to the MITRE taxonomies</h1>
+  <p class="sub">Every weakness you exercise on the StampLC maps onto the same public frameworks a real OT security team uses.
+  This page ties each lab attack across seven taxonomies — the embedded threat (<b>EMB3D</b>), the code weakness (<b>CWE</b>),
+  the attack pattern (<b>CAPEC</b>), the ICS technique (<b>ATT&amp;CK for ICS</b>), how a red team emulates it (<b>CALDERA</b>),
+  the defensive countermeasure (<b>D3FEND</b>), and — where an AI/ML surface exists — <b>ATLAS</b>.</p>
+
+  <div class="tabs">
+    <div class="tab active" data-view="matrix" id="tab-matrix">Matrix</div>
+    <div class="tab" data-view="stepper" id="tab-stepper">Step through an attack</div>
+  </div>
+
+  <section id="view-matrix">
+    <div class="legend">
+      <span><i class="dot" style="background:var(--f-emb3d)"></i>EMB3D threat</span>
+      <span><i class="dot" style="background:var(--f-cwe)"></i>CWE weakness</span>
+      <span><i class="dot" style="background:var(--f-capec)"></i>CAPEC pattern</span>
+      <span><i class="dot" style="background:var(--f-attack)"></i>ATT&amp;CK for ICS</span>
+      <span><i class="dot" style="background:var(--f-caldera)"></i>CALDERA emulation</span>
+      <span><i class="dot" style="background:var(--f-d3fend)"></i>D3FEND defense</span>
+      <span><i class="dot" style="background:var(--f-atlas)"></i>ATLAS (AI/ML)</span>
+    </div>
+    <div class="matrix-scroll">
+      <table id="matrix">
+        <thead><tr>
+          <th>Lab attack</th>
+          <th class="col-emb3d">EMB3D</th>
+          <th class="col-cwe">CWE</th>
+          <th class="col-capec">CAPEC</th>
+          <th class="col-attack">ATT&amp;CK&nbsp;ICS</th>
+          <th class="col-caldera">CALDERA</th>
+          <th class="col-d3fend">D3FEND</th>
+          <th class="col-atlas">ATLAS</th>
+        </tr></thead>
+        <tbody id="matrix-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="view-stepper" style="display:none">
+    <div class="pickrow">
+      <label for="atk" style="font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px">Attack</label>
+      <select id="atk"></select>
+      <span class="chip" id="atkphase"></span>
+    </div>
+    <div class="card" id="atk-intro"></div>
+    <div class="steps" id="atk-steps"></div>
+  </section>
+
+  <p class="foot">IDs link to the official framework entry. Frameworks: EMB3D (emb3d.mitre.org), CWE (cwe.mitre.org),
+  CAPEC (capec.mitre.org), ATT&amp;CK for ICS (attack.mitre.org), D3FEND (d3fend.mitre.org), CALDERA / caldera-ot (github.com/mitre),
+  ATLAS (atlas.mitre.org). <b>ATLAS is N/A for all eight</b> — none involve a machine-learning model today; if the course adds an ML
+  anomaly detector on the sensor stream, the phone-sensor false-data attack would then map to ATLAS <code>AML.T0043</code> (Craft Adversarial Data).
+  <b>CALDERA reality check:</b> caldera-ot ships six protocol plugins (modbus, bacnet, dnp3, profinet, iec61850, gems) — only the two Modbus
+  attacks have a real public plugin; MQTT, credential, overflow and RE attacks need a custom ability. Mappings are teaching approximations
+  for CS460 Week&nbsp;10, not an official crosswalk.</p>
+</div>
+
+<script>
+const D3 = s => `https://d3fend.mitre.org/technique/d3f:${s}/`;
+const FW = {
+  emb3d:  {name:'EMB3D',   color:'var(--f-emb3d)',  url:id=>`https://emb3d.mitre.org/threats/${id}/`},
+  cwe:    {name:'CWE',     color:'var(--f-cwe)',    url:id=>`https://cwe.mitre.org/data/definitions/${id.replace(/\D/g,'')}.html`},
+  capec:  {name:'CAPEC',   color:'var(--f-capec)',  url:id=>`https://capec.mitre.org/data/definitions/${id.replace(/\D/g,'')}.html`},
+  attack: {name:'ATT&CK ICS', color:'var(--f-attack)', url:id=>`https://attack.mitre.org/techniques/${id.replace('.','/')}/`},
+  d3fend: {name:'D3FEND',  color:'var(--f-d3fend)', url:id=>'https://d3fend.mitre.org/'},
+  caldera:{name:'CALDERA', color:'var(--f-caldera)',url:id=>'https://github.com/mitre/caldera-ot'},
+  atlas:  {name:'ATLAS',   color:'var(--f-atlas)',  url:id=>`https://atlas.mitre.org/techniques/${id}`},
+};
+
+// framework cell = {id,title,url?} | [cells] | null. url overrides the builder (D3FEND/CALDERA).
+const ATTACKS = [
+  {
+    key:'default-creds', name:'Default / hardcoded web credentials', phase:'Part 6 · firmware',
+    intro:`The StampLC web console ships with a built-in login <code>admin:openplc</code>. You recover it without touching the device — just by reading the firmware image: <code>strings stamplc-factory-8MB.bin | grep -iE 'admin|passw|login'</code>. A credential baked into the binary is identical on every unit and can't be rotated per-device.`,
+    evidence:`$ strings sbom/firmware/prebuilt/stamplc-factory-8MB.bin | grep -iE 'admin|openplc'\nadmin\nopenplc        # default console login, identical on every unit`,
+    fix:`Secure build: no built-in account; first boot provisions a unique credential, stored hashed. CWE-798/1392 closed.`,
+    fw:{
+      emb3d:{id:'TID-311',title:'Default Credentials'},
+      cwe:[{id:'CWE-798',title:'Hard-coded Credentials'},{id:'CWE-1392',title:'Use of Default Credentials'}],
+      capec:{id:'CAPEC-70',title:'Try Common or Default Usernames and Passwords'},
+      attack:{id:'T0812',title:'Default Credentials · Lateral Movement'},
+      caldera:null,
+      d3fend:{id:'D3-MFA',title:'Multi-factor Authentication',url:D3('Multi-factorAuthentication')},
+      atlas:null
+    }
+  },
+  {
+    key:'hardcoded-key', name:'Hardcoded cryptographic key', phase:'Part 6 · firmware',
+    intro:`Carving the firmware turns up a PEM private key compiled into the image. Any attacker with the (public) firmware holds the device's "secret" key, so any TLS/signing that relies on it is worthless. A key shared across every unit behaves as a predictable key.`,
+    evidence:`$ binwalk -e stamplc-factory-8MB.bin\n...  PEM RSA private key\n$ grep -R 'BEGIN .*PRIVATE KEY' _stamplc-factory-8MB.bin.extracted/`,
+    fix:`Secure build: keys generated per-device at provisioning, kept out of the image (ideally eFuse/secure element), never in source.`,
+    fw:{
+      emb3d:{id:'TID-317',title:'Predictable Cryptographic Key'},
+      cwe:{id:'CWE-321',title:'Hard-coded Cryptographic Key'},
+      capec:{id:'CAPEC-37',title:'Retrieve Embedded Sensitive Data'},
+      attack:null,
+      caldera:null,
+      d3fend:{id:'D3-DENCR',title:'Flash / Disk Encryption',url:D3('DiskEncryption')},
+      atlas:null
+    }
+  },
+  {
+    key:'modbus-unauth', name:'Unauthenticated Modbus/TCP control', phase:'Part 5 · protocol',
+    intro:`Modbus :502 on the plant LAN (10.20.30.0/24) authenticates nothing. Anyone who can reach the controller reads and writes coils and holding registers directly — force a relay, move the temperature setpoint — with a one-line client. This is the defining weakness of legacy OT protocols.`,
+    evidence:`# from the engineer station on the plant net\nmbpoll -0 -t0 -r1 10.20.30.10          # read coils\nmbpoll -0 -t0 -r2 10.20.30.10 1        # WRITE coil1 (RELAY0)=ON — no creds asked`,
+    fix:`Segment the Modbus zone, gateway with auth, or wrap in TLS; alert on writes from unexpected hosts.`,
+    fw:{
+      emb3d:{id:'TID-310',title:'Remotely Accessible Unauthenticated Services'},
+      cwe:{id:'CWE-306',title:'Missing Authentication for Critical Function'},
+      capec:{id:'CAPEC-1',title:'Accessing Functionality Not Constrained by ACLs'},
+      attack:[{id:'T0855',title:'Unauthorized Command Message'},{id:'T0835',title:'Manipulate I/O Image'}],
+      caldera:{id:'modbus',title:'caldera-ot · modbus plugin'},
+      d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
+      atlas:null
+    }
+  },
+  {
+    key:'modbus-spoof', name:'Modbus command injection / spoofing', phase:'Part 5 · analyzer',
+    intro:`In the Wireshark/spoofer exercise you watch legitimate Modbus traffic, then forge your own write frames (or replay captured ones). Because the protocol has no message authenticity or replay protection, the PLC can't tell your injected write from the HMI's.`,
+    evidence:`# observe, then inject a crafted FC16 write-multiple-registers frame\n# plant.pcap shows HMI polls; the spoofer replays a setpoint write from .2`,
+    fix:`Message authenticity (signed/sequenced commands) and detection of duplicate/forged transaction IDs.`,
+    fw:{
+      emb3d:[{id:'TID-406',title:'Unauthorized Messages or Connections'},{id:'TID-407',title:'Missing Message Replay Protection'}],
+      cwe:[{id:'CWE-345',title:'Insufficient Verification of Data Authenticity'},{id:'CWE-940',title:'Improper Verification of Source'}],
+      capec:{id:'CAPEC-594',title:'Traffic Injection'},
+      attack:{id:'T0856',title:'Spoof Reporting Message'},
+      caldera:{id:'modbus',title:'caldera-ot · modbus plugin'},
+      d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
+      atlas:null
+    }
+  },
+  {
+    key:'mqtt-dcmd', name:'MQTT Sparkplug DCMD → coil write (no broker auth)', phase:'Part 5 · protocol',
+    intro:`The controller subscribes to Sparkplug <code>DCMD</code> and a legacy decoder writes a raw output coil when it sees a boolean-value byte — and the broker has no authentication or topic ACLs. Publish one crafted DCMD and the relay moves.`,
+    evidence:`# broker has no auth; publish a DCMD with a boolean-value (0x70) byte\nmosquitto_pub -h 10.20.30.40 -t 'spBv1.0/CS460/DCMD/stamplc/#' -m <payload>\n# PLC's on_message() writes coil0`,
+    fix:`Broker auth + per-topic ACLs; require Sparkplug host/state session; drop the legacy raw-coil decoder in the secure build.`,
+    fw:{
+      emb3d:{id:'TID-310',title:'Remotely Accessible Unauthenticated Services'},
+      cwe:[{id:'CWE-306',title:'Missing Authentication for Critical Function'},{id:'CWE-862',title:'Missing Authorization'}],
+      capec:{id:'CAPEC-1',title:'Accessing Functionality Not Constrained by ACLs'},
+      attack:{id:'T0855',title:'Unauthorized Command Message'},
+      caldera:null,
+      d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
+      atlas:null
+    }
+  },
+  {
+    key:'overflow-force', name:'Buffer overflow → phantom relay force', phase:'Part 6/7 · exploit',
+    intro:`An unauthenticated oversized write (e.g. <code>POST /api/tag</code>) overruns a 32-byte scratch buffer into the adjacent force-mask words, energizing a relay with <b>no audit entry</b> — the I/O image says "forced", the trail says nobody did it. A real memory-corruption actuation, deterministic in the twin (no ASLR).`,
+    evidence:`$ xtensa-esp32s3-elf-nm -S firmware.elf | grep force\n3fca80c8 s_coil_force_val   <- overflow lands here (+32)\n3fca80d0 s_coil_force_en    <- (+40)\n# relay0 ON, audit log has NO FORCE record -> actuation without provenance`,
+    fix:`Secure build (ENABLE_CWE_DEMOS off): bounded copy; overflow fixed at compile time. CWE-121/787/306 closed.`,
+    fw:{
+      emb3d:{id:'TID-327',title:'Out of Bounds Memory Access'},
+      cwe:[{id:'CWE-121',title:'Stack-based Buffer Overflow'},{id:'CWE-787',title:'Out-of-bounds Write'}],
+      capec:{id:'CAPEC-100',title:'Overflow Buffers'},
+      attack:{id:'T0866',title:'Exploitation of Remote Services'},
+      caldera:null,
+      d3fend:{id:'D3-SFCV',title:'Stack Frame Canary Validation',url:D3('StackFrameCanaryValidation')},
+      atlas:null
+    }
+  },
+  {
+    key:'firmware-re', name:'Firmware extraction & reverse engineering', phase:'Part 6 · RE',
+    intro:`Dump the flash with esptool, carve it with binwalk, and disassemble with Ghidra/objdump to recover the default login, the embedded key, and the control logic. The extraction itself is the enabling step for most of the weaknesses above.`,
+    evidence:`esptool.py read_flash 0 0x800000 dump.bin\nbinwalk -e dump.bin\nxtensa-esp32s3-elf-objdump -d firmware.elf | less`,
+    fix:`Secure/verified boot + flash encryption so a dump yields ciphertext; no secrets in the image to recover.`,
+    fw:{
+      emb3d:[{id:'TID-115',title:'Firmware/Data Extraction via Hardware Interface'},{id:'TID-108',title:'ROM/NVRAM Data Extraction'}],
+      cwe:[{id:'CWE-312',title:'Cleartext Storage of Sensitive Information'},{id:'CWE-1191',title:'Improper Debug/Test Interface Access'}],
+      capec:[{id:'CAPEC-37',title:'Retrieve Embedded Sensitive Data'},{id:'CAPEC-167',title:'White Box Reverse Engineering'}],
+      attack:{id:'T0845',title:'Program Upload'},
+      caldera:null,
+      d3fend:{id:'D3-DENCR',title:'Flash / Disk Encryption',url:D3('DiskEncryption')},
+      atlas:null
+    }
+  },
+  {
+    key:'phone-inject', name:'Unauthenticated phone-sensor → PLC input injection', phase:'Part 5 · MQTT bridge',
+    intro:`Phones publish light / accelerometer / orientation / button data over MQTT; the PLC maps them to input words (<code>%IW</code>) and input bits (<code>%IX6/7</code>) with no authentication. A rogue publisher impersonates a phone and drives the ladder logic with false sensor data — a false-data-injection surface on the process inputs.`,
+    evidence:`# impersonate a phone, inject a bright-light reading that trips the logic\nmosquitto_pub -h 10.20.30.40 -t 'phone/evil/light' -m '{"lux":60000}'\n# PLC writes it to %IW (plausibility-gated on the HMI); same for btn1 -> %IX6`,
+    fix:`Authenticate publishers; validate/plausibility-gate %IW (the HMI already gates out-of-range values); bind a phone session to a team token.`,
+    fw:{
+      emb3d:[{id:'TID-406',title:'Unauthorized Messages or Connections'},{id:'TID-310',title:'Remotely Accessible Unauthenticated Services'}],
+      cwe:[{id:'CWE-345',title:'Insufficient Verification of Data Authenticity'},{id:'CWE-306',title:'Missing Authentication'}],
+      capec:{id:'CAPEC-594',title:'Traffic Injection'},
+      attack:[{id:'T0855',title:'Unauthorized Command Message'},{id:'T0835',title:'Manipulate I/O Image'}],
+      caldera:null,
+      d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
+      atlas:null
+    }
+  },
+];
+
+const STEP_ORDER = [
+  {fw:'emb3d',  cls:'offense',  label:'Embedded threat',  lead:'The device-level threat this exposes (EMB3D).'},
+  {fw:'cwe',    cls:'weakness', label:'Code weakness',     lead:'The root-cause weakness in the firmware (CWE).'},
+  {fw:'capec',  cls:'offense',  label:'Attack pattern',    lead:'How an attacker abuses it, in the abstract (CAPEC).'},
+  {fw:'attack', cls:'offense',  label:'ICS technique',     lead:'The adversary technique against the control system (ATT&CK for ICS).'},
+  {fw:'caldera',cls:'emulate',  label:'Emulate it',        lead:'How a red team would automate/emulate this (CALDERA / caldera-ot).'},
+  {fw:'d3fend', cls:'defense',  label:'Countermeasure',    lead:'The defensive technique that neutralizes it (D3FEND).'},
+  {fw:'atlas',  cls:'offense',  label:'AI/ML angle',       lead:'Where an ML component would change the picture (ATLAS).'},
+];
+
+function links(key, c){
+  if(!c) return '<span style="color:var(--dim)">—</span>';
+  const ids = Array.isArray(c)?c:[c];
+  return ids.map(x=>`<a href="${x.url||FW[key].url(x.id)}" target="_blank" rel="noopener"><code>${x.id}</code></a><span class="t">${x.title}</span>`).join('<div style="height:6px"></div>');
+}
+function buildMatrix(){
+  document.getElementById('matrix-body').innerHTML = ATTACKS.map(a=>`
+    <tr>
+      <th>${a.name}<span class="atk">${a.phase}</span></th>
+      <td class="col-emb3d">${links('emb3d',a.fw.emb3d)}</td>
+      <td class="col-cwe">${links('cwe',a.fw.cwe)}</td>
+      <td class="col-capec">${links('capec',a.fw.capec)}</td>
+      <td class="col-attack">${links('attack',a.fw.attack)}</td>
+      <td class="col-caldera">${links('caldera',a.fw.caldera)}</td>
+      <td class="col-d3fend">${links('d3fend',a.fw.d3fend)}</td>
+      <td class="col-atlas">${links('atlas',a.fw.atlas)}</td>
+    </tr>`).join('');
+}
+function buildStepperOptions(){
+  document.getElementById('atk').innerHTML = ATTACKS.map((a,i)=>`<option value="${i}">${a.name}</option>`).join('');
+}
+function renderStepper(i){
+  const a = ATTACKS[i];
+  document.getElementById('atkphase').textContent = a.phase;
+  document.getElementById('atk-intro').innerHTML = `<p style="margin:0 0 10px">${a.intro}</p><div class="ev">${a.evidence}</div>`;
+  const steps = STEP_ORDER.map(s=>{
+    const c = a.fw[s.fw], meta = FW[s.fw];
+    const idhtml = c
+      ? (Array.isArray(c)?c:[c]).map(x=>`<a href="${x.url||meta.url(x.id)}" target="_blank" rel="noopener">${x.id}</a> — ${x.title}`).join(' · ')
+      : '<span style="color:var(--dim)">N/A for this attack</span>';
+    return `<div class="step ${s.cls}">
+      <h3><span class="fw" style="background:${meta.color}">${meta.name}</span> ${s.label}</h3>
+      <div class="idline">${idhtml}</div>
+      <p style="color:var(--dim)">${s.lead}</p>
+    </div>`;
+  }).join('');
+  document.getElementById('atk-steps').innerHTML = steps +
+    `<div class="step defense"><h3>Fix in the secure build</h3><p class="fixnote">${a.fix}</p></div>`;
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active');
+  const v=t.dataset.view;
+  document.getElementById('view-matrix').style.display = v==='matrix'?'':'none';
+  document.getElementById('view-stepper').style.display = v==='stepper'?'':'none';
+});
+document.getElementById('atk').onchange = e=>renderStepper(+e.target.value);
+buildMatrix(); buildStepperOptions(); renderStepper(0);
+</script>
+</body>
+</html>
