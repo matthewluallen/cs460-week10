@@ -221,6 +221,52 @@ textarea#stl{flex:1;border:0;resize:none;padding:12px 14px 40px;font-family:var(
 .pf-ms{margin-left:auto;color:var(--muted);font-size:10px}
 .pf-hex{color:var(--muted);word-break:break-all;margin-top:3px;font-size:10.5px}
 .pf-dec{color:var(--ink);margin-top:3px}
+/* ===== Circuit Studio ===== */
+#viewCircuit{display:none;flex:1;min-height:0;flex-direction:column;background:var(--bg)}
+.app.circuit-active main,.app.circuit-active #palette,.app.circuit-active .controller-status,
+.app.circuit-active #controllerModeHelp,.app.circuit-active #executionPanel,.app.circuit-active #logicInspector,
+.app.circuit-active #forceBanner,.app.circuit-active .hero,.app.circuit-active #heroStrip,.app.circuit-active #workflowGuide,
+.app.circuit-active #viewFlow,.app.circuit-active #viewProtocol{display:none!important}
+.app.circuit-active #viewCircuit{display:flex}
+.circ-body{flex:1;min-height:0;display:grid;grid-template-columns:1.25fr .9fr .9fr;gap:0;overflow:auto}
+.circ-col{min-height:0;overflow:auto;padding:14px 16px;border-right:1px solid var(--line)}
+.circ-col.circ-out{border-right:0}
+.circ-card{border:1px solid var(--line);border-radius:11px;background:var(--panel);padding:12px 13px;margin-bottom:12px}
+.circ-ch{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.circ-ch .cn{font:700 13px/1.1 var(--sans);color:var(--ink)}
+.circ-ch .ca{font:600 10.5px/1 var(--mono);color:var(--violet)}
+.circ-ch .cland{margin-left:auto;font:700 10px/1 var(--mono);color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:3px 8px}
+.circ-cdesc{font:500 11px/1.4 var(--sans);color:var(--muted);margin-bottom:10px}
+/* DI toggle switches */
+.di-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.di-sw{display:flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:8px;padding:6px 9px;cursor:pointer;background:var(--panel2)}
+.di-sw[aria-disabled=true]{opacity:.55;cursor:not-allowed}
+.di-sw .knob{width:30px;height:17px;border-radius:999px;background:var(--line2);position:relative;flex:0 0 auto;transition:.12s}
+.di-sw .knob::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:.12s}
+.di-sw.on .knob{background:var(--live)}
+.di-sw.on .knob::after{left:15px}
+.di-sw .dl{font:600 11px/1.15 var(--sans);color:var(--ink2);min-width:0}
+.di-sw .dl b{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:600}
+/* analog bars */
+.ana-row{margin:9px 0}
+.ana-row .al{display:flex;justify-content:space-between;font:600 11px/1.3 var(--mono);color:var(--ink2)}
+.ana-row .al .av{color:var(--live);font-weight:700}
+.ana-bar{height:9px;border-radius:999px;background:var(--panel2);border:1px solid var(--line2);overflow:hidden;margin-top:3px}
+.ana-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--live));transition:.2s}
+/* sensor reading */
+.sens-big{font:800 26px/1 var(--sans);color:var(--live);letter-spacing:-.02em}
+.sens-sub{font:500 11px/1.4 var(--mono);color:var(--muted);margin-top:4px}
+/* CPU + outputs */
+.circ-cpu{border:1px solid var(--line2);border-radius:12px;background:linear-gradient(180deg,var(--panel),var(--panel2));padding:14px;text-align:center}
+.circ-cpu .cpuname{font:800 15px/1.1 var(--sans)}
+.circ-cpu .cpusub{font:600 11px/1.4 var(--mono);color:var(--muted);margin-top:4px}
+.circ-cpu .cpumode{display:inline-block;margin-top:10px;font:700 12px/1 var(--mono);padding:5px 12px;border-radius:999px;color:var(--live);background:var(--live-soft);border:1px solid color-mix(in srgb,var(--live) 40%,transparent)}
+.out-row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line)}
+.out-led{width:15px;height:15px;border-radius:50%;background:var(--line2);border:1px solid var(--line2);flex:0 0 auto}
+.out-led.on{background:var(--live);border-color:var(--live);box-shadow:0 0 10px var(--live)}
+.out-row .on-name{font:600 12px/1.2 var(--sans);color:var(--ink)}
+.out-row .on-sub{font:600 10px/1 var(--mono);color:var(--muted)}
+.out-row .on-a{margin-left:auto;font:700 10px/1 var(--mono);color:var(--violet)}
 .console-head{display:flex;align-items:center;gap:10px;padding:6px 13px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--ink2)}
 #log{flex:1;overflow:auto;padding:7px 13px;font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink2);white-space:pre-wrap}
 #log .tx{color:var(--accent)}#log .ok{color:var(--live)}#log .er{color:var(--danger)}#log .rx{color:var(--muted)}#log .fc{color:var(--force)}
@@ -462,7 +508,7 @@ body.hero-collapsed #heroStrip{display:flex}
 <div class="app">
   <header>
     <div class="brand"><span class="mark">S3</span><div>TBD Logic Studio <small>TBD · StamPLC</small></div></div>
-    <span class="seg" id="appViewSeg" title="Logic authoring · the end-to-end signal Flow · the network (Modbus) view"><button type="button" data-appview="logic" class="on">Logic</button><button type="button" data-appview="flow">Flow ⚡</button><button type="button" data-appview="protocol">Protocol ⇄</button></span>
+    <span class="seg" id="appViewSeg" title="Logic authoring · the end-to-end signal Flow · the network (Modbus) view"><button type="button" data-appview="logic" class="on">Logic</button><button type="button" data-appview="flow">Flow ⚡</button><button type="button" data-appview="protocol">Protocol ⇄</button><button type="button" data-appview="circuit">Circuit ⚙</button></span>
     <span class="seg" id="modeSeg" title="Author edits the project; Monitor observes controller replies without changing outputs">
       <button data-mode="edit" class="on">✎ Author</button><button data-mode="online">◉ Monitor</button>
     </span>
@@ -652,6 +698,30 @@ body.hero-collapsed #heroStrip{display:flex}
       <div class="proto-col proto-frames">
         <div class="proto-sect">Live Modbus frames <span style="font-weight:400;color:var(--muted)">· real packets on <code>lo:502</code> — capture with <code>tshark -i lo -f "port 502"</code></span></div>
         <div id="protoFrames"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="viewCircuit" aria-label="Circuit Studio — sensor wiring">
+    <div class="proto-head">
+      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">how the physical world wires into the controller — three input paths → point map → outputs</span></div>
+      <span class="spacer" style="flex:1"></span>
+      <span class="flow-hint" id="circuitHint"></span>
+    </div>
+    <div class="circ-body">
+      <div class="circ-col circ-in">
+        <div class="proto-sect">Inputs — three ways a signal enters</div>
+        <div id="circDI" class="circ-card"></div>
+        <div id="circAnalog" class="circ-card"></div>
+        <div id="circGrove" class="circ-card"></div>
+      </div>
+      <div class="circ-col circ-mid">
+        <div class="circ-cpu" id="circCpu"></div>
+        <p class="proto-note" id="circNote"></p>
+      </div>
+      <div class="circ-col circ-out">
+        <div class="proto-sect">Outputs — AW9523 control bus @0x59</div>
+        <div id="circOut" class="circ-card"></div>
       </div>
     </div>
   </section>
@@ -1056,6 +1126,85 @@ body.hero-collapsed #heroStrip{display:flex}
   seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setView(b.getAttribute('data-appview'))));
   const chk=el('protoPoll'); if(chk)chk.addEventListener('change',()=>{ if(chk.checked){ if(!pollTimer)pollTimer=setInterval(()=>readAll(false),1000); } else if(pollTimer){clearInterval(pollTimer);pollTimer=null;} });
   const rnow=el('protoReadBtn'); if(rnow)rnow.addEventListener('click',()=>readAll(true));
+})();
+</script>
+<script>
+// ===== Circuit Studio: the three sensor/input paths → point map → outputs =====
+(function(){
+  const seg=document.getElementById('appViewSeg'), app=document.querySelector('.app');
+  if(!seg||!app)return;
+  let active=false, pollTimer=null;
+  const el=id=>document.getElementById(id);
+  const DI_NAMES=['di0_start','di1_stop','di2_estop_in','di3','di4','di5','di6','di7'];
+  const DI_LABEL=['Start','Stop','E-stop','DI3','DI4','DI5','DI6','DI7'];
+  const st={di:[0,0,0,0,0,0,0,0],coil:[0,0,0,0,0,0,0],reg:{}, forced:{}};
+  async function mb(q){ const r=await fetch('/modbus?'+q,{cache:'no-store'}); return await r.json(); }
+  const connNow=()=>((typeof conn!=='undefined')&&conn);
+
+  async function poll(){
+    try{
+      const d=await mb('fc=1&addr=100&count=8'); if(d.ok)st.di=d.values;
+      const c=await mb('fc=1&addr=1&count=6');   if(c.ok)st.coil=c.values;
+      const r=await mb('fc=3&addr=0&count=22');   if(r.ok)st.reg=r.values;
+      el('circuitHint').textContent='';
+      render();
+    }catch(e){ el('circuitHint').textContent='Run the twin with ./qemu/studio.sh (the bridge proxies :502) to see live wiring.'; }
+  }
+  function driveDI(n){
+    if(!connNow()){ el('circuitHint').textContent='Connect twin (or USB) to drive the inputs.'; return; }
+    st.forced[n]=!st.forced[n];
+    try{rawSend('force IX'+n+' '+(st.forced[n]?1:0));}catch(e){}
+    st.di[n]=st.forced[n]?1:st.di[n];   // optimistic until the next poll
+    render();
+  }
+
+  function render(){
+    // 1) Hardwired DI
+    const di=el('circDI');
+    di.innerHTML='<div class="circ-ch"><span class="cn">Hardwired digital inputs</span><span class="ca">opto ×8 · control bus @0x59</span><span class="cland">→ %IX0–7</span></div>'
+      +'<div class="circ-cdesc">Binary field signals — switches, buttons, limit/E-stop contacts. Opto-isolated, read every scan straight into the input image. No scaling, no binding.</div>'
+      +'<div class="di-grid">'+DI_NAMES.map((nm,i)=>
+        `<div class="di-sw${st.di[i]?' on':''}" data-di="${i}" ${connNow()?'':'aria-disabled="true"'}><span class="knob"></span><span class="dl">${DI_LABEL[i]}<b>%IX${i} · ${nm}</b></span></div>`).join('')+'</div>';
+    di.querySelectorAll('.di-sw').forEach(s=>s.addEventListener('click',()=>driveDI(+s.getAttribute('data-di'))));
+    // 2) Analog bus-expansion
+    const a=el('circAnalog');
+    const ch1v=st.reg[10]||0,ch1i=st.reg[11]||0,ch2v=st.reg[12]||0,ch2i=st.reg[13]||0;
+    const bar=(v,max)=>`<div class="ana-bar"><i style="width:${Math.max(0,Math.min(100,v/max*100)).toFixed(0)}%"></i></div>`;
+    a.innerHTML='<div class="circ-ch"><span class="cn">Analog bus-expansion module</span><span class="ca">I²C @0x20 · Wire</span><span class="cland">→ %IW</span></div>'
+      +'<div class="circ-cdesc">0–10 V / 0–20 mA field transmitters (level, pressure, flow). The module digitizes them on the expansion bus; each channel must be <b>scaled</b> to engineering units and bound to an %IW before logic can use it.</div>'
+      +`<div class="ana-row"><div class="al">CH1 voltage<span class="av">${(ch1v/1000).toFixed(2)} V</span></div>${bar(ch1v,10000)}</div>`
+      +`<div class="ana-row"><div class="al">CH1 current<span class="av">${(ch1i/1000).toFixed(2)} mA</span></div>${bar(ch1i,20000)}</div>`
+      +`<div class="ana-row"><div class="al">CH2 voltage<span class="av">${(ch2v/1000).toFixed(2)} V</span></div>${bar(ch2v,10000)}</div>`
+      +`<div class="ana-row"><div class="al">CH2 current<span class="av">${(ch2i/1000).toFixed(2)} mA</span></div>${bar(ch2i,20000)}</div>`;
+    // 3) Grove sensor (sensor bus)
+    const g=el('circGrove');
+    const temp=st.reg[2], vin=st.reg[0], cur=st.reg[1];
+    g.innerHTML='<div class="circ-ch"><span class="cn">Grove sensor</span><span class="ca">I²C · Wire1 sensor bus</span><span class="cland">→ %IW (bound)</span></div>'
+      +'<div class="circ-cdesc">Plug-in I²C modules (e.g. BME688 temp/humidity/pressure/gas @0x77). A detected device is not a validated source — it needs a binding naming its route, measurement, units and invalid-input behavior before logic reads it.</div>'
+      +`<div class="sens-big">${temp!=null?(temp/10).toFixed(1)+' °C':'—'}</div>`
+      +`<div class="sens-sub">sensor-bus temperature · on-board rail ${vin!=null?(vin/1000).toFixed(1)+' V':'—'} / ${cur!=null?cur+' mA':'—'}</div>`;
+    // CPU
+    const cpu=el('circCpu'); const mode=['PROGRAM','RUN','REMOTE'][st.reg[20]]||'—', scan=st.reg[21]!=null?(st.reg[21]/1000).toFixed(1)+' ms':'—';
+    cpu.innerHTML='<div class="cpuname">M5 StamPLC</div><div class="cpusub">ESP32-S3 · point map</div>'
+      +`<div class="cpumode">${mode} · scan ${scan}</div>`
+      +'<div class="circ-cdesc" style="margin-top:12px;text-align:left">Every input lands in the <b>point map</b> as %IX (digital) or %IW (analog/sensor); the scan runs your ladder; results go out as %QX to the relays. The map is the single meeting point of the three input paths and the two protocols (bus & network).</div>';
+    // Outputs
+    const o=el('circOut');
+    const outs=[['relay0','Relay 0 · motor','%QX0',1],['relay1','Relay 1 · run light','%QX1',2],['relay2','Relay 2 · warning','%QX2',3],['relay3','Relay 3 · fault','%QX3',4],['ssr1','SSR 1 · IO-exp','%QX4',5],['ssr2','SSR 2 · IO-exp','%QX5',6]];
+    o.innerHTML=outs.map(([nm,lbl,qx,coil])=>`<div class="out-row"><span class="out-led${st.coil[coil-1]?' on':''}"></span><div><div class="on-name">${lbl}</div><div class="on-sub">${nm}</div></div><span class="on-a">${qx} · coil ${coil}</span></div>`).join('');
+    el('circNote').innerHTML='<b>Three paths, one map.</b> Digital inputs are immediate and binary; the analog module needs scaling; a Grove sensor needs a validated binding — a connector shape never proves compatibility. Drive a digital input (left) and, if your ladder wires it, watch the relay energize (right).';
+  }
+
+  function setView(v){
+    active=(v==='circuit');
+    app.classList.toggle('circuit-active',active);
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-appview')===v));
+    if(active){ render(); poll(); if(!pollTimer)pollTimer=setInterval(poll,1000); }
+    else { if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+      // release any inputs we forced
+      Object.keys(st.forced).forEach(n=>{ if(st.forced[n]&&connNow()){try{rawSend('force IX'+n+' 0');}catch(e){}} st.forced[n]=false; }); }
+  }
+  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setView(b.getAttribute('data-appview'))));
 })();
 </script>
 <script src="operator/vendor/three-r180.js"></script>
