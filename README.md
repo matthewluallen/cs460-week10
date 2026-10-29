@@ -114,15 +114,24 @@ Modbus / HMI / OTA services you'd meet on the bench — in an emulator, so you c
 drive it, attack it, and watch the consequence on the I²C bus with **no hardware**. The dev
 container fetches it for you (`qemu/fetch-qemu.sh`).
 
-**Run a firmware version, then control it like it's plugged in over USB.** Use two
-terminals — one for the running twin, one for the console:
+**Run a firmware version, then control it like it's plugged in over USB.** You already
+started the twin for Parts 4–5 with one command:
 
 ```bash
-./qemu/run.sh              # terminal 1: boot the vulnerable teaching build
-./qemu/console.sh          # terminal 2: the plc> console  (identical to USB on hardware)
+./qemu/studio.sh           # boots the twin, serves the Studio on :8080, AND muxes the console
 ```
 
-Each script explains what it's doing as it runs. The console is the real USB console:
+For the firmware/attack parts you want the text console too. Open a second terminal and run:
+
+```bash
+./qemu/console.sh          # the plc> console — attaches to the bridge, so it runs AT THE SAME
+                           # time as the browser Studio (no "stuck console", no separate run.sh)
+```
+
+You do **not** need a separate `./qemu/run.sh` for the default build — `studio.sh` already
+booted it, and `console.sh` attaches to that same twin. (`run.sh` is only for booting a
+*different* profile — `secure` or `malicious` — directly, as shown below.) The console is the
+real USB console:
 `mode run`, `io`, `force`, `status`, `busstream on`, `btn a|b|c`, `cwe`, `proto`,
 `login`, `passwd`, `clk`, `ntpsync` all behave exactly as on a physical StampLC.
 

@@ -27,5 +27,6 @@ fi
 
 echo "twin console   : $SERIAL_SOCK"
 echo "Studio + bridge: http://localhost:$PORT   (Codespaces: open forwarded port $PORT)"
+echo "text console   : ./qemu/console.sh        (attaches alongside the Studio)"
 echo "In the Studio, click 'Connect twin'.  Ctrl-C stops the server (twin keeps running)."
 exec python3 "$HERE/twin-bridge.py" --port "$PORT" --serial "$SERIAL_SOCK"

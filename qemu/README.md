@@ -27,10 +27,17 @@ vulnerable Modbus / HMI / OTA services you'd meet on the bench — entirely in s
 
 ```bash
 ./qemu/fetch-qemu.sh        # one-time: downloads the prebuilt twin for your platform
-./qemu/run.sh               # boots the firmware (leave it running)
-# in another shell:
+./qemu/studio.sh            # boots the twin, serves the Studio on :8080, muxes the console
+# in another shell (optional — only if you want the text console too):
 ./qemu/console.sh           # the plc> console   (quit: Ctrl-C)
 ```
+
+`studio.sh` starts everything you need: the twin, the browser Studio (**Connect twin**),
+and a multiplexed console. `console.sh` attaches to that same console, so the text console
+and the browser Studio run **at the same time**. (Earlier, a second client on the twin's
+single-client serial socket would connect but get nothing — the "stuck console". The bridge
+now owns the one serial connection and fans it out, so that can't happen.) You only need
+`./qemu/run.sh` directly to boot a *different* profile (`secure`, `malicious`) by itself.
 
 > **On an Apple-Silicon Mac?** There's no native-macOS twin — the patched QEMU is built
 > for Linux only (the release ships `qemu-twin-linux-x86_64` and `-linux-arm64`; stock
@@ -49,7 +56,7 @@ part annotated, and when you run it, it prints the exact command before executin
 | Run this | Instead of typing | Used in |
 |---|---|---|
 | `./qemu/run.sh` | the full `qemu-system-xtensa …` line (knobs: `ICOUNT`, `FLASH_IMG`, `W5_BIND`, `ALLOW_REBOOT`) | 6, 7 |
-| `./qemu/console.sh` | `nc -U /tmp/plc-serial` (+ the quit incantation) | 6, 7 |
+| `./qemu/console.sh` | attaches the `plc>` console via the bridge (`nc 127.0.0.1 8081`), so it coexists with the Studio; falls back to `nc -U /tmp/plc-serial` if no bridge is up | 6, 7 |
 | `./qemu/ota-push.sh [file]` | `curl -s -X POST --data-binary @file http://127.0.0.1:80/api/upload` | 6 |
 | `./qemu/relay.sh [name]` | `curl -s …:8080/api/points \| grep -o '"n":"relay0"[^}]*'` | 6, 7 |
 | `./firmware-ota/show-bug.sh` | `grep -rn 'verify_firmware\|verified\|Update.begin' sbom/firmware/src/` | 6 |

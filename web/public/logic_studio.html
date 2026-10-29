@@ -46,7 +46,7 @@ button.btn:disabled{opacity:.45;cursor:not-allowed}
 .pill.off{background:var(--panel2);color:var(--muted);border:1px solid var(--line2)}
 .pill.on{background:var(--live-soft);color:var(--live)}
 .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
-.controller-status{display:flex;flex-wrap:wrap;gap:6px 18px;padding:7px 14px;background:var(--panel);border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2)}
+.controller-status{display:flex;flex-wrap:wrap;gap:5px 18px;padding:5px 14px;background:var(--panel);border-bottom:1px solid var(--line);font-size:12px;color:var(--ink2)}
 .controller-status strong{color:var(--ink)}
 .controller-status .details{font-size:11px;color:var(--ink2)}
 .reg .led.unknown{background:transparent;border-style:dashed}
@@ -129,8 +129,11 @@ textarea#stl{flex:1;border:0;resize:none;padding:12px 14px 40px;font-family:var(
 .reg .fbadge{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--force);border:1px solid var(--force);border-radius:4px;padding:0 3px;flex:0 0 auto}
 .regs-note{padding:9px 12px;font-size:11px;color:var(--muted);line-height:1.5}
 /* console */
-.console{flex:0 0 auto;height:132px;display:flex;flex-direction:column;border-top:1px solid var(--line);background:var(--panel)}
+.console{flex:0 0 auto;height:128px;display:flex;flex-direction:column;border-top:1px solid var(--line);background:var(--panel)}
 .console.bus-expanded{height:min(460px,50vh);min-height:280px}
+.console.collapsed{height:auto!important;min-height:0}
+.console.collapsed>:not(.console-head){display:none!important}
+#bConsoleToggle{font-family:var(--mono);font-size:12px;line-height:1;padding:3px 8px;border:1px solid var(--line2);border-radius:6px;background:var(--panel2);color:var(--ink2);cursor:pointer}
 .console-head{display:flex;align-items:center;gap:10px;padding:6px 13px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--ink2)}
 #log{flex:1;overflow:auto;padding:7px 13px;font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink2);white-space:pre-wrap}
 #log .tx{color:var(--accent)}#log .ok{color:var(--live)}#log .er{color:var(--danger)}#log .rx{color:var(--muted)}#log .fc{color:var(--force)}
@@ -354,12 +357,24 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
 .htile.good .v{color:var(--live)}
 @media(max-width:1000px){.hero{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.hmode .d{animation:none}}
+/* ===== collapsible overview: give the ladder + ST the vertical room (persona: ladder is the work) ===== */
+.hscope{min-height:112px}#heroScope{min-height:112px}
+.htile{padding:9px 13px}.htile .v{font-size:21px;margin-top:6px}
+.hero{padding:10px 14px}
+body.hero-collapsed #heroBand{display:none}
+/* slim status strip, shown only when the overview is collapsed */
+#heroStrip{display:none;align-items:center;gap:8px 16px;flex-wrap:wrap;padding:6px 14px;background:linear-gradient(180deg,var(--panel2),var(--panel));border-bottom:1px solid var(--line);font:600 11.5px/1 var(--mono);color:var(--ink2);flex:0 0 auto}
+body.hero-collapsed #heroStrip{display:flex}
+#heroStrip .hs-mode{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+#heroStrip .hs-mode .d{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor}
+#heroStrip .hs-k{color:var(--muted);font-weight:600}
+#heroStrip .hs-live{margin-left:auto;cursor:pointer;border:1px solid var(--line2);border-radius:999px;padding:3px 10px;color:var(--muted);background:var(--panel)}
+#heroStrip .hs-live.on{color:var(--live);border-color:color-mix(in srgb,var(--live) 45%,transparent)}
 </style>
 
 <div class="app">
   <header>
     <div class="brand"><span class="mark">S3</span><div>TBD Logic Studio <small>TBD · StamPLC</small></div></div>
-    <span class="seg" id="appViewSeg" title="Switch between PLC Logic and the Bus Analyzer"><button type="button" data-appview="logic" class="on">Logic</button><button type="button" data-appview="analyzer">Analyzer</button></span>
     <span class="seg" id="modeSeg" title="Author edits the project; Monitor observes controller replies without changing outputs">
       <button data-mode="edit" class="on">✎ Author</button><button data-mode="online">◉ Monitor</button>
     </span>
@@ -383,6 +398,7 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
       <button class="btn pri" id="bDownload" disabled>Load application ▸</button>
       <button class="btn" id="bMonitor" disabled>Start monitoring</button>
       <span class="pill off" id="connPill"><span class="dot"></span>USB disconnected</span>
+      <button class="btn" id="bHero" title="Show or hide the overview band — hide it to give the ladder and text more room">▾ Overview</button>
       <button class="btn" id="bTheme" title="Theme">◐</button>
     </div>
   </header>
@@ -408,7 +424,7 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
       </div>
     </div>
     <div class="hcard">
-      <div class="hc-h"><span class="tk"></span>Live signal<span class="hsrc" id="heroSigSrc">synthetic</span></div>
+      <div class="hc-h"><span class="tk"></span>Live signal<span class="hsrc" id="heroSigSrc">go live ▸</span></div>
       <div class="hc-b" style="display:flex;flex-direction:column"><div class="hscope"><canvas id="heroScope" width="1200" height="320"></canvas></div>
         <div class="hleg"><span><i style="background:var(--accent)"></i>reads</span><span><i style="background:var(--warn)"></i>writes</span><span><i style="background:var(--live)"></i>energized</span></div></div>
     </div>
@@ -418,6 +434,14 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
       <div class="htile"><div class="k">Bus events / s</div><div class="v" id="hBus">&mdash;</div></div>
     </div>
   </section>
+
+  <div id="heroStrip" aria-label="Controller overview (compact)">
+    <span class="hs-mode" id="hsMode"><span class="d"></span><span id="hsModeT">Unknown</span></span>
+    <span><span class="hs-k">conn</span> <span id="hsConn">—</span></span>
+    <span><span class="hs-k">scan</span> <span id="hsScan">—</span></span>
+    <span><span class="hs-k">bus/s</span> <span id="hsBus">—</span></span>
+    <span class="hs-live" id="hsLive" title="Stream real @BUS transactions to the overview scope">go live ▸</span>
+  </div>
 
   <section class="controller-status" aria-label="Project workspace">
     <strong id="projectTitle">No project open</strong>
@@ -511,7 +535,8 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
       <button class="btn" style="padding:3px 9px;font-size:11px" id="bBusTrace" title="Enable software annotations briefly, acknowledge OFF, then read retained records">Capture 1 s</button>
       <span class="spacer" style="flex:1"></span>
       <span id="modeChips" aria-label="Explicit controller mode commands"></span>
-      <button class="btn" style="padding:3px 9px;font-size:11px" id="bClearLog">clear</button></div>
+      <button class="btn" style="padding:3px 9px;font-size:11px" id="bClearLog">clear</button>
+      <button id="bConsoleToggle" title="Collapse or expand the console to give the ladder more room">▾</button></div>
     <div id="log"></div>
     <div id="busView">
       <div class="bus-tools"><span id="busState" role="status">Trace state unknown</span><button class="btn" id="bBusRead">Read retained</button><button class="btn" id="bBusOff">Request trace OFF</button><button class="btn" id="bBusFile">Open capture</button><button class="btn" id="bBusExport">Export capture</button></div>
@@ -524,24 +549,9 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
     </div>
     <canvas id="trendView"></canvas>
   </section>
-  <section id="viewAnalyzer"><iframe id="analyzerFrame" allow="serial" title="Cardputer Bus Analyzer"></iframe></section>
 </div>
 <div class="ov" id="ov"><div class="modal" id="modalInner"></div></div>
 
-<script>
-(function(){
-  var app=document.querySelector('.app'), seg=document.getElementById('appViewSeg'), frame=document.getElementById('analyzerFrame');
-  if(!app||!seg)return;
-  function setView(v){
-    app.classList.toggle('analyzer-active', v==='analyzer');
-    document.body.classList.toggle('analyzer-active', v==='analyzer');
-    var bs=seg.querySelectorAll('button'); for(var i=0;i<bs.length;i++){bs[i].classList.toggle('on', bs[i].getAttribute('data-appview')===v);}
-    if(v==='analyzer' && frame && !frame.getAttribute('src')){ frame.setAttribute('src','cardputer_analyzer.html'); }
-  }
-  var bs=seg.querySelectorAll('button'); for(var i=0;i<bs.length;i++){ (function(b){ b.addEventListener('click',function(){ setView(b.getAttribute('data-appview')); }); })(bs[i]); }
-  setView('logic');
-})();
-</script>
 <script>
 // ===== command-center hero: device panel + live signal + stats =====
 (function(){
@@ -575,9 +585,15 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
        sx.fillStyle=lane.c;sx.globalAlpha=foc?Math.max(.3,1-age/span):0.06;sx.beginPath();sx.roundRect(x-5,lane.y-7,10,14,3);sx.fill();sx.globalAlpha=1;});
      if(H.busFocus!=null){sx.globalAlpha=1;sx.fillStyle=C.ACC;sx.font='12px ui-monospace,monospace';sx.fillText('focus 0x'+H.busFocus.toString(16)+(H.busFocusName?' '+H.busFocusName:''),8,16);}
    } else {
-     // synthetic square wave when no stream
-     sx.strokeStyle=C.ACC;sx.lineWidth=2;sx.beginPath();for(let i=0;i<W;i+=2){const hi=Math.floor((i+now/40)/26)%2;sx.lineTo(i,lanes[0].y+(hi?-14:14));}sx.stroke();
-     sx.strokeStyle=C.WARN;sx.beginPath();for(let i=0;i<W;i+=2){const hi=Math.floor((i+now/18)/13)%2;sx.lineTo(i,lanes[1].y+(hi?-11:11));}sx.stroke();
+     // No live bus events yet. NEVER synthesize a waveform — show an honest idle
+     // state. The scope only ever plots real @BUS transactions from the device.
+     const connNow=(typeof conn!=='undefined')&&conn;
+     const L=window.__liveBus||{wanted:false};
+     const msg=!connNow?'Connect the twin or USB to stream live bus traffic'
+              :L.wanted?'Live bus on — waiting for the controller to scan (put it in RUN)'
+              :'Live bus off — click “Go live ▸” to stream real @BUS traffic';
+     sx.fillStyle=C.MUTED;sx.font='13px ui-monospace,monospace';sx.textBaseline='middle';
+     sx.fillText(msg,14,Hh/2);sx.textBaseline='alphabetic';
    }
  }
  // --- hooks called from onLine ---
@@ -608,10 +624,27 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
    document.getElementById('heroConn').style.color=connNow?'var(--live)':'var(--muted)';
    const pn=(typeof PROJECT!=='undefined'&&PROJECT)?(PROJECT.name||'Project'):'No project'; const hn=document.getElementById('heroName'); if(hn)hn.textContent=pn;
    document.getElementById('heroPanelSrc').textContent=connNow?'live mirror · device':'emulated';
-   {const ss=document.getElementById('heroSigSrc'); ss.textContent=(H.busFocus!=null)?('focus 0x'+H.busFocus.toString(16)+(H.busFocusName?' '+H.busFocusName:'')+' ✕'):((connNow&&H.busRing.length)?'native @BUS · StampLC':'synthetic'); ss.style.cursor=H.busFocus!=null?'pointer':''; ss.title=H.busFocus!=null?'click to clear bus focus':''; if(!ss._clr){ss._clr=1;ss.addEventListener('click',()=>{if(H.busFocus!=null)heroBusFocus(null);});}}
+   {const ss=document.getElementById('heroSigSrc'); const L=window.__liveBus||{wanted:false,active:false};
+    const src=(typeof wsSock!=='undefined'&&wsSock)?'twin':'StampLC';
+    if(H.busFocus!=null){ ss.textContent='focus 0x'+H.busFocus.toString(16)+(H.busFocusName?' '+H.busFocusName:'')+' ✕'; ss.title='click to clear bus focus'; }
+    else if(L.wanted){ ss.textContent='● live @BUS'+(connNow?' · '+src:' (offline)'); ss.title='streaming real bus transactions — click to stop'; }
+    else { ss.textContent='go live ▸'; ss.title='click to stream real @BUS transactions from the device'; }
+    ss.style.cursor='pointer';
+    // green while genuinely streaming live events; neutral/amber otherwise — never "synthetic"
+    ss.style.color=(H.busFocus==null&&L.wanted&&connNow&&H.busRing.length)?'var(--live)':'';
+    ss.style.borderColor=(H.busFocus==null&&L.wanted&&connNow&&H.busRing.length)?'color-mix(in srgb,var(--live) 45%,transparent)':'';
+    if(!ss._h){ss._h=1;ss.addEventListener('click',()=>{ if(H.busFocus!=null){heroBusFocus(null);} else {try{window.toggleLiveBus&&window.toggleLiveBus();}catch(e){}} });}}
    // stats
    const q=document.getElementById('hScan'); if(q)q.textContent=(connNow&&H.scanUs!=null)?(H.scanUs/1000).toFixed(1)+' ms':'—';
    const h2=document.getElementById('hHb'); if(h2)h2.textContent=(connNow&&H.hb!=null)?H.hb.toLocaleString():'—';
+   // compact overview strip (shown when the big band is collapsed)
+   const L=window.__liveBus||{wanted:false,active:false};
+   const sm=document.getElementById('hsMode'),smt=document.getElementById('hsModeT');
+   if(smt){smt.textContent=mKnown()?mL(mi):'Unknown';const c=mKnown()?mC(mi):C.MUTED;if(sm)sm.style.color=c;}
+   const sc2=document.getElementById('hsConn'); if(sc2){sc2.textContent=connNow?((typeof wsSock!=='undefined'&&wsSock)?'twin':'USB'):'offline';}
+   const ss2=document.getElementById('hsScan'); if(ss2)ss2.textContent=(connNow&&H.scanUs!=null)?(H.scanUs/1000).toFixed(1)+'ms':'—';
+   const sb2=document.getElementById('hsBus'); if(sb2)sb2.textContent=connNow?H.busEps:'—';
+   const sl=document.getElementById('hsLive'); if(sl){sl.textContent=L.wanted?'● live @BUS':'go live ▸';sl.classList.toggle('on',!!(L.wanted&&connNow&&H.busRing.length));}
  };
  // buttons: drive real device when connected, always navigate the local panel
  function localNav(k){ if(k==='a'){if(H.scr==='HOME')H.menu=(H.menu+1)%4;else if(H.scr==='MODE')H.target=(H.target+1)%3;else if(H.scr==='IO')H.iocur=(H.iocur+1)%ELEMS.length;} else if(k==='b'){if(H.scr==='HOME')H.scr=['MODE','IO','FORCE','INFO'][H.menu];else H.scr='HOME';} else {if(H.scr!=='HOME')H.scr='HOME';} }
@@ -621,6 +654,29 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
  function tick(){ const now=performance.now(); if(now-H.busWinStart>=1000){ H.busEps=H.busCount; H.busCount=0; H.busWinStart=now; const be=document.getElementById('hBus'); if(be)be.textContent=((typeof conn!=='undefined'&&conn)?H.busEps:'—'); }
    drawLcd(); drawScope(); requestAnimationFrame(tick); }
  drawLcd(); tick();
+})();
+</script>
+<script>
+// ===== overview band: collapsible so the ladder + ST get the vertical room =====
+(function(){
+  const KEY='tbd.heroCollapsed', btn=document.getElementById('bHero');
+  function apply(collapsed){
+    document.body.classList.toggle('hero-collapsed', collapsed);
+    if(btn)btn.textContent=(collapsed?'▸ Overview':'▾ Overview');
+    if(btn)btn.title=(collapsed?'Show the overview band (device panel, live bus scope, stats)':'Hide the overview band to give the ladder and text more room');
+  }
+  let stored=null; try{stored=localStorage.getItem(KEY);}catch(e){}
+  // default: collapsed on short screens so the ladder/ST aren't squeezed; remember the choice
+  const start = stored===null ? (window.innerHeight<900) : (stored==='1');
+  apply(start);
+  if(btn)btn.addEventListener('click',()=>{ const c=!document.body.classList.contains('hero-collapsed'); apply(c); try{localStorage.setItem(KEY,c?'1':'0');}catch(e){} });
+  const sl=document.getElementById('hsLive'); if(sl)sl.addEventListener('click',()=>{try{window.toggleLiveBus&&window.toggleLiveBus();}catch(e){}});
+  // console collapse — reclaim the log's height for the ladder when wanted
+  const CK='tbd.consoleCollapsed', cons=document.querySelector('.console'), ctog=document.getElementById('bConsoleToggle');
+  function capply(c){ if(cons)cons.classList.toggle('collapsed',c); if(ctog){ctog.textContent=c?'▸':'▾';ctog.title=(c?'Expand the console':'Collapse the console to give the ladder more room');} }
+  let cstored=null; try{cstored=localStorage.getItem(CK);}catch(e){}
+  capply(cstored==='1');
+  if(ctog)ctog.addEventListener('click',()=>{ const c=!cons.classList.contains('collapsed'); capply(c); try{localStorage.setItem(CK,c?'1':'0');}catch(e){} });
 })();
 </script>
 <script src="operator/vendor/three-r180.js"></script>
@@ -3015,6 +3071,18 @@ function openBusMap(){
 
 /* ===== bus monitor: retained software evidence, not an electrical analyzer ===== */
 let busBusy=false,busWaiter=null,busTraceState='unknown',busCapture=null,busRecorded=false;
+/* ===== live bus: stream the device's own @BUS transactions to the hero scope =====
+   This is the ONLY source of the Live-signal scope — real decoded I²C traffic from
+   the twin (over the bridge) or a real StampLC (over USB). It is never synthesized.
+   `busstream` is paused automatically during any clean readback (see busCommand) so
+   its lines can never split the chunked project-identity JSON. */
+window.__liveBus={wanted:false,active:false};
+function setLiveActual(on){const L=window.__liveBus;if(on===L.active)return;L.active=on;try{rawSend(on?'busstream on':'busstream off');}catch(e){}}
+function reconcileLiveBus(){const L=window.__liveBus;if(!conn){if(L.active)L.active=false;return;}const want=L.wanted&&!busBusy&&!busWaiter;if(want&&!L.active)setLiveActual(true);}
+window.toggleLiveBus=function(){const L=window.__liveBus;L.wanted=!L.wanted;if(!L.wanted)setLiveActual(false);else if(conn&&!busBusy&&!busWaiter)setLiveActual(true);
+  try{renderHero&&renderHero();}catch(e){}
+  if(L.wanted){log(conn?'Live bus ON — streaming real @BUS transactions to the scope. Put the controller in RUN to see scan traffic.':'Live bus armed — it starts when you Connect twin or Connect USB.','ok');}
+  else log('Live bus OFF.','rx');};
 let busEpoch=0,busUnsolicited=0;
 let qemuBusRecords=[],qemuPage=0,qemuBusDecoded=new Map(),qemuRunCases=new Map();
 const QEMU_BUS_SCHEMA='studio-qemu-bus/v1',QEMU_MAX_BYTES=16*1024*1024;
@@ -3348,6 +3416,11 @@ let busQueue=Promise.resolve();
 function busCommand(command,matches){
   const run=()=>new Promise((resolve,reject)=>{
     if(!conn){reject(Error('Not connected'));return;}
+    // Stop the live @BUS stream BEFORE issuing a clean read: the firmware processes
+    // commands in order, so 'busstream off' takes effect before this reply is sent,
+    // guaranteeing no @BUS line can split the chunked JSON. The reconciler turns it
+    // back on once the console is idle again.
+    {const L=window.__liveBus;if(L&&L.active){try{rawSend('busstream off');}catch(e){}L.active=false;}}
     if(busWaiter){reject(Error('Diagnostic command already pending'));return;}
     const w={matches,resolve,reject,timer:null};busWaiter=w;
     w.timer=setTimeout(()=>{if(busWaiter===w){busWaiter=null;reject(Error('No matching reply to '+command));}},5000);
@@ -3603,7 +3676,7 @@ async function connect(){
   if(!hasSerial){log('Web Serial not available. Use Chrome/Edge, or Compile ▸ Copy frame into the console.','er');return;}
   let candidate=null;connecting=true;const button=document.getElementById('bConnect');button.disabled=true;button.textContent='Choose USB device…';
   log('Choose the intended controller in the browser device chooser, or cancel. No connection is confirmed yet.','rx');
-  try{candidate=await navigator.serial.requestPort({filters:[{usbVendorId:0x303a}]});await candidate.open({baudRate:115200});port=candidate;writer=port.writable.getWriter();rxBuf='';setConn(true);readLoop();log('USB port opened @115200. Controller identity and mode require replies.','ok');await send('status');try{await readProjectIdentity();}catch(e){log('Application identity unavailable: '+e.message,'er');}setTimeout(function(){ if(conn && port===candidate){ if(controllerModeAt===null){ log('\u26a0 This USB device is not responding as a StampLC controller. If you selected the Cardputer analyzer, switch to the Analyzer view; otherwise Disconnect and pick the StampLC (both show as \u201cUSB JTAG serial\u201d).','er'); } else { log('\u2713 StampLC controller confirmed on this port.','ok'); } } },2600);}
+  try{candidate=await navigator.serial.requestPort({filters:[{usbVendorId:0x303a}]});await candidate.open({baudRate:115200});port=candidate;writer=port.writable.getWriter();rxBuf='';setConn(true);readLoop();log('USB port opened @115200. Controller identity and mode require replies.','ok');await send('status');try{await readProjectIdentity();}catch(e){log('Application identity unavailable: '+e.message,'er');}setTimeout(function(){ if(conn && port===candidate){ if(controllerModeAt===null){ log('\u26a0 This USB device is not responding as a StampLC controller. Disconnect and pick the StampLC in the port chooser (it shows as \u201cUSB JTAG serial\u201d).','er'); } else { log('\u2713 StampLC controller confirmed on this port.','ok'); } } },2600);}
   catch(e){if(candidate&&candidate===port)await disconnect();if(/permissions policy|disallowed|SecurityError/i.test(e.message||'')){log('USB blocked by this browser context. Open the standalone page in Chrome/Edge.','er');}else if(e.name==='NotFoundError')log('USB selection cancelled; no controller connected.','rx');else log('Connection unavailable: '+e.message,'er');}
   finally{connecting=false;button.disabled=false;button.textContent=port?'Disconnect USB':'Connect USB';}
 }
@@ -3719,7 +3792,7 @@ function setConn(on){
   if(busWaiter){const w=busWaiter;busWaiter=null;clearTimeout(w.timer);w.reject(Error('USB session changed; trace state unknown'));}
   processBindings=null;processBindingsAt=null;
   sensorPortC=null;sensorPortCAt=null;sensorSamples=null;sensorInventory=null;sensorInventoryAt=null;sensorReceivedAt=null;sensorMessage=on?'Read sensors to obtain controller replies.':'USB disconnected; readings unavailable.';
-  conn=on;renderSensors();protoObserved=new Map();protoReadAt=null;controllerStatus=null;lastSampleAt=null;controllerModeAt=null;pointReplyAt=null;monitorLive=null;forces.clear();trendBuf=[];
+  conn=on;window.__liveBus.active=false;if(on&&window.__liveBus.wanted)setTimeout(reconcileLiveBus,400);renderSensors();protoObserved=new Map();protoReadAt=null;controllerStatus=null;lastSampleAt=null;controllerModeAt=null;pointReplyAt=null;monitorLive=null;forces.clear();trendBuf=[];
   if(!on&&monTimer!==null){clearInterval(monTimer);monTimer=null;}
   if(on){if(hbTimer===null)hbTimer=setInterval(()=>{if(conn&&!busBusy&&monTimer===null)send('status');},1500);}else if(hbTimer!==null){clearInterval(hbTimer);hbTimer=null;}
   if(on){var _br=document.querySelector('.brand');if(_br){_br.classList.add('poweron');setTimeout(function(){_br.classList.remove('poweron');},1300);}}
@@ -3738,7 +3811,7 @@ function toggleMonitor(){
   log('Read-only monitoring. Received values do not establish the loaded program, source acquisition time, or physical contact feedback.','ok');renderControllerStatus();
 }
 let priorFresh=false;
-setInterval(()=>{const fresh=sampleFresh();renderControllerStatus();renderProjectModuleRows();renderProtocolStates();if(fresh!==priorFresh){priorFresh=fresh;renderRegs();renderLadder(MODE==='online'?monitorLive:null);renderRegisterTable();}},500);
+setInterval(()=>{const fresh=sampleFresh();renderControllerStatus();renderProjectModuleRows();renderProtocolStates();try{reconcileLiveBus();}catch(e){}if(fresh!==priorFresh){priorFresh=fresh;renderRegs();renderLadder(MODE==='online'?monitorLive:null);renderRegisterTable();}},500);
 
 /* ===== Read-only register inspector: live replies or an explicit recording ===== */
 let registerCapture=null;

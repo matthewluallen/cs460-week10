@@ -23,7 +23,7 @@ command -v syft  >/dev/null && echo "  syft        : OK" || echo "  syft        
 command -v grype >/dev/null && echo "  grype       : OK" || echo "  grype       : not found (runs in the devcontainer)"
 command -v pio   >/dev/null && echo "  platformio  : OK" || echo "  platformio  : not found (runs in the devcontainer; Part 9)"
 if ls qemu/twin/qemu-twin-*/qemu-system-xtensa >/dev/null 2>&1 && [ -f qemu/twin/stamplc-flash-8MB.bin ]; then
-  echo "  twin        : ready  ->  ./qemu/run.sh   (then  ./qemu/console.sh )"
+  echo "  twin        : ready  ->  ./qemu/studio.sh   (twin + Studio + console, one command)"
 else
   echo "  twin        : not fetched ->  ./qemu/fetch-qemu.sh   (needed for Parts 6-9)"
 fi
