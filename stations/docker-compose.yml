@@ -65,8 +65,8 @@ services:
       - PLC_HOST=10.20.30.10
     depends_on: [plc]
     networks:
-      plant:
-        ipv4_address: 10.20.30.30
+      - plant                    # dynamic IP: lets `docker compose run engineer …` spin up
+                                 # ad-hoc write sessions without an address clash
     # default command polls the controller; to command it over the network, run e.g.:
     #   docker compose -f stations/docker-compose.yml run --rm engineer python3 /app/engineer.py write-coil relay2 1
     #   docker compose -f stations/docker-compose.yml run --rm engineer python3 /app/engineer.py write-setpoint 321
