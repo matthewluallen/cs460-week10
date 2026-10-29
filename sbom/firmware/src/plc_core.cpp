@@ -7,6 +7,7 @@
 #include "io_expansion.h"
 #include "plc_engine.h"
 #include "process_bindings.h"
+#include "mqtt_sensors.h"
 #include "loop_timing.h"
 #include <stdarg.h>
 #include <cstring>
@@ -383,6 +384,17 @@ void plc_core_scan() {
     g_engine.set_analog(pointmap::IW_TEMPERATURE_SETPOINT, int16_t(modbus_server.get_register(pointmap::SETPOINT_TEMPX10)));
     g_engine.set_analog(pointmap::IW_HIGH_TEMPERATURE_LIMIT, int16_t(modbus_server.get_register(pointmap::ALARM_TEMPX10)));
     g_engine.set_analog(pointmap::IW_CYCLE_MS, modbus_server.get_register(pointmap::CYCLE_MS));
+    // Phone-sensor bridge (MQTT): map a subscribed phone's live sensors onto the free
+    // process-role input words so ladder logic can react to them, and mirror to holding
+    // registers 50..52 so the Studio/HMI can read them over Modbus. Aged-out when stale.
+    if (mqtt_sensors_fresh()) {
+        g_engine.set_analog(pointmap::IW_PROCESS_ROLE_1, mqtt_sensors_light_x1());        // %IW1 = light (lux)
+        g_engine.set_analog(pointmap::IW_PROCESS_ROLE_2, mqtt_sensors_accel_mag_x100());  // %IW2 = |accel|*100
+        g_engine.set_analog(pointmap::IW_PROCESS_ROLE_3, mqtt_sensors_tilt_beta());       // %IW3 = tilt beta
+        modbus_server.set_register(50, (uint16_t)mqtt_sensors_light_x1());
+        modbus_server.set_register(51, (uint16_t)mqtt_sensors_accel_mag_x100());
+        modbus_server.set_register(52, (uint16_t)mqtt_sensors_tilt_beta());
+    }
     g_engine.set_mem(0, plc_coil_live(pointmap::SOFT_ESTOP));      // MX0 = soft_estop (coil 8)
     g_engine.set_mem(1, s_first_scan);          // MX1 = first-scan bit
     g_engine.set_mem(3, plc_coil_live(pointmap::CMD_RUN));      // MX3 = cmd_run (coil 9)

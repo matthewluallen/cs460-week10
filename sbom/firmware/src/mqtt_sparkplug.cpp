@@ -6,6 +6,7 @@
 #include "plc_core.h"
 #include "net_types.h"
 #include "mqtt_runtime.h"
+#include "mqtt_sensors.h"
 #include <string.h>
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,8 @@ static void topic(char* out, size_t n, const char* msgtype) {
 
 // Legacy DCMD writes raw coil0; it is not the canonical base relay QX0 mapping.
 static void on_message(const char* t, const uint8_t* payload, size_t len) {
+    // Phone-sensor bridge: phone/<id>/{light,accel,orient} -> %IW input words.
+    if (!strncmp(t, "phone/", 6)) { mqtt_sensors_ingest(t, payload, len); return; }
     if (!strstr(t, "/DCMD/")) return;
     if (g_bustrace) plc_bus_log(0x00, 'W', "Sparkplug DCMD (MQTT) -> relay", len, true);
     // Legacy teaching decoder: a boolean-value byte pattern writes raw coil0. A hardened
@@ -135,6 +138,7 @@ void mqtt_sparkplug_poll() {
         s_connection = state.connections;
         char sub[64]; snprintf(sub, sizeof(sub), "spBv1.0/%s/DCMD/%s/#", s_group, s_node);
         mqtt_runtime_subscribe(sub, 2);
+        mqtt_sensors_subscribe();          // phone/+/{light,accel,orient} -> %IW
         sp_publish("DBIRTH");
         diagnostic_log_printf(diagnostics::Origin::Mqtt,"[PROTO] MQTT3.1.1 session connected; resumed=%d\n", state.session_present);
     }

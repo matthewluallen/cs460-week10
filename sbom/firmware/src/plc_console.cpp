@@ -3,6 +3,8 @@
 #include "console_health.h"
 #include "device_inventory.h"
 #include "svc_config.h"
+#include "mqtt_sparkplug.h"
+#include "mqtt_sensors.h"
 #include "port_c.h"
 #include "eth_net.h"
 #include "plc_diag.h"
@@ -123,6 +125,7 @@ static void cmd_help() {
     Serial.println(F("  logs exercise 1..32 generate marked task logs (PROGRAM only)"));
     Serial.println(F("  mon <tag> [n]        stream a point n times (default 10)"));
     Serial.println(F("  cwe                  embedded weaknesses & service ports"));
+    Serial.println(F("  mqtt connect <host>  subscribe phone sensors -> %IW1..3 (mqtt status to read)"));
     Serial.println(F("  clk                  show the wall-clock (stored as 32-bit - Y2038 target)"));
     Serial.println(F("  ntpsync [ip] [port] | auto [ip] [sec] | off   sync time from the net (unauth)"));
     Serial.println(F("  netcfg [json] | dhcp | static <ip> <gw> <mask> | ntp <ip> [port] | auth <u> <p> | save"));
@@ -321,6 +324,23 @@ static void cmd_svcinfo() {
     Serial.printf("user pw     : %s  [CWE-257 recoverable / CWE-256 plaintext]\n", plc_auth_user_password());
     Serial.printf("session     : %s   failed-logins=%lu (no lockout)\n",
                   plc_auth_whoami(), (unsigned long)plc_auth_failed_count());
+}
+
+static void cmd_mqtt(const char* sub, const char* host) {
+    // Point the twin at the phone-sensor MQTT broker and subscribe phone/+/… -> %IW.
+    if (sub && !strcmp(sub, "connect") && host && host[0]) {
+        if (!svc_set(SVC_MQTT, true)) { Serial.println("{\"mqtt\":\"error\",\"reason\":\"service budget full (disable a network service)\"}"); return; }
+        mqtt_sparkplug_begin(host, 1883, "TBD", "stamplc");
+        Serial.printf("{\"mqtt\":\"connecting\",\"broker\":\"%s:1883\",\"maps\":{\"%%IW1\":\"light\",\"%%IW2\":\"accel_mag_x100\",\"%%IW3\":\"tilt_beta\"},\"regs\":[50,51,52]}\n", host);
+        return;
+    }
+    if (sub && !strcmp(sub, "status")) {
+        Serial.printf("{\"mqtt\":\"status\",\"connected\":%s,\"fresh\":%s,\"light\":%d,\"accel_mag_x100\":%d,\"tilt_beta\":%d}\n",
+            mqtt_sparkplug_connected() ? "true" : "false", mqtt_sensors_fresh() ? "true" : "false",
+            mqtt_sensors_light_x1(), mqtt_sensors_accel_mag_x100(), mqtt_sensors_tilt_beta());
+        return;
+    }
+    Serial.println("{\"mqtt\":\"usage\",\"cmds\":[\"mqtt connect <broker-host>\",\"mqtt status\"],\"note\":\"phone/+/{light,accel,orient} -> %IW1..3 + regs 50..52\"}");
 }
 
 static void cmd_cwe() {
@@ -602,6 +622,7 @@ static void process(char* line) {
     else if (!strcmp(cmd, "rtudiag")) modbus_rtu_diag();
     else if (!strcmp(cmd,"logs")) diagnostic_log_console(a1,a2,strtok(nullptr," \t")!=nullptr);
     else if (!strcmp(cmd, "bustrace")) { g_bustrace = a1 && !strcmp(a1, "on"); Serial.printf("bus trace %s\n", g_bustrace ? "ON" : "OFF"); }
+    else if (!strcmp(cmd, "mqtt")) cmd_mqtt(a1, a2);
     else if (!strcmp(cmd, "cwe")) cmd_cwe();
     else if (!strcmp(cmd, "clk")) cmd_clk();
     else if (!strcmp(cmd, "ntpsync")) cmd_ntpsync(a1, a2, strtok(nullptr, " \t"));
