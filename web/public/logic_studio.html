@@ -71,6 +71,21 @@ main{display:flex;flex:1;min-height:0}
 .col.ladder{flex:1.4;border-right:1px solid var(--line)}
 .col.stl{flex:.95;border-right:1px solid var(--line)}
 .col.regs{flex:0 0 250px;background:var(--panel)}
+/* logic view modes: split (default) / ladder-only / text-only, + register toggle + focus */
+main.lv-ladder .col.stl{display:none}
+main.lv-text .col.ladder{display:none}
+main.lv-ladder .col.ladder{flex:1}
+main.lv-text .col.stl{flex:1}
+body.regs-hidden .col.regs{display:none}
+.lvseg{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+.lvseg button{border:0;background:var(--panel2);color:var(--ink2);font-size:11px;font-weight:700;padding:3px 10px;cursor:pointer}
+.lvseg button.on{background:var(--accent);color:var(--accent-ink)}
+/* Focus: maximize the logic area — hide the surrounding chrome, keep header + palette */
+body.logic-focus #workflowGuide,body.logic-focus .hero,body.logic-focus #heroStrip,
+body.logic-focus .controller-status,body.logic-focus #controllerModeHelp,
+body.logic-focus #executionPanel,body.logic-focus #logicInspector,
+body.logic-focus .console{display:none!important}
+body.logic-focus #bLogicFocus{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .col-head{display:flex;align-items:center;gap:9px;padding:8px 13px;background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
 .col-head h2{margin:0;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
 .col-head .hint{font-size:11px;color:var(--muted)}
@@ -497,7 +512,12 @@ body.hero-collapsed #heroStrip{display:flex}
     <button class="pbtn" data-ins="startup" id="bStartup" title="Add an explicit boot-admission declaration outside scan logic">↻ <span>Reboot RUN</span></button>
     <span class="lbl" style="margin-left:8px" id="palHint">keys: n·NO  /·NC  m·CMP  t·TON  r·R_TRIG  o·OR  c·coil  e·network</span>
     <span class="hint" style="font-size:11px;color:var(--ink2)">Boolean logic, comparisons and timers · PID is not yet supported by this compiler/runtime.</span>
-  </div>
+    <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">
+      <span class="lbl">View</span>
+      <span class="lvseg" id="logicViewSeg" title="How much room the ladder vs the program text gets"><button type="button" data-lv="split" class="on">Split</button><button type="button" data-lv="ladder">Ladder</button><button type="button" data-lv="text">Text</button></span>
+      <button class="pbtn" id="bRegsToggle" title="Show or hide the register column">⊟ Regs</button>
+      <button class="pbtn" id="bLogicFocus" title="Maximize the logic area — hide everything else (Esc to exit)">⛶ Focus</button>
+    </span></div>
 
   <details id="logicInspector" style="flex:0 0 auto;max-height:210px;overflow:hidden;border-bottom:1px solid var(--line);padding:5px 12px">
     <summary id="logicInspectorTitle">Inspect selected logic · variables and explanation</summary>
@@ -677,6 +697,28 @@ body.hero-collapsed #heroStrip{display:flex}
   let cstored=null; try{cstored=localStorage.getItem(CK);}catch(e){}
   capply(cstored==='1');
   if(ctog)ctog.addEventListener('click',()=>{ const c=!cons.classList.contains('collapsed'); capply(c); try{localStorage.setItem(CK,c?'1':'0');}catch(e){} });
+})();
+</script>
+<script>
+// ===== logic view: Split / Ladder / Text, register toggle, and Focus (maximize) =====
+(function(){
+  const main=document.querySelector('main'), seg=document.getElementById('logicViewSeg');
+  const VK='tbd.logicView', RK='tbd.regsHidden';
+  function setView(v){ main.classList.remove('lv-split','lv-ladder','lv-text'); main.classList.add('lv-'+v);
+    if(seg)seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-lv')===v));
+    try{localStorage.setItem(VK,v);}catch(e){} }
+  let v='split'; try{v=localStorage.getItem(VK)||'split';}catch(e){} setView(v);
+  if(seg)seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setView(b.getAttribute('data-lv'))));
+  // register column toggle
+  const rbtn=document.getElementById('bRegsToggle');
+  function setRegs(hidden){ document.body.classList.toggle('regs-hidden',hidden); if(rbtn)rbtn.textContent=hidden?'⊞ Regs':'⊟ Regs'; try{localStorage.setItem(RK,hidden?'1':'0');}catch(e){} }
+  let rh=false; try{rh=localStorage.getItem(RK)==='1';}catch(e){} setRegs(rh);
+  if(rbtn)rbtn.addEventListener('click',()=>setRegs(!document.body.classList.contains('regs-hidden')));
+  // Focus: maximize the logic area (not persisted — it's a momentary zoom)
+  const fbtn=document.getElementById('bLogicFocus');
+  function setFocus(on){ document.body.classList.toggle('logic-focus',on); if(fbtn)fbtn.textContent=on?'⛶ Exit focus':'⛶ Focus'; }
+  if(fbtn)fbtn.addEventListener('click',()=>setFocus(!document.body.classList.contains('logic-focus')));
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.body.classList.contains('logic-focus'))setFocus(false); });
 })();
 </script>
 <script src="operator/vendor/three-r180.js"></script>
