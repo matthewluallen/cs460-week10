@@ -46,6 +46,13 @@ import urllib.parse
 WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 INDEX = "logic_studio.html"   # what "/" serves
 
+# Studio-hub extras: files reachable from the one Studio port but kept in their real
+# home (the READMEs reference them there), so there is a single source of truth.
+EXTRA_FILES = {
+    "/i2c-analyzer.html": "bus-analysis/i2c-analyzer.html",
+    "/bus-analyzer.html": "bus-analysis/i2c-analyzer.html",
+}
+
 
 # ───────────────────────── the hub: one twin, many subscribers ─────────────────────────
 class TwinHub:
@@ -216,6 +223,17 @@ def serve_static(conn, path, root):
     """Serve a file from `root`. Path traversal is rejected."""
     rel = urllib.parse.urlparse(path).path
     rel = urllib.parse.unquote(rel)
+    if rel in EXTRA_FILES:
+        repo_root = os.path.realpath(os.path.join(root, ".."))
+        full = os.path.realpath(os.path.join(repo_root, EXTRA_FILES[rel]))
+        if full.startswith(repo_root + os.sep) and os.path.isfile(full):
+            ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
+            with open(full, "rb") as f:
+                body = f.read()
+            conn.sendall(("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %d\r\n"
+                          "Cache-Control: no-store\r\nConnection: close\r\n\r\n"
+                          % (ctype, len(body))).encode() + body)
+            return
     if rel == "/" or rel == "":
         rel = "/" + INDEX
     clean = posixpath.normpath(rel).lstrip("/")
