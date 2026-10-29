@@ -5,16 +5,21 @@
 
 namespace {
 constexpr int TX_PIN = 5, RX_PIN = 4;
+constexpr int HALL_SIG_PIN = 5;   // BLUE port yellow/SIG wire (A3144E output, active-LOW)
 HardwareSerial radio(2);  // UART1 belongs exclusively to PWR-485.
 PortCProfile active = PortCProfile::Disabled, saved = PortCProfile::Disabled;
 bool started = false, uart_ready = false;
 uint32_t baud = 115200, saved_baud = 115200;
 uint32_t tx_bytes = 0, rx_bytes = 0;
+// Hall state (A3144E). Debounced level + a count of latch activations.
+bool hall_present = false;
+uint32_t hall_events = 0, hall_changed_ms = 0;
 
 const char* name(PortCProfile p) {
     switch (p) {
         case PortCProfile::HX711: return "hx711";
         case PortCProfile::H2Uart: return "h2-uart";
+        case PortCProfile::Hall: return "hall";
         default: return "disabled";
     }
 }
@@ -23,6 +28,7 @@ bool parse_profile(const char* text, PortCProfile& out) {
     if (!strcmp(text, "disabled")) out = PortCProfile::Disabled;
     else if (!strcmp(text, "hx711")) out = PortCProfile::HX711;
     else if (!strcmp(text, "h2-uart")) out = PortCProfile::H2Uart;
+    else if (!strcmp(text, "hall")) out = PortCProfile::Hall;
     else return false;
     return true;
 }
@@ -54,10 +60,17 @@ void port_c_begin() {
         baud = p.getUInt("baud", 115200);
         p.end();
     }
-    valid = mode <= uint8_t(PortCProfile::H2Uart) && valid_baud(baud);
+    valid = mode <= uint8_t(PortCProfile::Hall) && valid_baud(baud);
     active = valid ? PortCProfile(mode) : PortCProfile::Disabled;
     if (!valid) baud = 115200;
     saved = active; saved_baud = baud;
+    if (active == PortCProfile::Hall) {
+        // Open-collector output: idle-HIGH via the internal pull-up, LOW when a
+        // magnet of the correct polarity latches the A3144E. RX_PIN stays input.
+        pinMode(HALL_SIG_PIN, INPUT_PULLUP);
+        hall_present = (digitalRead(HALL_SIG_PIN) == LOW);
+        hall_events = 0; hall_changed_ms = millis();
+    }
     if (active == PortCProfile::H2Uart) {
         radio.setRxBufferSize(1024);
         radio.setTxBufferSize(128);
@@ -75,20 +88,38 @@ void port_c_begin() {
 
 PortCProfile port_c_profile() { return active; }
 
+void port_c_poll() {
+    if (active != PortCProfile::Hall) return;
+    // ~30 ms debounce: the mechanical approach of a magnet is slow, and this
+    // runs every loop, so a single confirmed level change is enough.
+    bool present = (digitalRead(HALL_SIG_PIN) == LOW);
+    if (present != hall_present && millis() - hall_changed_ms >= 30) {
+        hall_present = present;
+        hall_changed_ms = millis();
+        if (present) ++hall_events;   // count magnet arrivals (latch activations)
+    }
+}
+
+bool port_c_hall_present() { return active == PortCProfile::Hall && hall_present; }
+
 void port_c_console(const char* operation, const char* argument, bool extra) {
     if (extra) { error("extra arguments"); return; }
     if (!operation || !strcmp(operation, "status")) {
         if (argument) { error("unexpected argument"); return; }
+        port_c_poll();
         Serial.printf("{\"portc\":\"status\",\"active\":\"%s\",\"saved\":\"%s\","
                       "\"baud\":%lu,\"saved_baud\":%lu,\"uart_ready\":%s,"
-                      "\"rx_bytes\":%lu,\"tx_bytes\":%lu,\"zigbee_verified\":false}\n",
+                      "\"rx_bytes\":%lu,\"tx_bytes\":%lu,\"zigbee_verified\":false,"
+                      "\"hall_magnet_present\":%s,\"hall_events\":%lu}\n",
                       name(active), name(saved), (unsigned long)baud, (unsigned long)saved_baud,
-                      uart_ready ? "true" : "false", (unsigned long)rx_bytes, (unsigned long)tx_bytes);
+                      uart_ready ? "true" : "false", (unsigned long)rx_bytes, (unsigned long)tx_bytes,
+                      (active == PortCProfile::Hall && hall_present) ? "true" : "false",
+                      (unsigned long)hall_events);
         return;
     }
     if (!strcmp(operation, "profile")) {
         PortCProfile requested;
-        if (!parse_profile(argument, requested)) { error("profile must be disabled, hx711 or h2-uart"); return; }
+        if (!parse_profile(argument, requested)) { error("profile must be disabled, hx711, h2-uart or hall"); return; }
         Preferences p;
         if (!p.begin("portc", false)) { error("cannot open profile storage"); return; }
         bool ok = p.putUChar("profile", uint8_t(requested)) == 1 &&
@@ -117,6 +148,16 @@ void port_c_console(const char* operation, const char* argument, bool extra) {
         return;
     }
     if (strcmp(operation, "read") && strcmp(operation, "send")) { error("unknown operation"); return; }
+    // The hall unit answers 'read' directly (it is a GPIO switch, not the UART).
+    if (active == PortCProfile::Hall && !strcmp(operation, "read")) {
+        if (argument) { error("unexpected argument"); return; }
+        port_c_poll();
+        int level = digitalRead(HALL_SIG_PIN);
+        Serial.printf("{\"portc\":\"hall\",\"magnet_present\":%s,\"level\":%d,"
+                      "\"events\":%lu,\"active_low\":true}\n",
+                      hall_present ? "true" : "false", level, (unsigned long)hall_events);
+        return;
+    }
     if (!uart_ready) { error("UART is not the active Port C owner"); return; }
     if (!strcmp(operation, "read")) {
         if (argument) { error("unexpected argument"); return; }

@@ -128,7 +128,7 @@ static void cmd_help() {
     Serial.println(F("  netcfg [json] | dhcp | static <ip> <gw> <mask> | ntp <ip> [port] | auth <u> <p> | save"));
     Serial.println(F("  bustrace on|off      retain decoded bus diagnostics (see logs)"));
     Serial.println(F("  rtudiag              RTU worker counters and longest poll gap (us)"));
-    Serial.println(F("  portc [status|profile disabled|hx711|h2-uart|baud N|read|send HEX]"));
+    Serial.println(F("  portc [status|profile disabled|hx711|h2-uart|hall|baud N|read|send HEX]"));
     Serial.println(F("  proto [name on|off]  selectable protocols/services + attack surface"));
     Serial.println(F("  quiet on|off         mute/resume loop telemetry retention"));
     Serial.println(F("  console              how this USB port works (for humans and tools)"));

@@ -273,6 +273,7 @@ void loop() {
     if (svc_enabled(SVC_MQTT)) mqtt_sparkplug_poll();
 
     plc_timing_loop_phase(timing::FRONT_SERVICES);
+    port_c_poll();          // Port C hall switch (A3144E); no-op unless that profile is active
     device_acquisition_tick();
     // Compatibility telemetry has only the explicit direct ENV role. Routed
     // samples are available through devices samples, never enumeration order.

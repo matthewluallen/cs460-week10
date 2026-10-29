@@ -7,13 +7,17 @@
 
 namespace acquisition {
 enum class Kind : uint8_t { Env, Sgp, Heart, Io, Ncir, Tof };
-enum class Quality : uint8_t { Awaiting, Valid, Warmup, IoError, CrcError, Overflow, Stale, Paused, SensorError };
+// 'Removed' is appended last so the existing on-wire quality ordinals are unchanged.
+// It denotes a unit that was present and sampling and has since been unplugged
+// (auto age-out), distinct from IoError (a unit that is wired but failing I/O).
+enum class Quality : uint8_t { Awaiting, Valid, Warmup, IoError, CrcError, Overflow, Stale, Paused, SensorError, Removed };
 inline const char* name(Quality q) {
     switch(q) {
     case Quality::Valid:return "valid"; case Quality::Warmup:return "warmup";
     case Quality::IoError:return "io_error"; case Quality::CrcError:return "crc_error";
     case Quality::Overflow:return "overflow"; case Quality::Stale:return "stale";
     case Quality::SensorError:return "sensor_error";
+    case Quality::Removed:return "removed";
     case Quality::Paused:return "paused"; default:return "awaiting";
     }
 }
@@ -72,8 +76,26 @@ class Engine {
     static uint32_t le32(const uint8_t* p) {
         return uint32_t(p[0])|uint32_t(p[1])<<8|uint32_t(p[2])<<16|uint32_t(p[3])<<24;
     }
+    // Grace past a slot's freshness window before a unit that has stopped
+    // responding is treated as physically removed rather than momentarily
+    // glitching. max_age() + this must clear a few retry cycles.
+    static constexpr uint32_t RetireGraceMs=3000;
     static void fail(Slot& s,Quality q,uint32_t now) {
-        s.quality=q;++s.errors;s.phase=0;s.started=0;s.next=now+1000;
+        ++s.errors;s.phase=0;s.started=0;
+        // Auto age-out. A unit that produced valid samples and has now been
+        // unreadable well past its freshness window has been unplugged: report
+        // it as 'removed' (not a hard io_error) and probe gently. A re-inserted
+        // unit recovers on the next successful identity(), which restores Valid.
+        // Only I/O-class failure (no ACK / wrong identity) retires a slot; data
+        // faults (CRC / overflow / sensor) keep their own quality. A slot that
+        // was never present (no sample yet) still latches io_error, so a genuine
+        // wiring/config mismatch stays visible instead of silently disappearing.
+        if(q==Quality::IoError &&
+           (s.quality==Quality::Removed ||
+            (s.has_sample && now-s.sampled>s.max_age()+RetireGraceMs))) {
+            s.quality=Quality::Removed;s.has_sample=false;s.next=now+2000;return;
+        }
+        s.quality=q;s.next=now+1000;
     }
     static void sample(Slot& s,uint32_t now,Quality q=Quality::Valid) {
         s.has_sample=true;s.sampled=now;++s.sequence;s.quality=q;
