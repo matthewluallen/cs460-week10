@@ -149,6 +149,40 @@ textarea#stl{flex:1;border:0;resize:none;padding:12px 14px 40px;font-family:var(
 .console.collapsed{height:auto!important;min-height:0}
 .console.collapsed>:not(.console-head){display:none!important}
 #bConsoleToggle{font-family:var(--mono);font-size:12px;line-height:1;padding:3px 8px;border:1px solid var(--line2);border-radius:6px;background:var(--panel2);color:var(--ink2);cursor:pointer}
+/* ===== Flow workspace ===== */
+#viewFlow{display:none;flex:1;min-height:0;flex-direction:column;background:var(--bg)}
+.app.flow-active main,.app.flow-active #palette,.app.flow-active .controller-status,
+.app.flow-active #controllerModeHelp,.app.flow-active #executionPanel,.app.flow-active #logicInspector,
+.app.flow-active #forceBanner,.app.flow-active .hero,.app.flow-active #heroStrip,.app.flow-active #workflowGuide{display:none!important}
+.app.flow-active #viewFlow{display:flex}
+.flow-head{display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.flow-title{font:700 14px/1.2 var(--sans);color:var(--ink)}
+.flow-sub{font:500 11.5px/1 var(--mono);color:var(--muted);margin-left:8px}
+.flow-hint{font:500 11.5px/1.4 var(--sans);color:var(--muted)}
+.flow-rungsel{display:inline-flex;gap:4px}
+.flow-rungsel button{border:1px solid var(--line2);background:var(--panel2);color:var(--ink2);font:700 11px/1 var(--mono);padding:4px 9px;border-radius:6px;cursor:pointer}
+.flow-rungsel button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.flow-canvas{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:14px 18px;overflow:auto}
+#flowSvg{width:100%;height:100%;max-height:560px}
+.flow-foot{padding:9px 16px;border-top:1px solid var(--line);background:var(--panel);font:500 11.5px/1.5 var(--sans);color:var(--ink2)}
+.flow-foot b{color:var(--ink)}
+/* svg flow primitives */
+.fl-wire{stroke:var(--wire);stroke-width:3;fill:none}
+.fl-wire.live{stroke:var(--live);stroke-width:3.5;stroke-dasharray:13 7;animation:flflow .7s linear infinite;filter:drop-shadow(0 0 4px var(--live))}
+@keyframes flflow{to{stroke-dashoffset:-20}}
+.fl-net{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:4 5;opacity:.5}
+.fl-node{fill:var(--panel);stroke:var(--line2);stroke-width:1.5}
+.fl-node.live{stroke:var(--live);stroke-width:2.5;filter:drop-shadow(0 0 7px color-mix(in srgb,var(--live) 60%,transparent))}
+.fl-node.pulse{stroke:var(--warn);stroke-width:2.5;filter:drop-shadow(0 0 8px var(--warn))}
+.fl-node.press{cursor:pointer}
+.fl-node.press:hover{stroke:var(--accent)}
+.fl-t{font:700 13px/1 var(--sans);fill:var(--ink)}
+.fl-s{font:500 10.5px/1 var(--mono);fill:var(--muted)}
+.fl-badge{font:700 9.5px/1 var(--mono);fill:var(--accent)}
+.fl-led{fill:var(--line2);stroke:var(--line2)}
+.fl-led.on{fill:var(--live);stroke:var(--live);filter:drop-shadow(0 0 10px var(--live))}
+.fl-lane{font:700 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;fill:var(--muted)}
+@media(prefers-reduced-motion:reduce){.fl-wire.live{animation:none;stroke-dasharray:none}}
 .console-head{display:flex;align-items:center;gap:10px;padding:6px 13px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--ink2)}
 #log{flex:1;overflow:auto;padding:7px 13px;font-family:var(--mono);font-size:11px;line-height:1.55;color:var(--ink2);white-space:pre-wrap}
 #log .tx{color:var(--accent)}#log .ok{color:var(--live)}#log .er{color:var(--danger)}#log .rx{color:var(--muted)}#log .fc{color:var(--force)}
@@ -390,6 +424,7 @@ body.hero-collapsed #heroStrip{display:flex}
 <div class="app">
   <header>
     <div class="brand"><span class="mark">S3</span><div>TBD Logic Studio <small>TBD · StamPLC</small></div></div>
+    <span class="seg" id="appViewSeg" title="Logic authoring vs the end-to-end signal Flow"><button type="button" data-appview="logic" class="on">Logic</button><button type="button" data-appview="flow">Flow ⚡</button></span>
     <span class="seg" id="modeSeg" title="Author edits the project; Monitor observes controller replies without changing outputs">
       <button data-mode="edit" class="on">✎ Author</button><button data-mode="online">◉ Monitor</button>
     </span>
@@ -548,6 +583,17 @@ body.hero-collapsed #heroStrip{display:flex}
       <div class="scroll" id="regPanel"></div>
     </section>
   </main>
+
+  <section id="viewFlow" aria-label="End-to-end signal flow">
+    <div class="flow-head">
+      <div class="flow-title">Signal flow <span class="flow-sub">field input → bus → logic → bus → output · the same points an HMI reads over the network</span></div>
+      <span class="flow-rungsel" id="flowRungSel"></span>
+      <span class="spacer" style="flex:1"></span>
+      <span class="flow-hint" id="flowHint">Open a project and Connect twin, then press the input.</span>
+    </div>
+    <div class="flow-canvas"><svg id="flowSvg" preserveAspectRatio="xMidYMid meet"></svg></div>
+    <div class="flow-foot" id="flowFoot"></div>
+  </section>
 
   <section class="console" id="studioConsole">
     <div class="console-head">
@@ -719,6 +765,123 @@ body.hero-collapsed #heroStrip{display:flex}
   function setFocus(on){ document.body.classList.toggle('logic-focus',on); if(fbtn)fbtn.textContent=on?'⛶ Exit focus':'⛶ Focus'; }
   if(fbtn)fbtn.addEventListener('click',()=>setFocus(!document.body.classList.contains('logic-focus')));
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&document.body.classList.contains('logic-focus'))setFocus(false); });
+})();
+</script>
+<script>
+// ===== Flow workspace: field input → bus → logic → bus → output, live, pressable =====
+(function(){
+  const seg=document.getElementById('appViewSeg'), app=document.querySelector('.app'), svg=document.getElementById('flowSvg');
+  if(!seg||!app||!svg)return;
+  let active=false, pollTimer=null, rafPending=false, selNetIdx=0;
+  const live={di:[0,0,0,0,0,0,0,0],relay:[0,0,0,0]}, pulse={}, forcedByFlow={};
+
+  // live I/O from the device's own `io` replies (same source the Test bench uses)
+  function onIo(line){
+    const di=/DI\s*:\s*((?:[01]\s*){8})/.exec(line);
+    if(di){const bits=di[1].trim().split(/\s+/).map(Number);for(let i=0;i<8;i++)live.di[i]=bits[i]||0;}
+    const re=/relay([0-3])\s+cmd=\d+\s+act=([01])/g;let m;while((m=re.exec(line)))live.relay[+m[1]]=+m[2];
+  }
+  let ioRegistered=false;
+  function registerIo(){ if(ioRegistered)return; try{ if(typeof lineListeners!=='undefined'&&!lineListeners.includes(onIo)){lineListeners.push(onIo);ioRegistered=true;} }catch(e){} }
+  window.__flowBusEvent=function(line){const m=/^@BUS\s+\d+\s+([RW])\s+0x([0-9a-fA-F]+)/.exec(line);if(m)pulse[m[2].toLowerCase()+m[1]]=performance.now();};
+
+  const NS=()=>((typeof PROG!=='undefined'&&PROG&&Array.isArray(PROG.nets))?PROG.nets:[]);
+  function contacts(node,out){out=out||[];if(!node)return out;if(node.t==='c')out.push(node);if(node.kids)node.kids.forEach(k=>contacts(k,out));if(node.in)contacts(node.in,out);return out;}
+  // The scan sees the forced value even though the raw DI readout stays 0, so reflect
+  // forces here — the whole chain then lights when you press, matching what the device does.
+  function liveMap(){const IX={},QX={};for(let i=0;i<8;i++)IX[i]=forcedByFlow[i]?1:live.di[i];for(let i=0;i<4;i++)QX[i]=live.relay[i];return {IX,QX,IW:{},FB:{}};}
+  const inPath=io=>io==='IX'?'hardwired DI · opto×8 @0x59':io==='IW'?'analog bus-expansion @0x20':'Grove sensor · Wire1';
+  const recent=k=>pulse[k]&&(performance.now()-pulse[k]<450);
+  const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const nm=(io,idx)=>{try{return nodeName(io,idx);}catch(e){return '%'+io+idx;}};
+  const sym=(io,idx)=>{try{return symName(io,idx)||'';}catch(e){return '';}};
+
+  // one SVG rounded node
+  function node(x,y,w,h,title,sub,cls,extra){
+    return `<g class="fl-node-g" ${extra||''}><rect class="fl-node ${cls||''}" x="${x}" y="${y}" width="${w}" height="${h}" rx="12"/>`
+      +`<text class="fl-t" x="${x+w/2}" y="${y+h/2-4}" text-anchor="middle">${esc(title)}</text>`
+      +(sub?`<text class="fl-s" x="${x+w/2}" y="${y+h/2+14}" text-anchor="middle">${esc(sub)}</text>`:'')+`</g>`;
+  }
+  function wire(x1,y,x2,on){return `<path class="fl-wire ${on?'live':''}" d="M ${x1} ${y} L ${x2} ${y}"/>`;}
+
+  function render(){
+    const nets=NS();
+    const hint=document.getElementById('flowHint'), foot=document.getElementById('flowFoot'), rsel=document.getElementById('flowRungSel');
+    if(!nets.length){svg.setAttribute('viewBox','0 0 1200 300');svg.innerHTML=`<text class="fl-s" x="600" y="150" text-anchor="middle" style="font-size:14px">Open a project (Examples → Pushbutton) to see its signal flow.</text>`;if(hint)hint.textContent='No project open.';if(rsel)rsel.innerHTML='';if(foot)foot.innerHTML='';return;}
+    if(selNetIdx>=nets.length)selNetIdx=0;
+    // rung selector
+    if(rsel)rsel.innerHTML=nets.map((n,i)=>`<button data-ni="${i}" class="${i===selNetIdx?'on':''}">NET ${i+1}</button>`).join('');
+    const n=nets[selNetIdx];
+    const ins=contacts(n.expr), primary=ins[0]||{io:'IX',idx:0};
+    const lm=liveMap();
+    const inputOn = primary.io==='IX'?(!!forcedByFlow[primary.idx]||!!live.di[primary.idx]):(primary.io==='QX'?!!live.relay[primary.idx]:false);
+    const conduct = (typeof evalNode==='function')?evalNode(n.expr,lm)===true:false;
+    const coilOn = n.coil.io==='QX'?!!live.relay[n.coil.idx]:(typeof evalCoil==='function'?evalCoil(n,lm)===true:false);
+    const connNow=(typeof conn!=='undefined')&&conn;
+
+    const VB_W=1220, VB_H=430; svg.setAttribute('viewBox',`0 0 ${VB_W} ${VB_H}`);
+    const yB=300, h=78, nodeW=168;
+    const xs=[40,290,540,840,1012];           // input, read, logic, write, output
+    const lw=[xs[0]+nodeW, xs[1], xs[1]+nodeW, xs[2], xs[2]+nodeW, xs[3], xs[3]+nodeW, xs[4]]; // wire endpoints
+    let s='';
+    // network lane (top) — the same points, read/written over the network by an HMI/SCADA master
+    const yN=96;
+    s+=`<text class="fl-lane" x="40" y="${yN-30}">Network plane — how an HMI / SCADA master reads &amp; writes these same points</text>`;
+    s+=node(40,yN-20,nodeW,64,'HMI / SCADA','Modbus-TCP client','');
+    s+=`<path class="fl-net" d="M ${40+nodeW} ${yN+12} H ${xs[4]+nodeW/2} "/>`;
+    s+=`<text class="fl-badge" x="${(40+nodeW+xs[4]+nodeW/2)/2}" y="${yN-2}" text-anchor="middle">Modbus/TCP :502 · FC3 read / FC16 write · DNP3 :20000</text>`;
+    // down-arrow to the input point and up from the output point
+    s+=`<path class="fl-net" d="M ${xs[0]+nodeW/2} ${yN+44} V ${yB-4}"/>`;
+    s+=`<path class="fl-net" d="M ${xs[4]+nodeW/2} ${yB-4} V ${yN+44}"/>`;
+    // bus/logic lane (main)
+    s+=`<text class="fl-lane" x="40" y="${yB-56}">Field / bus plane — the real signal path on the device</text>`;
+    // wires (energized segment by segment)
+    s+=wire(lw[0],yB+h/2,lw[1],inputOn);
+    s+=wire(lw[2],yB+h/2,lw[3],inputOn);
+    s+=wire(lw[4],yB+h/2,lw[5],conduct);
+    s+=wire(lw[6],yB+h/2,lw[7],coilOn);
+    // 1 field input (pressable)
+    s+=node(xs[0],yB,nodeW,h,nm(primary.io,primary.idx)+(sym(primary.io,primary.idx)?(' · '+sym(primary.io,primary.idx)):''),inputOn?'● ON':'press to drive',(inputOn?'fl-node live ':'fl-node ')+(primary.io==='IX'?'press':''),`id="flowInput"`);
+    s+=`<text class="fl-badge" x="${xs[0]+nodeW/2}" y="${yB+h+16}" text-anchor="middle">${esc(inPath(primary.io))}</text>`;
+    // 2 i2c read
+    s+=node(xs[1],yB,nodeW,h,'I²C read',recent('0x59r')||recent('0x59R')?'@0x59 ▸':'opto ×8 @0x59',recent('0x59R')?'fl-node pulse':'fl-node');
+    // 3 logic scan
+    s+=node(xs[2],yB,nodeW,h,'Logic scan',conduct?'rung conducts':('NET '+(selNetIdx+1)),conduct?'fl-node live':'fl-node');
+    // 4 i2c write
+    s+=node(xs[3],yB,nodeW,h,'I²C write',recent('0x59W')?'@0x59 ▸':'AW9523 @0x59',recent('0x59W')?'fl-node pulse':'fl-node');
+    // 5 output + LED
+    s+=node(xs[4],yB,nodeW,h,nm(n.coil.io,n.coil.idx)+(sym(n.coil.io,n.coil.idx)?(' · '+sym(n.coil.io,n.coil.idx)):''),coilOn?'● energized':'output',coilOn?'fl-node live':'fl-node');
+    s+=`<circle class="fl-led ${coilOn?'on':''}" cx="${xs[4]+nodeW/2}" cy="${yB+h+22}" r="11"/>`;
+    svg.innerHTML=s;
+    if(hint)hint.textContent=connNow?(primary.io==='IX'?'Click the field input to drive it — watch the path energize the LED.':'This rung’s input is not a digital input; connect a client to drive it.'):'Connect twin (or USB) to drive it live. The structure is shown from your project.';
+    if(foot)foot.innerHTML=`<b>Network plane</b> (top) and <b>bus plane</b> (bottom) act on the <b>same points</b>: an HMI writing %${n.coil.io}${n.coil.idx} over Modbus/TCP and the ladder driving it over I²C are two paths to one output — that is the network-protocol vs bus-protocol distinction. Live network frames arrive with the Protocol workspace (next).`;
+  }
+
+  function pressInput(idx){
+    if(!((typeof conn!=='undefined')&&conn))return;
+    const want=!forcedByFlow[idx]; forcedByFlow[idx]=want;
+    try{rawSend('force IX'+idx+' '+(want?1:0));}catch(e){}
+    setTimeout(()=>{try{rawSend('io');}catch(e){}},120);
+  }
+  function startPoll(){ if(pollTimer)return; pollTimer=setInterval(()=>{ if((typeof conn!=='undefined')&&conn){try{rawSend('io');}catch(e){}} },600); }
+  function stopPoll(){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
+  function clearOurForces(){ Object.keys(forcedByFlow).forEach(i=>{ if(forcedByFlow[i]&&(typeof conn!=='undefined')&&conn){try{rawSend('force IX'+i+' 0');}catch(e){}} forcedByFlow[i]=false; }); }
+
+  function loop(){ if(!active)return; render(); requestAnimationFrame(()=>setTimeout(loop,140)); }
+
+  function setView(v){
+    active=(v==='flow');
+    app.classList.toggle('flow-active',active);
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-appview')===v));
+    if(active){ registerIo(); startPoll(); if(window.__liveBus&&!window.__liveBus.wanted){try{window.toggleLiveBus();}catch(e){}} loop(); }
+    else { stopPoll(); clearOurForces(); }
+  }
+  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setView(b.getAttribute('data-appview'))));
+  // press the field input — delegated on the stable <svg> (its innerHTML is replaced each frame)
+  svg.addEventListener('click',e=>{ if(e.target.closest&&e.target.closest('#flowInput')){ const nets=NS(),n=nets[selNetIdx],ins=n?contacts(n.expr):[],p=ins[0]; if(p&&p.io==='IX')pressInput(p.idx); } });
+  // rung selector (delegated)
+  document.getElementById('flowRungSel').addEventListener('click',e=>{const b=e.target.closest('button[data-ni]');if(b){selNetIdx=+b.getAttribute('data-ni');render();}});
+  setView('logic');
 })();
 </script>
 <script src="operator/vendor/three-r180.js"></script>
@@ -3761,7 +3924,7 @@ async function readLoop(){
 }
 function onLine(line){
   line=line.replace(/^(?:plc>\s*)+/,'').trim();
-  if(line.indexOf('@BUS')===0){try{heroBus(line);}catch(e){}return;}
+  if(line.indexOf('@BUS')===0){try{heroBus(line);}catch(e){} try{window.__flowBusEvent&&window.__flowBusEvent(line);}catch(e){} return;}
   if(acceptBusReply(line))return;
   if(line.startsWith('{')){try{if(JSON.parse(line).schema==='tbd.project-readback/v1'){log('Unsolicited application readback ignored; use Read installed application.','rx');return;}}catch{}}
   if(line.startsWith('[BUS]')){onBusLine(line);return;}
