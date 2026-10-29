@@ -12,7 +12,7 @@ Week-4 wind-turbine lab, applied to the StampLC — and it stands alone (no wind
   │ SCADA :8800   │                     │ twin + bridge │  QEMU StampLC twin
   └───────────────┘                     │  :502 Modbus  │  (real firmware)
   ┌───────────────┐   read + WRITE      │  :80  HTTP    │
-  │ engineer .30  │ ─── (CWE-306) ────▶ │  :8080 Studio │
+  │ engineer      │ ─── (CWE-306) ────▶ │  :8080 Studio │
   │ Modbus master │                     └───────────────┘
   └───────────────┘            ▲
   ┌───────────────┐            │ passive span
@@ -24,7 +24,7 @@ Week-4 wind-turbine lab, applied to the StampLC — and it stands alone (no wind
 |---|---|---|
 | **plc** (10.20.30.10) | the controller — the QEMU twin + bridge; its own Modbus/TCP and HTTP are bound on the plant network | 8080 Studio, 502 Modbus, 80 HTTP |
 | **hmi** (10.20.30.20) | a SCADA HMI that **polls the controller over Modbus** and shows a live dashboard | 8800 |
-| **engineer** (10.20.30.30) | an engineering / attacker workstation — a **Modbus master** that reads and (on the vulnerable build) writes the controller with no auth | — |
+| **engineer** (plant, dynamic IP) | an engineering / attacker workstation — a **Modbus master** that reads and (on the vulnerable build) writes the controller with no auth | — |
 | **capture** | a passive sniffer (Wireshark/tshark) that sees the Modbus frames between the stations | writes `captures/plant.pcap` |
 
 ## Run it
