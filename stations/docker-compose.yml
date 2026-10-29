@@ -71,6 +71,19 @@ services:
     #   docker compose -f stations/docker-compose.yml run --rm engineer python3 /app/engineer.py write-coil relay2 1
     #   docker compose -f stations/docker-compose.yml run --rm engineer python3 /app/engineer.py write-setpoint 321
 
+  mqtt:
+    build:
+      context: ../mqtt            # repo-root mqtt/ bridge (broker + sensor page + QR)
+    image: cs460/mqtt-bridge
+    networks:
+      plant:
+        ipv4_address: 10.20.30.40
+    ports:
+      - "8090:8090"              # the phone sensor page + QR + MQTT-over-WebSocket (make PUBLIC)
+      - "1883:1883"              # MQTT/TCP — the twin (plc) subscribes here
+    # Phones reach :8090 over the Codespace public forward and publish their sensors; the
+    # StampLC twin subscribes to phone/+/… at 10.20.30.40:1883 and maps chosen topics to %IW.
+
   capture:
     build:
       context: .

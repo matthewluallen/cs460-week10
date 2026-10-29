@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CS460 Phone Sensor Bridge</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+ :root{color-scheme:dark}
+ *{box-sizing:border-box}
+ body{margin:0;background:#0b0e14;color:#e7eef6;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      padding:22px 16px calc(22px + env(safe-area-inset-bottom));max-width:680px;margin:0 auto}
+ h1{font-size:19px;margin:0 0 2px}
+ .sub{color:#8aa0ba;font:12px ui-monospace,monospace;margin-bottom:18px}
+ .card{background:#121a28;border:1px solid #1e2a38;border-radius:14px;padding:16px;margin-bottom:14px}
+ .qr{display:flex;gap:16px;align-items:center}
+ .qr img{width:150px;height:150px;border-radius:10px;background:#fff;padding:6px}
+ .qr .t{font-size:13px;color:#9fb4cc}
+ button{appearance:none;border:0;border-radius:11px;padding:14px 18px;font-size:16px;font-weight:650;
+        background:#4d9fff;color:#05121f;width:100%;cursor:pointer}
+ button.stop{background:#ff7a7a}
+ button:disabled{opacity:.5}
+ .status{display:flex;align-items:center;gap:9px;font:13px ui-monospace,monospace;margin:4px 0 2px}
+ .dot{width:11px;height:11px;border-radius:50%;background:#2a3650;flex:none}
+ .dot.on{background:#5ff0b0;box-shadow:0 0 10px #5ff0b0}
+ .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+ .s{background:#0e1622;border:1px solid #1e2a38;border-radius:11px;padding:11px}
+ .s .k{font:11px ui-monospace,monospace;color:#8aa0ba;text-transform:uppercase;letter-spacing:.06em}
+ .s .v{font:17px/1.35 ui-monospace,monospace;color:#5ff0b0;margin-top:5px;word-break:break-all}
+ .s.na .v{color:#6b7f99}
+ .tp{font:11px ui-monospace,monospace;color:#6b7f99;margin-top:3px}
+ .note{color:#8aa0ba;font-size:12.5px;margin-top:6px}
+ code{color:#ffd166;font-family:ui-monospace,monospace}
+</style>
+</head>
+<body>
+<h1>CS460 Phone Sensor Bridge <span style="color:#4d9fff">· MQTT</span></h1>
+<div class="sub" id="where">connecting…</div>
+
+<div class="card qr" id="qrcard">
+  <img src="/qr.png" alt="QR to this page">
+  <div class="t"><b>On a laptop?</b> Scan this with a phone to open this page there, then tap
+  <b>Start sensors</b>. The phone streams its sensors to the broker; the M5StampLC in QEMU
+  subscribes to the ones it wants and maps them to <code>%IW</code> input registers.</div>
+</div>
+
+<div class="card">
+  <button id="go">Start sensors</button>
+  <div class="status" style="margin-top:12px"><span class="dot" id="bdot"></span><span id="bstat">broker: not connected</span></div>
+  <div class="status"><span class="dot" id="pdot"></span><span id="pstat">sensors: idle</span> · <span id="cnt">0 msgs</span></div>
+  <div class="note">Client id <code id="cid">—</code> · topics <code>phone/&lt;id&gt;/{accel,orient,light}</code></div>
+</div>
+
+<div class="grid" id="readout">
+  <div class="s na" id="s-accel"><div class="k">Accelerometer</div><div class="v">—</div><div class="tp">phone/…/accel</div></div>
+  <div class="s na" id="s-orient"><div class="k">Orientation</div><div class="v">—</div><div class="tp">phone/…/orient</div></div>
+  <div class="s na" id="s-light"><div class="k">Light</div><div class="v">—</div><div class="tp">phone/…/light</div></div>
+  <div class="s na" id="s-gyro"><div class="k">Rotation</div><div class="v">—</div><div class="tp">phone/…/gyro</div></div>
+</div>
+
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>
+const cid = 'ph-' + Math.random().toString(36).slice(2, 7);
+document.getElementById('cid').textContent = cid;
+const base = 'phone/' + cid;
+let client = null, count = 0, running = false;
+const el = id => document.getElementById(id);
+
+fetch('/whoami').then(r=>r.json()).then(j=>{ el('where').textContent = 'server: ' + j.url; }).catch(()=>{});
+
+function setCard(id, text, ok){ const c=el(id); c.querySelector('.v').textContent=text; c.classList.toggle('na',!ok); }
+function pub(topic, obj){
+  if(!client || !client.connected) return;
+  client.publish(base + '/' + topic, JSON.stringify(obj), {qos:0});
+  count++; el('cnt').textContent = count + ' msgs';
+}
+let lastPub = 0;
+function throttled(fn){ const now=Date.now(); if(now-lastPub>120){ lastPub=now; fn(); } } // ~8 Hz cap
+
+async function requestPerms(){
+  // iOS 13+ requires an explicit permission request from a user gesture.
+  try{ if(typeof DeviceMotionEvent!=='undefined' && DeviceMotionEvent.requestPermission)
+        await DeviceMotionEvent.requestPermission(); }catch(e){}
+  try{ if(typeof DeviceOrientationEvent!=='undefined' && DeviceOrientationEvent.requestPermission)
+        await DeviceOrientationEvent.requestPermission(); }catch(e){}
+}
+
+function startSensors(){
+  // --- motion: accelerometer (incl. gravity) + rotation rate ---
+  window.addEventListener('devicemotion', e=>{
+    const a=e.accelerationIncludingGravity||e.acceleration;
+    if(a && a.x!=null){
+      const mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
+      setCard('s-accel', `x ${a.x.toFixed(2)}  y ${a.y.toFixed(2)}  z ${a.z.toFixed(2)}  |${mag.toFixed(2)}|`, true);
+      throttled(()=>pub('accel', {x:+a.x.toFixed(3),y:+a.y.toFixed(3),z:+a.z.toFixed(3),mag:+mag.toFixed(3)}));
+    }
+    const r=e.rotationRate;
+    if(r && r.alpha!=null){
+      setCard('s-gyro', `α ${(r.alpha||0).toFixed(1)}  β ${(r.beta||0).toFixed(1)}  γ ${(r.gamma||0).toFixed(1)}`, true);
+      throttled(()=>pub('gyro', {alpha:+(r.alpha||0).toFixed(2),beta:+(r.beta||0).toFixed(2),gamma:+(r.gamma||0).toFixed(2)}));
+    }
+  });
+  // --- orientation (tilt / compass) ---
+  window.addEventListener('deviceorientation', e=>{
+    if(e.alpha==null && e.beta==null) return;
+    setCard('s-orient', `α ${(e.alpha||0).toFixed(1)}  β ${(e.beta||0).toFixed(1)}  γ ${(e.gamma||0).toFixed(1)}`, true);
+    throttled(()=>pub('orient', {alpha:+(e.alpha||0).toFixed(2),beta:+(e.beta||0).toFixed(2),gamma:+(e.gamma||0).toFixed(2)}));
+  });
+  // --- ambient light (Chrome/Android w/ Generic Sensor; often unavailable — graceful) ---
+  try{
+    if('AmbientLightSensor' in window){
+      const als=new AmbientLightSensor({frequency:5});
+      als.addEventListener('reading',()=>{ setCard('s-light', als.illuminance.toFixed(0)+' lux', true);
+        throttled(()=>pub('light', {lux:+als.illuminance.toFixed(1)})); });
+      als.addEventListener('error',()=> setCard('s-light','sensor blocked',false));
+      als.start();
+    } else {
+      window.addEventListener('devicelight', e=>{ setCard('s-light', e.value.toFixed(0)+' lux', true);
+        throttled(()=>pub('light',{lux:+e.value.toFixed(1)})); });
+      setTimeout(()=>{ const c=el('s-light'); if(c.classList.contains('na')) c.querySelector('.v').textContent='not available on this device'; }, 2500);
+    }
+  }catch(e){ setCard('s-light','not available',false); }
+  el('pdot').classList.add('on'); el('pstat').textContent='sensors: streaming';
+}
+
+el('go').onclick = async () => {
+  if(running){ // stop
+    running=false; el('go').textContent='Start sensors'; el('go').classList.remove('stop');
+    el('pdot').classList.remove('on'); el('pstat').textContent='sensors: stopped';
+    if(client) client.end(true); el('bdot').classList.remove('on'); el('bstat').textContent='broker: not connected';
+    return;
+  }
+  el('go').disabled=true;
+  await requestPerms();
+  const url=(location.protocol==='https:'?'wss://':'ws://')+location.host;
+  client = mqtt.connect(url, {clientId:cid, reconnectPeriod:2000, keepalive:30});
+  client.on('connect', ()=>{ el('bdot').classList.add('on'); el('bstat').textContent='broker: connected ('+location.host+')';
+    el('go').disabled=false; running=true; el('go').textContent='Stop'; el('go').classList.add('stop');
+    pub('hello',{ua:navigator.userAgent.slice(0,60),ts:Date.now()}); startSensors(); });
+  client.on('reconnect', ()=> el('bstat').textContent='broker: reconnecting…');
+  client.on('error', e=>{ el('bstat').textContent='broker error: '+(e.message||e); el('go').disabled=false; });
+};
+</script>
+</body>
+</html>

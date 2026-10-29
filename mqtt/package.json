@@ -1,0 +1,12 @@
+{
+  "name": "cs460-mqtt-bridge",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Phone-sensor MQTT bridge: broker (TCP + WebSocket) + sensor web page + dynamic QR.",
+  "main": "server.js",
+  "dependencies": {
+    "aedes": "0.51.3",
+    "websocket-stream": "5.5.2",
+    "qrcode": "1.5.4"
+  }
+}
