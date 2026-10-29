@@ -44,8 +44,8 @@ services:
 
   hmi:
     build:
-      context: ..               # repo root, so stations/lib + stations/hmi are both in context
-      dockerfile: stations/hmi/Dockerfile
+      context: .                # the stations/ dir, so lib/ and hmi/ are both in context
+      dockerfile: hmi/Dockerfile
     image: cs460/hmi-station
     environment:
       - PLC_HOST=10.20.30.10
@@ -58,8 +58,8 @@ services:
 
   engineer:
     build:
-      context: ..
-      dockerfile: stations/engineer/Dockerfile
+      context: .
+      dockerfile: engineer/Dockerfile
     image: cs460/engineer-station
     environment:
       - PLC_HOST=10.20.30.10
@@ -73,8 +73,8 @@ services:
 
   capture:
     build:
-      context: ..
-      dockerfile: stations/capture/Dockerfile
+      context: .
+      dockerfile: capture/Dockerfile
     image: cs460/capture-station
     network_mode: host           # see unicast traffic BETWEEN containers on the plant bridge
     cap_add: [NET_ADMIN, NET_RAW]
