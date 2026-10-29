@@ -75,6 +75,19 @@ static bool     s_enabled = false;
 static uint32_t s_seq = 0;
 static uint32_t s_lastPub = 0;
 static uint32_t s_lastTry = 0;
+static uint32_t s_lastRgb = 0;
+
+// Publish the ladder-driven display color (relay0->R, relay1->G, relay2->B) so a phone that
+// subscribes to stamplc/display/rgb paints its background from the PLC logic. Retained so a
+// freshly-connected phone gets the current color immediately.
+static void sp_publish_rgb() {
+    uint8_t r = modbus_server.get_coil(1) ? 255 : 0;   // RELAY0 -> R
+    uint8_t g = modbus_server.get_coil(2) ? 255 : 0;   // RELAY1 -> G
+    uint8_t b = modbus_server.get_coil(3) ? 255 : 0;   // RELAY2 -> B
+    char j[48];
+    int n = snprintf(j, sizeof(j), "{\"r\":%u,\"g\":%u,\"b\":%u}", r, g, b);
+    mqtt_runtime_publish("stamplc/display/rgb", (const uint8_t*)j, n, 0, true);
+}
 
 static void topic(char* out, size_t n, const char* msgtype) {
     snprintf(out, n, "spBv1.0/%s/%s/%s", s_group, msgtype, s_node);   // .../<msgtype>/<edge>
@@ -144,4 +157,5 @@ void mqtt_sparkplug_poll() {
     }
     const uint32_t now = millis();
     if (now - s_lastPub >= 2000) { s_lastPub = now; sp_publish("DDATA"); }
+    if (now - s_lastRgb >= 400) { s_lastRgb = now; sp_publish_rgb(); }   // logic -> phone background
 }

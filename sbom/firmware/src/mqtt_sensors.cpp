@@ -11,6 +11,8 @@ namespace {
 int32_t  s_light = 0, s_accel_x100 = 0, s_tilt = 0;
 uint32_t s_last = 0;
 bool     s_have = false;
+int32_t  s_btn1 = 0, s_btn2 = 0;
+uint32_t s_btn_last = 0;
 
 // Minimal, allocation-free JSON scalar extractor: find "<key>" then parse the number that
 // follows a ':' . Only what a phone publishes ({"lux":..},{"mag":..},{"beta":..}); not a
@@ -50,6 +52,10 @@ void mqtt_sensors_ingest(const char* topic, const uint8_t* payload, size_t len) 
         if (json_num(s, len, "mag", v)) { s_accel_x100 = (int32_t)lround(v * 100.0); s_have = true; s_last = millis(); }
     } else if (!strcmp(sensor, "orient")) {
         if (json_num(s, len, "beta", v)) { s_tilt = (int32_t)lround(v); s_have = true; s_last = millis(); }
+    } else if (!strcmp(sensor, "btn1")) {
+        if (json_num(s, len, "v", v)) { s_btn1 = v != 0 ? 1 : 0; s_btn_last = millis(); }
+    } else if (!strcmp(sensor, "btn2")) {
+        if (json_num(s, len, "v", v)) { s_btn2 = v != 0 ? 1 : 0; s_btn_last = millis(); }
     }
 }
 
@@ -57,6 +63,13 @@ void mqtt_sensors_subscribe() {
     mqtt_runtime_subscribe("phone/+/light", 0);
     mqtt_runtime_subscribe("phone/+/accel", 0);
     mqtt_runtime_subscribe("phone/+/orient", 0);
+    mqtt_runtime_subscribe("phone/+/btn1", 0);
+    mqtt_runtime_subscribe("phone/+/btn2", 0);
+}
+
+bool mqtt_sensors_btn(int n) {
+    if (millis() - s_btn_last > 10000) return false;   // safety: release if the phone goes quiet
+    return n == 1 ? s_btn1 != 0 : s_btn2 != 0;
 }
 
 bool mqtt_sensors_fresh() { return s_have && (millis() - s_last < 8000); }

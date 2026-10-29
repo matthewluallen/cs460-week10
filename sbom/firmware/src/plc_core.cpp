@@ -380,6 +380,10 @@ void plc_core_scan() {
         modbus_server.set_coil(pointmap::DI_MIRROR_BASE + i, value);
         g_engine.set_input(i, value);
     }
+    // Phone-as-input: a subscribed phone's momentary buttons OR into %IX6 / %IX7 so the
+    // ladder sees a phone press exactly like a hardwired digital input (aged out when quiet).
+    if (mqtt_sensors_btn(1)) { g_engine.set_input(6, true); modbus_server.set_coil(pointmap::DI_MIRROR_BASE + 6, true); }
+    if (mqtt_sensors_btn(2)) { g_engine.set_input(7, true); modbus_server.set_coil(pointmap::DI_MIRROR_BASE + 7, true); }
     g_engine.set_analog(pointmap::IW_BASE_TEMPERATURE, s_tempx10);          // program temp interlock reads IW0
     g_engine.set_analog(pointmap::IW_TEMPERATURE_SETPOINT, int16_t(modbus_server.get_register(pointmap::SETPOINT_TEMPX10)));
     g_engine.set_analog(pointmap::IW_HIGH_TEMPERATURE_LIMIT, int16_t(modbus_server.get_register(pointmap::ALARM_TEMPX10)));

@@ -22,3 +22,6 @@ bool mqtt_sensors_fresh();
 int16_t mqtt_sensors_light_x1();
 int16_t mqtt_sensors_accel_mag_x100();
 int16_t mqtt_sensors_tilt_beta();
+
+// Momentary phone push-buttons (n = 1 or 2): true while pressed, aged out to released.
+bool mqtt_sensors_btn(int n);
