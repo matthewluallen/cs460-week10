@@ -25,6 +25,7 @@ enum Op : uint8_t {
   OP_FBQ,       // arg=inst               push instance Q (last value)
   OP_DROP,      // pop and discard        (toolchain: FB-call statement result)
   OP_TOF,       // arg=inst, arg2=preset  pop IN, update TOF (off-delay), push Q
+  OP_FTRIG,     // arg=inst               pop CLK, push falling edge
 };
 
 struct Instr { uint8_t op; int32_t a; int32_t b; };
