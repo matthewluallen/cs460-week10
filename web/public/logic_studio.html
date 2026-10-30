@@ -631,6 +631,7 @@ body.hero-collapsed #heroStrip{display:flex}
     <button class="pbtn" data-ins="orbranch" title="Parallel OR branch on selected network">⑃ <span>OR branch</span></button>
     <button class="pbtn" data-ins="coil" title="Set the network's coil">( ) <span>Coil</span></button>
     <button class="pbtn" data-ins="srlatch" title="Set/Reset latch — the output stays ON after a Set pulse until Reset. Builds the standard seal-in rung: QX := Set OR (QX AND NOT Reset).">⊣S/R⊢ <span>S/R latch</span></button>
+    <button class="pbtn" data-ins="xor" title="Exclusive-OR — output is ON when exactly one input is ON. Builds the standard ladder XOR: (A AND NOT B) OR (NOT A AND B).">⊕ <span>XOR</span></button>
     <span class="sep"></span>
     <button class="pbtn" data-ins="net" title="Add a network">＋ <span>Network</span></button>
     <button class="pbtn" data-ins="startup" id="bStartup" title="Add an explicit boot-admission declaration outside scan logic">↻ <span>Reboot RUN</span></button>
@@ -2655,6 +2656,21 @@ function insertElement(kind){
                  'S/R latch — Set OR (hold AND NOT Reset)');
     PROG.nets.push(nn); selNet=nn.id; rebuildFromModel();
     openContactEditor(setC, rebuildFromModel);        // pick the Set input first
+    return;
+  }
+  if(kind==='xor'){
+    // Exclusive-OR, built as the canonical two-branch ladder XOR (no new runtime op;
+    // the IR also has OP_XOR, but this form is what every ladder textbook shows and it
+    // compiles/simulates/round-trips with the existing elements):
+    //   QX0 := (A AND NOT B) OR (NOT A AND B)
+    // A appears twice (NO in one branch, NC in the other); keep both A's — and both B's —
+    // on the same input if you change them.
+    const a1=contact('IX',0,false), b1=contact('IX',1,true);   // A AND NOT B
+    const a2=contact('IX',0,true),  b2=contact('IX',1,false);  // NOT A AND B
+    const nn=net(par([series([a1,b1]), series([a2,b2])]), {io:'QX',idx:0,neg:false},
+                 'XOR — output ON when exactly one input is ON');
+    PROG.nets.push(nn); selNet=nn.id; rebuildFromModel();
+    openContactEditor(a1, rebuildFromModel);          // pick input A first
     return;
   }
   const n=PROG.nets.find(x=>x.id===selNet)||PROG.nets[PROG.nets.length-1];
