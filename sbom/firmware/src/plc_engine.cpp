@@ -28,13 +28,14 @@ const char* validate_program(const Instr* prog, int n) {
       case OP_DROP: need = 1; break;
       case OP_TON: case OP_TOF: uses_b = true; // fall through
       case OP_RTRIG: case OP_FTRIG: need = 1; produced = 1; limit = NINST; break;
+      case OP_CTUD: uses_b = true; need = 4; produced = 1; limit = NINST; break;
       case OP_FBQ: limit = NINST; produced = 1; break;
       default: return "opcode";
     }
     if (limit && (c.a < 0 || c.a >= limit)) return "index";
     if (!limit && !uses_a && c.a != 0) return "unused operand";
     if (uses_b ? c.b < 0 : c.b != 0) return "preset/unused operand";
-    if (c.op == OP_TON || c.op == OP_TOF || c.op == OP_RTRIG || c.op == OP_FTRIG) {
+    if (c.op == OP_TON || c.op == OP_TOF || c.op == OP_RTRIG || c.op == OP_FTRIG || c.op == OP_CTUD) {
       if (fb_kind[c.a] && fb_kind[c.a] != c.op) return "FB type conflict";
       fb_kind[c.a] = c.op;
     }
@@ -115,6 +116,26 @@ bool Engine::scan(const Instr* prog, int n, uint32_t now_ms) {
         f.q = (!clk && f.prev);
         f.prev = clk;
         push(f.q ? 1:0);
+      } break;
+      case OP_CTUD: {                       // IEC up/down counter
+        FbInst& f = inst_[c.a];
+        // operands pushed in order CU,CD,R,LD -> stack top is LD
+        bool ld = (pop()!=0);
+        bool r  = (pop()!=0);
+        bool cd = (pop()!=0);
+        bool cu = (pop()!=0);
+        bool cu_edge = (cu && !f.prev);
+        bool cd_edge = (cd && !f.prevd);
+        f.prev = cu; f.prevd = cd;
+        if (r) f.cv = 0;
+        else if (ld) f.cv = c.b;            // load preset
+        else {
+          if (cu_edge && !cd_edge && f.cv < 32767)  f.cv++;
+          else if (cd_edge && !cu_edge && f.cv > -32768) f.cv--;
+        }
+        f.q  = (f.cv >= c.b);               // QU: reached preset
+        f.qd = (f.cv <= 0);                 // QD: down to/below zero
+        push(f.q ? 1:0);                    // main line output = QU
       } break;
       default: reset(); return false;
     }

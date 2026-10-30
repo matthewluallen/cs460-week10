@@ -26,6 +26,7 @@ enum Op : uint8_t {
   OP_DROP,      // pop and discard        (toolchain: FB-call statement result)
   OP_TOF,       // arg=inst, arg2=preset  pop IN, update TOF (off-delay), push Q
   OP_FTRIG,     // arg=inst               pop CLK, push falling edge
+  OP_CTUD,      // arg=inst, arg2=PV      pop CU,CD,R,LD; update CV; push QU
 };
 
 struct Instr { uint8_t op; int32_t a; int32_t b; };
@@ -38,11 +39,14 @@ static const int MAX_INSTRUCTIONS = 64, STACK_CAPACITY = 64;
 // validation covers dead code; stack validation covers the reachable prefix.
 const char* validate_program(const Instr* prog, int n);
 
-struct FbInst {         // one function-block instance (TON or R_TRIG)
-  bool     q = false;   // current output
-  bool     prev = false;// previous input (edge detect / TON IN latch)
+struct FbInst {         // one function-block instance (timer / edge / counter)
+  bool     q = false;   // current output (QU for CTUD)
+  bool     prev = false;// previous input (edge detect / TON IN latch / CU edge)
   uint32_t t0 = 0;      // TON start millis
   bool     running = false;
+  int32_t  cv = 0;      // CTUD current count value
+  bool     prevd = false;// previous CD input (CTUD down-edge detect)
+  bool     qd = false;  // CTUD down output (CV <= 0)
 };
 
 class Engine {
@@ -59,6 +63,8 @@ class Engine {
   bool     fbq(int i) const       { return (i>=0 && i<NINST) ? inst_[i].q : false; }
   bool     fbrunning(int i) const { return (i>=0 && i<NINST) ? inst_[i].running : false; }
   uint32_t fbt0(int i) const      { return (i>=0 && i<NINST) ? inst_[i].t0 : 0; }
+  int32_t  fbcv(int i) const      { return (i>=0 && i<NINST) ? inst_[i].cv : 0; }
+  bool     fbqd(int i) const      { return (i>=0 && i<NINST) ? inst_[i].qd : false; }
   bool mem(int i) const           { return (i>=0 && i<NMX)? mx_[i] : false; }
   // Run one scan of the loaded program.
   bool scan(const Instr* prog, int n, uint32_t now_ms);
