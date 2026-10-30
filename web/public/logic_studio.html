@@ -526,8 +526,10 @@ body.hero-collapsed #heroBand{display:none}
 body.hero-collapsed [aria-label="Controller status"],
 body.hero-collapsed #controllerModeHelp,
 body.hero-collapsed #executionPanel{display:none}
-/* and tuck the project-workspace actions behind a disclosure so only title+state show */
-body.hero-collapsed section.controller-status[aria-label="Project workspace"]{font-size:11.5px;padding-top:4px;padding-bottom:4px}
+/* the project line merges into the compact strip (project name shown there);
+   the full project band returns when Overview is expanded */
+body.hero-collapsed section.controller-status[aria-label="Project workspace"]{display:none}
+#heroStrip .hs-sep{width:1px;align-self:stretch;min-height:13px;background:var(--line2)}
 /* slim status strip, shown only when the overview is collapsed */
 #heroStrip{display:none;align-items:center;gap:8px 16px;flex-wrap:wrap;padding:6px 14px;background:linear-gradient(180deg,var(--panel2),var(--panel));border-bottom:1px solid var(--line);font:600 11.5px/1 var(--mono);color:var(--ink2);flex:0 0 auto}
 body.hero-collapsed #heroStrip{display:flex}
@@ -572,6 +574,7 @@ body.hero-collapsed #heroStrip{display:flex}
           <button class="btn" id="bSensors">Grove devices</button>
           <div class="menu-sep"></div>
           <div class="menu-lbl">Program &amp; tables</div>
+          <button class="btn" id="bProjectSettings" disabled>Project settings</button>
           <button class="btn" id="bProjectModules" disabled>Modules &amp; sources</button>
           <button class="btn" id="bCompile">Application artifact</button>
           <button class="btn" id="bSFC">◇ SFC</button>
@@ -622,6 +625,8 @@ body.hero-collapsed #heroStrip{display:flex}
   </section>
 
   <div id="heroStrip" aria-label="Controller overview (compact)">
+    <strong id="hsProjName" style="color:var(--ink);font-weight:700;letter-spacing:0" title="Open project is under Project ▾ / Examples; expand Overview for settings and readback">No project</strong>
+    <span class="hs-sep"></span>
     <span class="hs-mode" id="hsMode"><span class="d"></span><span id="hsModeT">Unknown</span></span>
     <span><span class="hs-k">conn</span> <span id="hsConn">—</span></span>
     <span><span class="hs-k">scan</span> <span id="hsScan">—</span></span>
@@ -634,7 +639,6 @@ body.hero-collapsed #heroStrip{display:flex}
     <strong id="projectTitle">No project open</strong>
     <span id="projectState" role="status">Open a project to inspect its logic and settings.</span>
     <button class="btn" id="bOpenProject">Open project…</button>
-    <button class="btn" id="bProjectSettings" disabled>Project settings</button>
   </section>
 
   <div class="controller-status" aria-label="Controller status">
@@ -4524,6 +4528,7 @@ function renderControllerStatus(){
   document.getElementById('controllerIdentity').textContent='Firmware profile: '+(profile||'not read / stale')+(projectFresh&&projectReadback?.elf_sha256?' · firmware ELF '+projectReadback.elf_sha256.slice(0,12):'')+' · installed application: '+(!projectFresh?'unverified':!projectReadback?.installed?'none':projectReadback.project_id+' revision '+projectReadback.project_revision+(matched?' · matches project':' · differs / not verified'));
   document.getElementById('controllerIdentity').title=projectFresh&&projectReadback?.payload_sha256?'Controller-reported payload SHA-256: '+projectReadback.payload_sha256+'; ELF SHA-256: '+(projectReadback.elf_sha256||'unavailable'):'Read installed application for identity; this does not authenticate the controller.';
   document.getElementById('projectTitle').textContent=PROJECT?PROJECT.name+' · revision '+PROJECT.revision:'No project open';
+  {const hp=document.getElementById('hsProjName');if(hp)hp.textContent=PROJECT?PROJECT.name:'No project';}
   document.getElementById('projectState').textContent=(!PROJECT?'Open a project to inspect its logic and settings.':projectNeedsReview?'Migrated file: review and save settings before loading.':matched&&projectFresh?(projectReadback.run_ready===true?'Installed application matches. Current mode: '+projectReadback.mode+'. Controller reports ready.':'Installed application matches. RUN unavailable: '+(projectReadback.readiness_reason||'readiness not reported')):'Workspace only / changed: validate, load, then read back the application.')+(PROJECT?' Reboot request: '+(PROG.startup?.mode==='run'?'RUN when ready (explicit startup rung).':'PROGRAM (default or explicit).'):'');
   const startup=projectFresh?projectReadback?.startup:null;
   const startupStates={disabled:'No automatic RUN request.',awaiting_reboot:'Saved RUN declaration awaits a later reboot; loading did not start RUN.',pending:'Startup RUN request is waiting for readiness (30 second limit).',started:'Startup entered RUN earlier in this boot; current reported mode is '+projectReadback?.mode+'.',cancelled:'This boot’s pending startup request was cancelled. Future reboot behavior still follows the installed declaration.',blocked:'Startup request was blocked; remain in PROGRAM until an explicit operator decision.'};
@@ -4932,7 +4937,7 @@ document.querySelectorAll('#palette .pbtn').forEach(b=>b.onclick=()=>insertEleme
 (function(){
   const seg=document.getElementById('palTier'); if(!seg)return;
   const hint=document.getElementById('palTierHint');
-  let tier=1; try{const s=localStorage.getItem('cs460_pal_tier'); if(s!==null&&/^[0-2]$/.test(s))tier=+s;}catch(e){}
+  let tier=0; try{const s=localStorage.getItem('cs460_pal_tier'); if(s!==null&&/^[0-2]$/.test(s))tier=+s;}catch(e){}
   const HINTS=[
     'Basic — the five pieces to build a working rung. Switch to Standard or Full when you need more.',
     'Standard — timers, counters, edges and compare, grouped by what they do. Analog math and PID are under Full.',
