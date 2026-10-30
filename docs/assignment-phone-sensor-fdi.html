@@ -1,0 +1,38 @@
+<h2 style="color:#13325b;">Part 5.5 &middot; You are the sensor &mdash; and the attacker (phone-sensor lab)</h2>
+<p><em>Runs on the MQTT phone-sensor bridge (the QR page). No extra hardware &mdash; your own phone is the sensor and the attack tool. Pairs with the <strong>Signal Journey</strong> view in the Logic Studio toolbar.</em></p>
+
+<div style="border-left:5px solid #e64100;background:#fff5f0;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;">
+<p style="margin:0;"><strong>The setup.</strong> Scan the bridge QR with your phone, connect to the broker, and <strong>Share</strong> a sensor (light, motion, or orientation &mdash; the ones tagged <em>used by logic</em>). The M5StampLC twin subscribes to it and maps it into an input register (<code>%IW</code>) your ladder can read. You are now a field instrument on the plant. Then you will attack the plant you are part of &mdash; two different ways.</p>
+</div>
+
+<h3 style="color:#13325b;">Attack A &mdash; Availability: take the sensor away</h3>
+<p>With your sensor feeding a rung, press <strong>Transmit &rarr; OFF</strong>. Watch the controller: after the freshness window (~8&nbsp;s) the point <strong>ages out</strong> and the logic loses the reading. What does your program do when an input it trusts simply stops &mdash; hold last value, fault, fail open, fail closed? Find the answer in <em>your</em> logic, not in the prose.</p>
+<ul>
+<li><strong>SHOW</strong> &mdash; the controller state (or <code>io</code> / the point readout) before and after you cut transmission; the stale/aged indication.</li>
+<li><strong>SAY</strong> &mdash; what the logic did with the missing input, and whether that is safe.</li>
+<li><strong>WHY</strong> &mdash; the real-world consequence of a sensor that drops out, and the design that makes the safe behavior <em>guaranteed</em> rather than accidental (watchdog / last-good timeout / fail-safe default).</li>
+</ul>
+<p style="font-size:14px;"><strong>Maps to:</strong> CWE-1150 / availability failure of a critical function; ATT&amp;CK for ICS <strong>T0815 Denial of View</strong>, <strong>T0814 Denial of Service</strong>; defender D3FEND / CIE: liveness checks on every critical input.</p>
+
+<h3 style="color:#13325b;">Attack B &mdash; Integrity: make it lie</h3>
+<p>Set <strong>Override &rarr; spoof</strong> and drag the slider to a value you choose. Your phone now publishes a value <em>you</em> decided while the plant believes it &mdash; <strong>false-data injection</strong>. Drive the logic across a threshold it guards (e.g. hold a level/tilt below an alarm limit while the real reading is past it) and show the logic making the wrong call on good-looking data.</p>
+<ul>
+<li><strong>SHOW</strong> &mdash; the spoofed value on the wire (the bridge log / an MQTT or Wireshark capture of <code>phone/&lt;id&gt;/&lt;sensor&gt;</code>), and the controller acting on it. Note the card reads <em>&ldquo;SPOOFED 20 (real&nbsp;&asymp;&nbsp;512)&rdquo;</em> &mdash; the phone knows it is lying; the wire does not.</li>
+<li><strong>SAY</strong> &mdash; which lenses in the Signal Journey still catch this and which do not. (The byte <em>is</em> on the wire, <em>is</em> in the <code>SRC_WEB</code>/MQTT log, <em>is</em> attributable to your phone &mdash; and is still false.)</li>
+<li><strong>WHY</strong> &mdash; why &ldquo;it&rsquo;s logged and attributable&rdquo; does not mean &ldquo;it&rsquo;s true,&rdquo; and what independent check would have caught it: a second sensor, a physical limit (float switch / hard stop), a rate-of-change / plausibility gate.</li>
+</ul>
+<p style="font-size:14px;"><strong>Maps to:</strong> CWE-20 (improper input validation), <strong>CWE-345</strong> (insufficient verification of data authenticity), CWE-1254 (no plausibility check); ATT&amp;CK for ICS <strong>T0856 Spoof Reporting Message</strong>, <strong>T0855 Unauthorized Command Message</strong> (the button path); CAPEC-148 (content spoofing).</p>
+
+<h3 style="color:#13325b;">Then defend it</h3>
+<p>Add a <strong>plausibility gate</strong> to your logic (range + rate-of-change limit, or a cross-check against a second input) so a spoofed value is rejected or flagged instead of acted on &mdash; and prove the <em>legitimate</em> reading still works afterward. This is the same move as the Modbus REMOTE-mode gate (CWE-306) one layer up: don&rsquo;t trust an input just because it arrived.</p>
+
+<div style="border:1px solid #1a7f37;border-left:6px solid #1a7f37;background:#f2fbf4;padding:10px 14px;margin:12px 0;border-radius:6px;">
+<p style="margin:0;"><strong>CYBER-INFORMED ENGINEERING &mdash; don&rsquo;t trust a single sensor.</strong> Every value entering control logic is a claim, not a fact. A safety-critical decision needs redundant, independent, or physically-bounded measurement &mdash; so that one phone (or one compromised transmitter) cannot talk the plant into the wrong state. Where in <em>your</em> design does one unverified input decide something that matters?</p>
+</div>
+
+<h3 style="color:#13325b;">What to submit</h3>
+<ul>
+<li>Attack A and Attack B each with a <strong>Show / Say / Why</strong> and evidence (captures/screenshots of the wire + the controller).</li>
+<li>Your <strong>plausibility gate</strong>: the rung/ST, the spoof it now rejects, and proof the legitimate reading still passes.</li>
+<li>One paragraph tying it to the <strong>Signal Journey</strong>: for the spoof, name the lens that fails to catch it and the lens (or independent check) that does.</li>
+</ul>
