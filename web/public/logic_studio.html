@@ -577,6 +577,7 @@ body.hero-collapsed #heroStrip{display:flex}
     <span><span class="hs-k">conn</span> <span id="hsConn">—</span></span>
     <span><span class="hs-k">scan</span> <span id="hsScan">—</span></span>
     <span><span class="hs-k">bus/s</span> <span id="hsBus">—</span></span>
+    <span class="hs-live" id="hsEnlarge" title="Open the StampLC screen large enough to read and interact with">⤢ PLC screen</span>
     <span class="hs-live" id="hsLive" title="Stream real @BUS transactions to the overview scope">go live ▸</span>
   </div>
 
@@ -866,8 +867,10 @@ body.hero-collapsed #heroStrip{display:flex}
     if(btn)btn.title=(collapsed?'Show the overview band (device panel, live bus scope, stats)':'Hide the overview band to give the ladder and text more room');
   }
   let stored=null; try{stored=localStorage.getItem(KEY);}catch(e){}
-  // default: collapsed on short screens so the ladder/ST aren't squeezed; remember the choice
-  const start = stored===null ? (window.innerHeight<900) : (stored==='1');
+  // default: collapsed so the ladder + ST editor get the vertical room (the editor is the work;
+  // the device panel/scope/stats are reference — expand them on demand, choice is remembered).
+  // The PLC screen stays reachable while collapsed via the "Enlarge PLC screen" control.
+  const start = stored===null ? true : (stored==='1');
   apply(start);
   if(btn)btn.addEventListener('click',()=>{ const c=!document.body.classList.contains('hero-collapsed'); apply(c); try{localStorage.setItem(KEY,c?'1':'0');}catch(e){} });
   const sl=document.getElementById('hsLive'); if(sl)sl.addEventListener('click',()=>{try{window.toggleLiveBus&&window.toggleLiveBus();}catch(e){}});
@@ -875,8 +878,39 @@ body.hero-collapsed #heroStrip{display:flex}
   const CK='tbd.consoleCollapsed', cons=document.querySelector('.console'), ctog=document.getElementById('bConsoleToggle');
   function capply(c){ if(cons)cons.classList.toggle('collapsed',c); if(ctog){ctog.textContent=c?'▸':'▾';ctog.title=(c?'Expand the console':'Collapse the console to give the ladder more room');} }
   let cstored=null; try{cstored=localStorage.getItem(CK);}catch(e){}
-  capply(cstored==='1');
+  // default: console collapsed so the ladder/ST get the room; remember the choice
+  capply(cstored===null ? true : cstored==='1');
   if(ctog)ctog.addEventListener('click',()=>{ const c=!cons.classList.contains('collapsed'); capply(c); try{localStorage.setItem(CK,c?'1':'0');}catch(e){} });
+})();
+</script>
+<script>
+// ===== Enlarge the StampLC screen: a big, crisp, live view of the on-device LCD =====
+// The hero LCD canvas is 960x540 but shown ~176px wide, so its text is unreadable. This pops
+// it to a readable size (live, copied from the hero canvas each frame) with working A/B/C keys,
+// and stays reachable from the compact strip when the overview is collapsed.
+(function(){
+  function enlargeLcd(){
+    if(typeof showModal!=='function')return;
+    showModal(`<h3>StampLC screen</h3><div class="body">
+      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 10px">A live, readable view of the on-device LCD. <b>A · B · C</b> drive the real device buttons — step through its menus just like on the bench.</p>
+      <div style="background:#0b0e13;border:1px solid #000;border-radius:10px;padding:14px;max-width:660px;margin:0 auto">
+        <canvas id="lcdBig" width="960" height="540" style="display:block;width:100%;border:2px solid #05070a;border-radius:6px;background:#0E1116;image-rendering:pixelated"></canvas>
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <button class="key" id="lbA" style="flex:1;height:38px">A</button>
+          <button class="key" id="lbB" style="flex:1;height:38px">B</button>
+          <button class="key" id="lbC" style="flex:1;height:38px">C</button>
+        </div>
+      </div>
+      <div class="row" style="justify-content:center;margin-top:14px"><button class="btn" onclick="closeModal()">Close</button></div>
+    </div>`);
+    const big=document.getElementById('lcdBig'), src=document.getElementById('heroLcd');
+    if(big&&src){ const bc=big.getContext('2d'); bc.imageSmoothingEnabled=false;
+      (function loop(){ if(!document.getElementById('lcdBig'))return; try{bc.drawImage(src,0,0,960,540);}catch(e){} requestAnimationFrame(loop); })(); }
+    [['lbA','hkA'],['lbB','hkB'],['lbC','hkC']].forEach(([a,b])=>{ const x=document.getElementById(a),y=document.getElementById(b); if(x&&y)x.onclick=()=>y.click(); });
+  }
+  window.enlargeLcd=enlargeLcd;
+  const strip=document.getElementById('hsEnlarge'); if(strip)strip.addEventListener('click',enlargeLcd);
+  const lcd=document.getElementById('heroLcd'); if(lcd){ lcd.style.cursor='zoom-in'; lcd.title='Click to enlarge the PLC screen'; lcd.addEventListener('click',enlargeLcd); }
 })();
 </script>
 <script>
