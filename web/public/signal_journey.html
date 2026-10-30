@@ -96,6 +96,9 @@ pre.src .ln.hit b{color:var(--code)}
 .deeper{font-size:11px;color:var(--muted);cursor:pointer;user-select:none;margin-top:2px}
 .deeper:hover{color:var(--ink2)}
 .deeper b{color:var(--code)}
+ .ghidratgt{font:11.5px/1.5 var(--mono);color:#d9c7ff;background:#191433;border:1px solid #3a2e5c;border-radius:7px;padding:7px 9px;margin-bottom:7px}
+ .ghidratgt code{color:#c6a4ff}
+ .gh-note{color:var(--muted)}
 .hidden{display:none}
 
 /* absent / spoof overlays */
@@ -153,6 +156,11 @@ pre.src .ln.hit b{color:var(--code)}
 <script>
 const INLINE = {"prov_meta": {"generated_utc": "2026-10-30T18:06:44Z", "source": "sbom/firmware/src/*.cpp plc_log() call sites", "live_feed": "/api/log  (web_api_log_json) and serial 'log' / busstream", "note": "STATIC half of the Logic-Studio association. A live /api/log line is matched to a row by its 'match' regex -> source file:line + CWE. An output change with no matching WRITE/FORCE row is the provenance gap that reveals an unaudited (memory-corruption) write.", "count": 56}, "snip": {"modbus_tcp_server.cpp:311": [[305, "    // Faithful PLC behavior: the write lands in the coil image and is applied to"], [306, "    // the physical output at the next scan boundary (plc_core_scan), where forcing"], [307, "    // and RUN/PROGRAM mode also apply. Record it with its source: CWE-306 checks no"], [308, "    // authorization, so this audit trail is the only evidence of who wrote what."], [309, "    {"], [310, "        const TagDef* t = plc_tag_for(TK_COIL, coil_addr);"], [311, "        plc_log(SRC_MODBUS, source, \"WRITE coil %u (%s) = %d\", coil_addr,"], [312, "                t ? t->name : \"coil\", value == 0xFF00 ? 1 : 0);"]], "plc_core.cpp:38": [[38, "#ifdef ENABLE_CWE_DEMOS"], [39, "// [CWE-787 / CWE-120] Teaching \"build break\": a fixed tag-label scratch buffer placed in"], [40, "// the SAME object as the I/O force image, immediately before the force masks. The"], [41, "// unauthenticated writer plc_tag_write() copies attacker-controlled bytes into scratch[]"], [42, "// with NO bounds check, so an overflow runs straight on into coil_force_val/en and forces"], [43, "// a relay by MEMORY CORRUPTION. It never calls the audited plc_force_coil(), so the force"], [44, "// appears with no source/who in the audit log. The struct guarantees scratch sits right"], [45, "// before the masks (offsetof is the exploit's whole \"memory map\"); tools/derive-force-offset.py"], [46, "// re-derives it from each build. The secure build (#else) keeps the masks with NO adjacent"]], "web_api.cpp:84": [[80, "    if (!t || !t->writable) return \"{\\\"err\\\":\\\"not writable\\\"}\";"], [81, "    char* end=nullptr;const long long v=strtoll(val,&end,10);"], [82, "    if(!val[0]||!end||*end||v<INT32_MIN||v>INT32_MAX)return \"{\\\"err\\\":\\\"int32 value required\\\"}\";"], [83, "    if(!plc_tag_set(t,int32_t(v)))return \"{\\\"err\\\":\\\"write refused\\\"}\";"], [84, "    plc_log(SRC_WEB,\"\",\"SET %s = %ld (live value)\",t->name,(long)v);"], [85, "    return \"{\\\"ok\\\":1}\";"], [86, "}"]]}};
 const SNIP = INLINE.snip;
+let FUNCMAP = {"modbus_tcp_server.cpp:311": {"func": "ModbusTCPServer::fc_write_single_coil(unsigned char const*, unsigned char*, unsigned short&, char const*)", "addr": "0x42037480", "addr_exact": true}, "plc_core.cpp:158": {"func": "plc_force_coil(unsigned short, bool, WriteSource, char const*)", "addr": "0x4203d255", "addr_exact": true}, "web_api.cpp:84": {"func": "web_api_set_json(char const*, char const*, unsigned long)", "addr": "0x4205060e", "addr_exact": true}};
+(async()=>{ try{ const r=await fetch('firmware-provenance-map.json',{cache:'no-store'});
+  if(!r.ok) return; const m=await r.json(); const nf={}; for(const e of m.events) if(e.func) nf[e.id]={func:e.func,addr:e.addr,addr_exact:e.addr_exact};
+  FUNCMAP=nf; if(typeof renderCards==='function') renderCards();
+}catch(_){} })();
 
 const LENS = [
  {key:'wire', num:'LENS 1', tool:'On the wire', sub:'Wireshark · network packet capture', color:'var(--wire)',
@@ -281,10 +289,11 @@ function lensBody(L,s){
   const snip=SNIP[d.src]||SNIP[d.src.replace(/:\d+$/,':'+d.hit)]||null;
   const code = snip?`<pre class="src">${snip.map(([n,t])=>`<span class="ln${n===d.hit?' hit':''}"><b>${n}</b>${esc(t)}</span>`).join('')}</pre>`:'';
   const reads=d.reads?`<div style="font:11.5px/1.7 var(--mono);color:var(--ink2)">${d.reads.map(r=>'&rarr; '+r).join('<br>')}</div>`:'';
+  const fm=FUNCMAP[d.src]||null;
+  const ghid = fm?`<div class="ghidratgt">▸ In the binary: <b>${esc(fm.func.replace(/\(.*$/,'()'))}</b> @ <code>${esc(fm.addr)}</code>${fm.addr_exact===false?' (nearest line)':''} <span class="gh-note">— open this address in Ghidra on <code>firmware.elf</code></span></div>`:'';
   const dis=`<div class="deeper" data-deeper>&#9662; <b>Deeper:</b> what the chip actually runs (disassembler)</div>
-   <div class="disasm hidden" data-disbox><span class="cm">; Xtensa — same code, as Ghidra/objdump shows it</span><br>
-   4203d20c: <span class="op">entry</span> a1, 48<br>4203d20f: <span class="op">l32r</span> a8, 0x4203c1a0<br>
-   4203d212: <span class="op">s32i</span> a10, a1, 4 <span class="cm">; coil_addr</span><br>4203d215: <span class="op">call8</span> plc_log</div>`;
+   <div class="disbox hidden" data-disbox>${ghid}<div class="disasm"><span class="cm">; Xtensa — representative instructions (a disassembler turns the chip's bytes back into these)</span><br>
+   <span class="op">entry</span> a1, 48 &nbsp; <span class="op">l32r</span> a8, … &nbsp; <span class="op">s32i</span> a10, a1, 4 <span class="cm">; coil_addr</span> &nbsp; <span class="op">call8</span> plc_log</div></div>`;
   inner=`<div class="srcref">${d.src}</div>${reads}${code}${dis}`;
  }
  if(L.key==='logic') inner=`
