@@ -26,7 +26,7 @@ const char* validate_program(const Instr* prog, int n) {
         need = 2; produced = 1; break;
       case OP_NOT: need = 1; produced = 1; break;
       case OP_DROP: need = 1; break;
-      case OP_TON: uses_b = true; // fall through
+      case OP_TON: case OP_TOF: uses_b = true; // fall through
       case OP_RTRIG: need = 1; produced = 1; limit = NINST; break;
       case OP_FBQ: limit = NINST; produced = 1; break;
       default: return "opcode";
@@ -34,7 +34,7 @@ const char* validate_program(const Instr* prog, int n) {
     if (limit && (c.a < 0 || c.a >= limit)) return "index";
     if (!limit && !uses_a && c.a != 0) return "unused operand";
     if (uses_b ? c.b < 0 : c.b != 0) return "preset/unused operand";
-    if (c.op == OP_TON || c.op == OP_RTRIG) {
+    if (c.op == OP_TON || c.op == OP_TOF || c.op == OP_RTRIG) {
       if (fb_kind[c.a] && fb_kind[c.a] != c.op) return "FB type conflict";
       fb_kind[c.a] = c.op;
     }
@@ -90,6 +90,16 @@ bool Engine::scan(const Instr* prog, int n, uint32_t now_ms) {
           if (!f.running) { f.running=true; f.t0=now_ms; }
           f.q = (now_ms - f.t0) >= (uint32_t)c.b;
         } else { f.running=false; f.q=false; }
+        push(f.q ? 1:0);
+      } break;
+      case OP_TOF: {                        // IEC TOF: Q holds on for PT ms after IN falls
+        FbInst& f = inst_[c.a];
+        bool in = (pop()!=0);
+        if (in) { f.running=false; f.q=true; }
+        else {
+          if (f.q && !f.running) { f.running=true; f.t0=now_ms; }
+          if (f.running && (now_ms - f.t0) >= (uint32_t)c.b) { f.q=false; f.running=false; }
+        }
         push(f.q ? 1:0);
       } break;
       case OP_RTRIG: {                      // rising-edge detector

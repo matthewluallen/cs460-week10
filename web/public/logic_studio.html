@@ -626,6 +626,7 @@ body.hero-collapsed #heroStrip{display:flex}
     <button class="pbtn" data-ins="nc" title="Normally-closed contact">⊣/⊢ <span>NC</span></button>
     <button class="pbtn" data-ins="cmp" title="Analog compare">[&gt;] <span>CMP</span></button>
     <button class="pbtn" data-ins="ton" title="On-delay timer">⏱ <span>TON</span></button>
+    <button class="pbtn" data-ins="tof" title="Off-delay timer — the output stays ON for the preset time after the input turns off">⏱↓ <span>TOF</span></button>
     <button class="pbtn" data-ins="rtrig" title="Rising-edge">↑ <span>R_TRIG</span></button>
     <span class="sep"></span>
     <button class="pbtn" data-ins="orbranch" title="Parallel OR branch on selected network">⑃ <span>OR branch</span></button>
@@ -1327,14 +1328,15 @@ function exportStructuredText(program, {scanMs} = {}) {
       // Materialize children in evaluation order; do not defer a repeated FB's Q read.
       const parts=n.kids.map(k=>expression(k,depth+1));
       value=parts.join(n.t==='series'?' AND ':' OR ');
-    } else if(n.t==='ton'||n.t==='rtrig') {
+    } else if(n.t==='ton'||n.t==='tof'||n.t==='rtrig') {
       integer(n.inst,0,15,'function block instance');
-      const type=n.t==='ton'?'TON':'R_TRIG',name='FB'+n.inst;
+      const type=n.t==='ton'?'TON':n.t==='tof'?'TOF':'R_TRIG',name='FB'+n.inst;
       if(blocks.has(name)&&blocks.get(name)!==type)throw new Error('Function block type conflict');
       blocks.set(name,type);
       const input=expression(n.in,depth+1);
-      if(type==='TON')integer(n.preset,0,2147483647,'timer preset');
-      emit(`${name}(${type==='TON'?'IN':'CLK'} := ${input}${type==='TON'?`, PT := T#${n.preset}ms`:''});`,n.id);
+      const timer=(type==='TON'||type==='TOF');
+      if(timer)integer(n.preset,0,2147483647,'timer preset');
+      emit(`${name}(${timer?'IN':'CLK'} := ${input}${timer?`, PT := T#${n.preset}ms`:''});`,n.id);
       value=name+'.Q';
     } else throw new Error(`Unsupported node type: ${n.t}`);
     if(temporaries.length>=256)throw new Error('Program expression limit');
@@ -1381,6 +1383,8 @@ function parseStructuredText(source) {
   const document=envelope.exec(clean);
   if(!document)fail('Unsupported program structure; keep the generated program/task declarations');
   const declarations=document[1],body=document[2],scan_ms=Number(document[3]);
+  // TON and TOF share the IN/PT call shape, so their kind is fixed by the VAR declaration.
+  const fbtypes={}; { let dm; const dre=/\bFB(\d+)\s*:\s*(TON|TOF|R_TRIG)\b/g; while((dm=dre.exec(declarations)))fbtypes[Number(dm[1])]=dm[2]; }
   const refs=new Map(),assigned=new Set(),nets=[];
   let pending=null,serial=0;
   const id=()=>`st_e${++serial}`;
@@ -1397,7 +1401,7 @@ function parseStructuredText(source) {
     if((m=/^FB(\d+)\s*\(\s*(IN|CLK)\s*:=\s*(EXPR\d+|FALSE)(?:\s*,\s*PT\s*:=\s*T#(\d+)MS)?\s*\)$/.exec(line))) {
       if(pending)fail('Function block output must be captured before the next call');
       if((m[2]==='IN')!==(m[4]!==undefined))fail('TON requires PT; R_TRIG has no PT');
-      pending={t:m[2]==='IN'?'ton':'rtrig',inst:Number(m[1]),in:take(m[3]),id:id()};
+      pending={t:m[2]==='IN'?(fbtypes[Number(m[1])]==='TOF'?'tof':'ton'):'rtrig',inst:Number(m[1]),in:take(m[3]),id:id()};
       if(m[4]!==undefined)pending.preset=Number(m[4]);
       continue;
     }
@@ -1471,9 +1475,9 @@ function programDependencies(program) {
       const source=incoming(variable,io);edge(source.from,n.id,source.kind);
     } else {
       const children=(n.kids||[n.in]).map(visit).filter(Boolean);
-      const fb=n.t==='ton'||n.t==='rtrig';
-      add({id:n.id,kind:n.t,label:fb?`FB${n.inst} ${n.t==='ton'?'TON':'R_TRIG'}`:n.t==='series'?'AND branch':'OR branch',
-        detail:n.t==='ton'?`Output Q becomes true after IN stays true for ${n.preset} ms; false IN resets the non-retained on-delay.`:n.t==='rtrig'?'Output Q marks a false-to-true transition at this call; the instance remembers the preceding input.':n.t==='series'?'Every child condition must be true.':'At least one child condition must be true.'});
+      const fb=n.t==='ton'||n.t==='tof'||n.t==='rtrig';
+      add({id:n.id,kind:n.t,label:fb?`FB${n.inst} ${n.t==='ton'?'TON':n.t==='tof'?'TOF':'R_TRIG'}`:n.t==='series'?'AND branch':'OR branch',
+        detail:n.t==='ton'?`Output Q becomes true after IN stays true for ${n.preset} ms; false IN resets the non-retained on-delay.`:n.t==='tof'?`Output Q stays true while IN is true and holds for ${n.preset} ms after IN falls; a new true IN cancels the off-delay.`:n.t==='rtrig'?'Output Q marks a false-to-true transition at this call; the instance remembers the preceding input.':n.t==='series'?'Every child condition must be true.':'At least one child condition must be true.'});
       for(const child of children)edge(child,n.id,'expression-input');
       if(fb){const instance='FB'+n.inst;const previous=lastCall.get(instance)||'state:'+instance;
         if(!lastCall.has(instance))add({id:previous,kind:'state',label:instance+' state entering scan'});
@@ -1851,7 +1855,7 @@ const MAX_PROJECT_BYTES=131072;
 const MAX_DEPLOY_BYTES=4096;
 const COUNTS={IX:8,QX:4,MX:32,IW:8};
 const PROCESS_FIELDS=PROCESS_DRIVER_FIELDS;
-const OPS={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18};
+const OPS={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,TOF:21};
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const integer=(value,min,max,label)=>need(Number.isInteger(value)&&value>=min&&value<=max,`${label} must be an integer from ${min} to ${max}.`);
@@ -1970,10 +1974,10 @@ function validateProject(project){
   if(n.t==='c'){object(n,['t','id','io','idx','neg'],[],'Contact');address(n.io,n.idx);need(n.io!=='IW','Use a comparison for word inputs.');flag(n.neg);}
   else if(n.t==='cmp'){object(n,['t','id','op','idx','k'],[],'Comparison');need(['GT','LT','GE','LE','EQ'].includes(n.op),'Unsupported comparison.');address('IW',n.idx);integer(n.k,-2147483648,2147483647,'Comparison constant');}
   else if(n.t==='series'||n.t==='par'){object(n,['t','id','kids'],[],'Branch');need(Array.isArray(n.kids)&&n.kids.length>0&&n.kids.length<=64,'A branch needs 1–64 children.');n.kids.forEach(k=>node(k,depth+1));}
-  else if(n.t==='ton'||n.t==='rtrig'){
-   object(n,['t','id','inst','in',...(n.t==='ton'?['preset']:[])],[],'Function block');integer(n.inst,0,15,'Function block instance');
+  else if(n.t==='ton'||n.t==='tof'||n.t==='rtrig'){
+   object(n,['t','id','inst','in',...((n.t==='ton'||n.t==='tof')?['preset']:[])],[],'Function block');integer(n.inst,0,15,'Function block instance');
    need(!blocks.has(n.inst)||blocks.get(n.inst)===n.t,'A function block instance cannot have two types.');blocks.set(n.inst,n.t);
-   if(n.t==='ton')integer(n.preset,0,2147483647,'Timer preset');node(n.in,depth+1);
+   if(n.t==='ton'||n.t==='tof')integer(n.preset,0,2147483647,'Timer preset');node(n.in,depth+1);
   }else throw new Error('Unsupported expression type.');
  }
  for(const net of project.program.nets){
@@ -2027,7 +2031,7 @@ function compileProgram(program){
   if(n.t==='c'){push([OPS['LD_'+n.io],n.idx],n.id);if(n.neg)push([OPS.NOT],n.id);}
   else if(n.t==='cmp'){push([OPS.LD_IW,n.idx],n.id);push([OPS.PUSH_I,n.k],n.id);push([OPS[n.op]],n.id);}
   else if(n.t==='series'||n.t==='par'){emit(n.kids[0]);for(let i=1;i<n.kids.length;i++){emit(n.kids[i]);push([n.t==='series'?OPS.AND:OPS.OR],n.id);}}
-  else if(n.t==='ton'||n.t==='rtrig'){emit(n.in);push(n.t==='ton'?[OPS.TON,n.inst,n.preset]:[OPS.RTRIG,n.inst],n.id);}
+  else if(n.t==='ton'||n.t==='tof'||n.t==='rtrig'){emit(n.in);push(n.t==='rtrig'?[OPS.RTRIG,n.inst]:[n.t==='tof'?OPS.TOF:OPS.TON,n.inst,n.preset],n.id);}
   else throw new Error('Unsupported expression type.');
  }
  for(const net of program.nets){emit(net.expr);if(net.coil.neg)push([OPS.NOT],net.id+'coil');push([OPS['ST_'+net.coil.io],net.coil.idx],net.id+'coil');}
@@ -2243,7 +2247,7 @@ return {EXECUTION_SCHEMA,EXECUTION_MAX_AGE_MS,parseExecutionReadback,validateExe
 <!-- PROJECT-ADAPTER-END -->
 <script>
 /* ===== opcodes: match firmware/src/plc_engine.h ===== */
-const OP={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,XOR:10,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,FBQ:19,DROP:20};
+const OP={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,XOR:10,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,FBQ:19,DROP:20,TOF:21};
 const LD={IX:OP.LD_IX,QX:OP.LD_QX,MX:OP.LD_MX};
 const ST={QX:OP.ST_QX,MX:OP.ST_MX};
 const CMP={GT:OP.GT,LT:OP.LT,GE:OP.GE,LE:OP.LE,EQ:OP.EQ};
@@ -2293,12 +2297,13 @@ const nodeName=(io,idx)=>IO[io].label(idx);
 function renderSTL(){
   const lines=[];const add=(txt,eid)=>lines.push({txt,eid:eid||null});
   if(PROG.startup){add('// STARTUP declaration — outside the scan');add('STARTUP '+PROG.startup.mode.toUpperCase(),StudioST.ST_STARTUP_ID);add('');}
-  const complex=n=>n&&(n.t==='series'||n.t==='par'||n.t==='ton'||n.t==='rtrig'||n.t==='cmp');
+  const complex=n=>n&&(n.t==='series'||n.t==='par'||n.t==='ton'||n.t==='tof'||n.t==='rtrig'||n.t==='cmp');
   function rend(node,lead){
     if(!node){add(`${lead} FALSE`);return;}
     if(node.t==='c'){add(`${lead}${node.neg?'N':''}  ${nodeName(node.io,node.idx)}`,node.id);return;}
     if(node.t==='cmp'){add(`${lead}  %IW${node.idx}`,node.id);add(`${node.op}   ${node.k}`,node.id);return;}
     if(node.t==='ton'){rend(node.in,lead);add(`TON   #${node.inst}, PT=${node.preset}ms`,node.id);return;}
+    if(node.t==='tof'){rend(node.in,lead);add(`TOF   #${node.inst}, PT=${node.preset}ms`,node.id);return;}
     if(node.t==='rtrig'){rend(node.in,lead);add(`R_TRIG #${node.inst}`,node.id);return;}
     if(node.t==='series'||node.t==='par'){
       const c=node.t==='series'?'AND':'OR';rend(node.kids[0],lead);
@@ -2383,7 +2388,7 @@ function measure(node){
   if(!node)return {w:1,h:1};
   if(node.t==='c')return {w:cellColumns(Math.max(labelWidth(symName(node.io,node.idx))+32,labelWidth(nodeName(node.io,node.idx),true,11)+48,76)),h:1};
   if(node.t==='cmp')return {w:cellColumns(labelWidth(`%IW${node.idx} ${CMPSYM[node.op]} ${node.k}`,true,12)+40),h:1};
-  if(node.t==='ton'||node.t==='rtrig'){const i=measure(node.in);return {w:i.w+cellColumns(labelWidth(node.t==='ton'?`#${node.inst} 2147483647/${node.preset}ms`:`#${node.inst}`,false,9.5)+40),h:Math.max(i.h,1)};}
+  if(node.t==='ton'||node.t==='tof'||node.t==='rtrig'){const i=measure(node.in);return {w:i.w+cellColumns(labelWidth((node.t==='ton'||node.t==='tof')?`#${node.inst} 2147483647/${node.preset}ms`:`#${node.inst}`,false,9.5)+40),h:Math.max(i.h,1)};}
   if(node.t==='series'){let w=0,h=1;for(const k of node.kids){const m=measure(k);w+=m.w;h=Math.max(h,m.h);}return {w,h};}
   if(node.t==='par'){let w=1,h=0;for(const k of node.kids){const m=measure(k);w=Math.max(w,m.w);h+=m.h;}return {w:w+1,h};}
   return {w:1,h:1};
@@ -2406,12 +2411,12 @@ function drawNode(node,x,y,w,h,S,live){
     S.el(node.id,`<rect class="${bc}" x="${bx}" y="${cy-15}" width="${bw}" height="30" rx="4"/><text class="tag-lbl" x="${bx+bw/2}" y="${cy+4}" text-anchor="middle" style="font-size:12px">%IW${node.idx} ${CMPSYM[node.op]} ${node.k}</text>`);
     return;
   }
-  if(node.t==='ton'||node.t==='rtrig'){
+  if(node.t==='ton'||node.t==='tof'||node.t==='rtrig'){
     const iw=measure(node.in).w*U;drawNode(node.in,x,y,iw,h,S,live);
     const bx=x+iw+6,bw=w-iw-12;S.wire(x+iw,cy,bx,cy,wc);
     const fb=(live&&live.FB)?live.FB[node.inst]:null;
-    const label=node.t==='ton'?'TON':'R_TRIG';
-    const sub=node.t==='ton'?(fb?`#${node.inst} ${fb.et}/${node.preset}ms`:`#${node.inst} PT=${node.preset}ms`):`#${node.inst}`;
+    const label=node.t==='ton'?'TON':node.t==='tof'?'TOF':'R_TRIG';
+    const sub=(node.t==='ton'||node.t==='tof')?(fb?`#${node.inst} ${fb.et}/${node.preset}ms`:`#${node.inst} PT=${node.preset}ms`):`#${node.inst}`;
     const fbcls='fbx'+(fb&&(fb.q||fb.run)?' live':'');
     S.el(node.id,`<rect class="${fbcls}" x="${bx}" y="${cy-16}" width="${bw}" height="32" rx="4"/><text class="tag-lbl" x="${bx+bw/2}" y="${cy-1}" text-anchor="middle" style="font-size:11px">${label}</text><text class="tag-sub" x="${bx+bw/2}" y="${cy+11}" text-anchor="middle">${sub}</text>`);
     S.wire(bx+bw,cy,x+w,cy,wc);return;
@@ -2473,7 +2478,7 @@ function evalNode(node,live){
   if(node.t==='c'){const raw=live[node.io]?.[node.idx];if(raw==null)return null;const v=!!raw;return node.neg?!v:v;}
   if(node.t==='cmp'){const a=live.IW?.[node.idx];if(a==null)return null;return node.op==='GT'?a>node.k:node.op==='LT'?a<node.k:node.op==='GE'?a>=node.k:node.op==='LE'?a<=node.k:a===node.k;}
   if(node.t==='series'||node.t==='par'){const values=node.kids.map(k=>evalNode(k,live));if(values.some(v=>v==null))return null;return node.t==='series'?values.every(Boolean):values.some(Boolean);}
-  if(node.t==='ton'||node.t==='rtrig')return live.FB?.[node.inst]?.q??null;
+  if(node.t==='ton'||node.t==='tof'||node.t==='rtrig')return live.FB?.[node.inst]?.q??null;
   return null;
 }
 const evalCoil=(n,live)=>live?.[n.coil.io]?.[n.coil.idx]??null;
@@ -2528,7 +2533,7 @@ function renderLogicInspector(id){
 function appendEngineeringCheck(body,kind){
  const check=document.createElement('details');check.className='engineering-check';
  const summary=document.createElement('summary');summary.textContent='Engineering check · limit the consequence';check.appendChild(summary);
- const rows=kind==='ton'||kind==='rtrig'?
+ const rows=kind==='ton'||kind==='tof'||kind==='rtrig'?
  ['A lost or stuck signal may leave a delayed action active longer than the process can tolerate.',
   'Specify input-validity handling and an allowed response time. Ask what independently limits the consequence if this PLC or its sensor is compromised; another timer in this PLC shares that failure.',
   'In an admitted simulation, compare normal input, signal loss, restart and recovery against the declared time limit. Check process feedback separately from the command.',754]:
@@ -2565,6 +2570,7 @@ function stNode(node,calls){
   if(node.t==='series')return node.kids.map(k=>stChild(k,calls)).join(' <span class="kw">AND</span> ');
   if(node.t==='par')return node.kids.map(k=>stChild(k,calls)).join(' <span class="kw">OR</span> ');
   if(node.t==='ton'){const inx=stNode(node.in,calls);calls.push(`<span class="kw">TON</span>${node.inst}(IN <span class="asg">:=</span> ${inx}, PT <span class="asg">:=</span> T#${node.preset}ms);`);return `TON${node.inst}.Q`;}
+  if(node.t==='tof'){const inx=stNode(node.in,calls);calls.push(`<span class="kw">TOF</span>${node.inst}(IN <span class="asg">:=</span> ${inx}, PT <span class="asg">:=</span> T#${node.preset}ms);`);return `TOF${node.inst}.Q`;}
   if(node.t==='rtrig'){const inx=stNode(node.in,calls);calls.push(`<span class="kw">R_TRIG</span>${node.inst}(CLK <span class="asg">:=</span> ${inx});`);return `R_TRIG${node.inst}.Q`;}
   return 'FALSE';
 }
@@ -2633,7 +2639,7 @@ function onElementClick(eid,n){
   const f=findNode(n.expr,eid);if(!f)return;
   if(f.node.t==='c')openContactEditor(f.node,rebuildFromModel);
   else if(f.node.t==='cmp')openCmpEditor(f.node,rebuildFromModel);
-  else if(f.node.t==='ton'||f.node.t==='rtrig')openFbEditor(f.node,rebuildFromModel);
+  else if(f.node.t==='ton'||f.node.t==='tof'||f.node.t==='rtrig')openFbEditor(f.node,rebuildFromModel);
 }
 function findNode(node,eid){if(!node)return null;if(node.id===eid)return {node};if(node.kids)for(const k of node.kids){const r=findNode(k,eid);if(r)return r;}if(node.in){const r=findNode(node.in,eid);if(r)return r;}return null;}
 
@@ -2683,9 +2689,10 @@ function insertElement(kind){
   else if(kind==='nc')node=contact('IX',0,true);
   else if(kind==='cmp')node=cmp('GT',0,0);
   else if(kind==='ton')node={t:'ton',inst:nextInst('ton'),preset:1000,in:contact('IX',0,false),id:uid()};
+  else if(kind==='tof')node={t:'tof',inst:nextInst('tof'),preset:1000,in:contact('IX',0,false),id:uid()};
   else if(kind==='rtrig')node={t:'rtrig',inst:nextInst('rtrig'),in:contact('IX',0,false),id:uid()};
   // append into the network expression as a series term
-  if(kind==='ton'||kind==='rtrig'){ n.expr=node; }   // FB wraps the rung
+  if(kind==='ton'||kind==='tof'||kind==='rtrig'){ n.expr=node; }   // FB wraps the rung
   else if(!n.expr) n.expr=node;
   else if(n.expr.t==='series') n.expr.kids.push(node);
   else n.expr=series([n.expr,node]);
@@ -2695,7 +2702,7 @@ function insertElement(kind){
   else if(node.t==='cmp')openCmpEditor(node,rebuildFromModel);
   else if(node.in)openContactEditor(node.in,rebuildFromModel);
 }
-function nextInst(kind){let m=-1;const walk=nd=>{if(!nd)return;if(nd.t===kind)m=Math.max(m,nd.inst);if(nd.kids)nd.kids.forEach(walk);if(nd.in)walk(nd.in);};PROG.nets.forEach(n=>walk(n.expr));return m+1;}
+function nextInst(kind){let m=-1;const walk=nd=>{if(!nd)return;if(nd.t==='ton'||nd.t==='tof'||nd.t==='rtrig')m=Math.max(m,nd.inst);if(nd.kids)nd.kids.forEach(walk);if(nd.in)walk(nd.in);};PROG.nets.forEach(n=>walk(n.expr));return m+1;}
 function addNetwork(){const n=net(contact('IX',0,false),{io:'QX',idx:0,neg:false},'New network');PROG.nets.push(n);selNet=n.id;rebuildFromModel();openContactEditor(n.expr,rebuildFromModel);}
 function netAction(act,n){
   if(act==='del'){PROG.nets=PROG.nets.filter(x=>x!==n);selNet=PROG.nets.length?PROG.nets[0].id:null;rebuildFromModel();return;}
@@ -2838,12 +2845,13 @@ function openCmpEditor(node,after){
   modalInner.querySelector('#mDel').onclick=()=>{deleteNode(node);closeModal();after&&after();};
 }
 function openFbEditor(node,after){
-  const ton=node.t==='ton';
-  showModal(`<h3>Edit ${ton?'on-delay timer (TON)':'rising-edge (R_TRIG)'}</h3><div class="body">
+  const timed=node.t==='ton'||node.t==='tof';
+  const title=node.t==='ton'?'on-delay timer (TON)':node.t==='tof'?'off-delay timer (TOF)':'rising-edge (R_TRIG)';
+  showModal(`<h3>Edit ${title}</h3><div class="body">
     <div class="field"><label>Instance #</label><input id="inst" type="number" min="0" max="15" value="${node.inst}"></div>
-    ${ton?`<div class="field"><label>Preset PT (ms)</label><input id="pt" type="number" min="0" value="${node.preset}"></div>`:''}
+    ${timed?`<div class="field"><label>Preset PT (ms)</label><input id="pt" type="number" min="0" value="${node.preset}"></div>`:''}
     <div class="row"><button class="btn" id="mDel">Delete</button><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" id="mOk">Apply</button></div></div>`);
-  modalInner.querySelector('#mOk').onclick=()=>{node.inst=parseInt(modalInner.querySelector('#inst').value,10)||0;if(ton)node.preset=parseInt(modalInner.querySelector('#pt').value,10)||0;closeModal();after&&after();};
+  modalInner.querySelector('#mOk').onclick=()=>{node.inst=parseInt(modalInner.querySelector('#inst').value,10)||0;if(timed)node.preset=parseInt(modalInner.querySelector('#pt').value,10)||0;closeModal();after&&after();};
   modalInner.querySelector('#mDel').onclick=()=>{deleteNode(node);closeModal();after&&after();};
 }
 function openCoilEditor(n){
