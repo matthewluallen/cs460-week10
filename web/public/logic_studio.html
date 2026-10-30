@@ -45,6 +45,21 @@ header{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(
 .menu-pop .btn,.menu-pop a.btn{justify-content:flex-start;text-align:left;width:100%}
 .menu-sep{height:1px;background:var(--line);margin:5px 2px}
 .menu-lbl{font:600 9px/1.4 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:6px 7px 2px}
+/* command palette (Ctrl/Cmd+K) */
+#cmdk{position:fixed;inset:0;z-index:200;background:rgba(5,8,13,.5);display:flex;align-items:flex-start;justify-content:center;padding-top:12vh}
+#cmdk[hidden]{display:none}
+.cmdk-box{width:min(620px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 24px 60px -18px rgba(0,0,0,.6);overflow:hidden;display:flex;flex-direction:column;max-height:70vh}
+#cmdkInput{border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font:500 15px var(--sans);padding:15px 18px;outline:none}
+#cmdkList{overflow:auto;padding:6px}
+.cmdk-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer}
+.cmdk-item.on{background:var(--accent);color:var(--accent-ink)}
+.cmdk-item.on .cmdk-g,.cmdk-item.on .cmdk-k{color:var(--accent-ink);opacity:.85}
+.cmdk-g{font:600 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-width:66px}
+.cmdk-l{flex:1;font-size:13.5px;font-weight:500}
+.cmdk-k{font:600 12px var(--mono);color:var(--muted)}
+.cmdk-empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+.cmdk-foot{display:flex;gap:16px;padding:9px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.cmdk-foot b{color:var(--ink);font-family:var(--mono)}
 button.btn{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--ink);background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.12s}
 button.btn:hover{border-color:var(--accent);color:var(--accent)}
 button.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -575,6 +590,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
         <summary class="btn" title="More tools, tables and views">⋯ Tools ▾</summary>
         <div class="menu-pop">
           <div class="menu-lbl">View</div>
+          <button class="btn" id="bCmdK" title="Search and run any command">Command palette  ⌘K</button>
           <button class="btn" id="bToggleWf" data-keepopen="1">Workflow steps</button>
           <div class="menu-sep"></div>
           <div class="menu-lbl">Controller</div>
@@ -4945,7 +4961,7 @@ document.getElementById('bBusFile').onclick=openBusCapture;
 document.querySelectorAll('.contabs button').forEach(b=>b.onclick=()=>showConTab(b.dataset.tab));
 document.getElementById('bTheme').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');setTheme(c==='dark'?'light':'dark');};
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
-document.querySelectorAll('#palette .pbtn').forEach(b=>b.onclick=()=>insertElement(b.dataset.ins));
+document.querySelectorAll('#palette .pbtn[data-ins]').forEach(b=>b.onclick=()=>insertElement(b.dataset.ins));
 /* Insert-palette skill tiers: group the instruction set and show only as much as
    the learner wants. Basic = enough to build a rung; Standard adds timing/counting/
    edges/compare; Full adds analog math + PID. Nothing is removed; the choice sticks. */
@@ -5009,6 +5025,98 @@ document.querySelectorAll('#palette .pbtn').forEach(b=>b.onclick=()=>insertEleme
       main.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
     });
   });
+})();
+/* Command palette (Ctrl/Cmd+K): search and run any action — the modern IDE way.
+   Reuses existing controls so it never drifts from what the buttons do. */
+(function(){
+  const $=id=>document.getElementById(id), sel=s=>document.querySelector(s);
+  const click=id=>{const el=$(id);if(el&&!el.disabled)el.click();};
+  const clickSel=s=>{const el=sel(s);if(el&&!el.disabled)el.click();};
+  const ins=k=>{try{if(typeof MODE!=='undefined'&&MODE!=='edit')return;insertElement(k);}catch(e){}};
+  const CMDS=[
+    ['Workflow','Validate project','✓',()=>click('bVerify')],
+    ['Workflow','Open project…','',()=>click('bProject')],
+    ['Workflow','Examples','',()=>click('bExample')],
+    ['Workflow','Connect USB','',()=>click('bConnect')],
+    ['Workflow','Connect twin (QEMU)','',()=>click('bConnectTwin')],
+    ['Workflow','Load application','▸',()=>click('bDownload')],
+    ['Workflow','Start monitoring','',()=>click('bMonitor')],
+    ['Controller','Read controller status','',()=>click('bReadStatus')],
+    ['Controller','Read installed application','',()=>click('bReadProject')],
+    ['Controller','Request PROGRAM','',()=>clickSel('#modeChips [data-m="program"]')],
+    ['Controller','Request RUN','',()=>clickSel('#modeChips [data-m="run"]')],
+    ['Controller','Request REMOTE','',()=>clickSel('#modeChips [data-m="remote"]')],
+    ['View','Focus — maximize the logic','⛶',()=>click('bLogicFocus')],
+    ['View','Split view (ladder + text)','',()=>clickSel('#logicViewSeg [data-lv="split"]')],
+    ['View','Ladder only','',()=>clickSel('#logicViewSeg [data-lv="ladder"]')],
+    ['View','Text only','',()=>clickSel('#logicViewSeg [data-lv="text"]')],
+    ['View','Toggle register column','',()=>click('bRegsToggle')],
+    ['View','Toggle overview panel','',()=>click('bHero')],
+    ['View','Toggle workflow steps','',()=>{$('toolsMenu').open=true;click('bToggleWf');$('toolsMenu').open=false;}],
+    ['View','Author mode','✎',()=>clickSel('#modeSeg [data-mode="edit"]')],
+    ['View','Monitor mode','◉',()=>clickSel('#modeSeg [data-mode="online"]')],
+    ['Go to','Logic','',()=>clickSel('#appViewSeg [data-appview="logic"]')],
+    ['Go to','Flow','',()=>clickSel('#appViewSeg [data-appview="flow"]')],
+    ['Go to','Protocol','',()=>clickSel('#appViewSeg [data-appview="protocol"]')],
+    ['Go to','Circuit','',()=>clickSel('#appViewSeg [data-appview="circuit"]')],
+    ['Tables','Register table','',()=>click('bRegisters')],
+    ['Tables','Tags & cross-reference','',()=>click('bTags')],
+    ['Tables','Application artifact','',()=>click('bCompile')],
+    ['Tools','SFC editor','',()=>click('bSFC')],
+    ['Tools','Network configuration','',()=>click('bNetCfg')],
+    ['Tools','Grove devices','',()=>click('bSensors')],
+    ['Tools','Test bench','',()=>click('bBench')],
+    ['Tools','Project settings','',()=>click('bProjectSettings')],
+    ['Insert','Network (new rung)','',()=>ins('net')],
+    ['Insert','NO contact','',()=>ins('no')],
+    ['Insert','NC contact','',()=>ins('nc')],
+    ['Insert','Coil','',()=>ins('coil')],
+    ['Insert','OR branch','',()=>ins('orbranch')],
+    ['Insert','On-delay timer (TON)','',()=>ins('ton')],
+    ['Insert','Off-delay timer (TOF)','',()=>ins('tof')],
+    ['Insert','Up/down counter (CTUD)','',()=>ins('ctud')],
+    ['Insert','Rising edge (R_TRIG)','',()=>ins('rtrig')],
+    ['Insert','Falling edge (F_TRIG)','',()=>ins('ftrig')],
+    ['Insert','S/R latch','',()=>ins('srlatch')],
+    ['Insert','XOR','',()=>ins('xor')],
+    ['Insert','Compare (CMP)','',()=>ins('cmp')],
+    ['Insert','Word math — ADD','',()=>ins('add')],
+    ['Insert','Word math — SUB','',()=>ins('sub')],
+    ['Insert','Word math — MUL','',()=>ins('mul')],
+    ['Insert','Word math — DIV','',()=>ins('div')],
+    ['Insert','Word MOVE','',()=>ins('move')],
+    ['Insert','LIMIT (clamp)','',()=>ins('limit')],
+    ['Insert','SEL (select)','',()=>ins('sel')],
+    ['Insert','PID controller','',()=>ins('pid')]
+  ];
+  const ov=document.createElement('div');ov.id='cmdk';ov.hidden=true;
+  ov.innerHTML='<div class="cmdk-box" role="dialog" aria-label="Command palette"><input id="cmdkInput" type="text" placeholder="Run a command…  (Validate, Connect, Load, Focus, insert PID…)" autocomplete="off" spellcheck="false"><div id="cmdkList" role="listbox"></div><div class="cmdk-foot"><span><b>↑↓</b> move</span><span><b>↵</b> run</span><span><b>esc</b> close</span></div></div>';
+  document.body.appendChild(ov);
+  const input=$('cmdkInput'),list=$('cmdkList');let active=0,shown=[];
+  const render=()=>{
+    const q=input.value.trim().toLowerCase();
+    shown=CMDS.filter(c=>!q||(c[0]+' '+c[1]).toLowerCase().includes(q)).slice(0,40);
+    if(active>=shown.length)active=Math.max(0,shown.length-1);
+    list.innerHTML=shown.map((c,i)=>'<div class="cmdk-item'+(i===active?' on':'')+'" data-i="'+i+'" role="option"><span class="cmdk-g">'+c[0]+'</span><span class="cmdk-l">'+c[1]+'</span><span class="cmdk-k">'+(c[2]||'')+'</span></div>').join('')||'<div class="cmdk-empty">No matching command</div>';
+    const on=list.querySelector('.cmdk-item.on');if(on)on.scrollIntoView({block:'nearest'});
+  };
+  const open=()=>{ov.hidden=false;input.value='';active=0;render();input.focus();};
+  const close=()=>{ov.hidden=true;};
+  const run=i=>{const c=shown[i];if(!c)return;close();setTimeout(()=>c[3](),0);};
+  input.addEventListener('input',()=>{active=0;render();});
+  input.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'){e.preventDefault();active=Math.min(active+1,shown.length-1);render();}
+    else if(e.key==='ArrowUp'){e.preventDefault();active=Math.max(active-1,0);render();}
+    else if(e.key==='Enter'){e.preventDefault();run(active);}
+    else if(e.key==='Escape'){e.preventDefault();close();}
+  });
+  list.addEventListener('click',e=>{const it=e.target.closest('.cmdk-item');if(it)run(+it.dataset.i);});
+  ov.addEventListener('click',e=>{if(e.target===ov)close();});
+  document.addEventListener('keydown',e=>{
+    if((e.metaKey||e.ctrlKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();ov.hidden?open():close();}
+  });
+  window.__openCmdK=open;
+  {const mb=$('bCmdK');if(mb)mb.addEventListener('click',()=>setTimeout(open,0));}
 })();
 const ta=document.getElementById('stl');ta.addEventListener('blur',rebuildFromSTL);ta.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();rebuildFromSTL();}});
 
