@@ -630,6 +630,7 @@ body.hero-collapsed #heroStrip{display:flex}
     <span class="sep"></span>
     <button class="pbtn" data-ins="orbranch" title="Parallel OR branch on selected network">⑃ <span>OR branch</span></button>
     <button class="pbtn" data-ins="coil" title="Set the network's coil">( ) <span>Coil</span></button>
+    <button class="pbtn" data-ins="srlatch" title="Set/Reset latch — the output stays ON after a Set pulse until Reset. Builds the standard seal-in rung: QX := Set OR (QX AND NOT Reset).">⊣S/R⊢ <span>S/R latch</span></button>
     <span class="sep"></span>
     <button class="pbtn" data-ins="net" title="Add a network">＋ <span>Network</span></button>
     <button class="pbtn" data-ins="startup" id="bStartup" title="Add an explicit boot-admission declaration outside scan logic">↻ <span>Reboot RUN</span></button>
@@ -2640,6 +2641,22 @@ function insertElement(kind){
   ensureProject();
   if(kind==='startup'){openStartupEditor();return;}
   if(kind==='net'){addNetwork();return;}
+  if(kind==='srlatch'){
+    // Standard Set/Reset latch as a seal-in rung, built from existing elements so it
+    // compiles, simulates and round-trips with no new runtime op:
+    //   QX0 := Set OR (QX0 AND NOT Reset)     (set-dominant; the output seals itself on).
+    // The self-contact and the coil share the same output; keep them matched if you
+    // change the output. Set and Reset are shown as plain inputs the student picks.
+    const outIdx=0;
+    const setC=contact('IX',0,false);                 // Set input
+    const self=contact('QX',outIdx,false);            // seal-in: output holds itself on
+    const rstC=contact('IX',1,true);                  // Reset (NC) — breaks the seal
+    const nn=net(par([setC, series([self, rstC])]), {io:'QX',idx:outIdx,neg:false},
+                 'S/R latch — Set OR (hold AND NOT Reset)');
+    PROG.nets.push(nn); selNet=nn.id; rebuildFromModel();
+    openContactEditor(setC, rebuildFromModel);        // pick the Set input first
+    return;
+  }
   const n=PROG.nets.find(x=>x.id===selNet)||PROG.nets[PROG.nets.length-1];
   if(!n){log('add a network first','rx');return;}
   selNet=n.id;
