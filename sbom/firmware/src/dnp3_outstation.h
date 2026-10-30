@@ -27,7 +27,7 @@ private:
     bool link_seen = false, link_fcb = false;
     int  build_response(uint8_t* out, uint16_t dest);
     int  build_control_reply(uint8_t* out, const uint8_t* obj, int objlen, uint16_t dest);
-    void apply_crob(const uint8_t* obj, int len, const char* src_ip);
+    bool apply_crob(const uint8_t* obj, int len, const char* src_ip, uint32_t peer);
     char cur_src_ip[24];
 };
 extern Dnp3Outstation dnp3_outstation;

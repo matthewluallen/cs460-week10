@@ -1,7 +1,7 @@
 {
-  "schema": "tbd.plc-point-map/v3",
-  "version": 3,
-  "description": "Shared FC3 register image and coil/DI mirrors. operator_writable gates named UI operations; intentional raw Modbus writes remain enabled. All word addresses are zero based.",
+  "schema": "tbd.plc-point-map/v4",
+  "version": 4,
+  "description": "Hardware channels and reserved diagnostics. Application names, VM bindings and defaults are loaded only from a project. Raw protocol write behavior remains selected by the firmware build profile.",
   "register_capacity": 256,
   "coil_capacity": 512,
   "di_mirror_base": 100,
@@ -11,57 +11,30 @@
     "encoding": "SHA256 bytes as16 network-order words"
   },
   "vm_word_count": 8,
-  "vm_inputs": [
-    {
-      "name": "base_temperature",
-      "index": 0,
-      "source": "temp_c_x10"
-    },
-    {
-      "name": "temperature_setpoint",
-      "index": 4,
-      "source": "setpoint_tempx10"
-    },
-    {
-      "name": "high_temperature_limit",
-      "index": 5,
-      "source": "alarm_tempx10"
-    },
-    {
-      "name": "cycle_ms",
-      "index": 6,
-      "source": "cycle_ms"
-    }
-  ],
+  "vm_inputs": [],
   "unbound_vm_words": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
     7
   ],
-  "parameter_defaults": [
-    {
-      "point": "setpoint_tempx10",
-      "value": 250
-    },
-    {
-      "point": "alarm_tempx10",
-      "value": 400
-    },
-    {
-      "point": "cycle_ms",
-      "value": 1000
-    }
-  ],
+  "parameter_defaults": [],
   "sparkplug_metrics": [
     {
       "name": "DI/IN0",
-      "point": "di0_start"
+      "point": "di0"
     },
     {
       "name": "DI/IN1",
-      "point": "di1_stop"
+      "point": "di1"
     },
     {
       "name": "DI/IN2",
-      "point": "di2_estop_in"
+      "point": "di2"
     },
     {
       "name": "DI/IN3",
@@ -114,14 +87,14 @@
   ],
   "points": [
     {
-      "name": "estop",
+      "name": "expansion_relay",
       "kind": "COIL",
       "address": 0,
       "unit": "",
       "operator_writable": true,
       "forceable": true,
       "encoding": "u16",
-      "description": "Mechanical relay request (CWE-306); circuit safety requires independent evidence"
+      "description": "Expansion mechanical relay request; register readback is not contact feedback"
     },
     {
       "name": "relay0",
@@ -131,7 +104,7 @@
       "operator_writable": true,
       "forceable": true,
       "encoding": "u16",
-      "description": "Motor contactor (base relay 0, program-driven)"
+      "description": "Base output channel 0"
     },
     {
       "name": "relay1",
@@ -141,7 +114,7 @@
       "operator_writable": true,
       "forceable": true,
       "encoding": "u16",
-      "description": "Run light (base relay 1)"
+      "description": "Base output channel 1"
     },
     {
       "name": "relay2",
@@ -151,7 +124,7 @@
       "operator_writable": true,
       "forceable": true,
       "encoding": "u16",
-      "description": "Warning light (base relay 2)"
+      "description": "Base output channel 2"
     },
     {
       "name": "relay3",
@@ -161,7 +134,7 @@
       "operator_writable": true,
       "forceable": true,
       "encoding": "u16",
-      "description": "Fault/estop light (base relay 3)"
+      "description": "Base output channel 3"
     },
     {
       "name": "ssr1",
@@ -184,54 +157,54 @@
       "description": "Solid-state relay 2 (IO-exp)"
     },
     {
-      "name": "soft_estop",
+      "name": "aux_coil0",
       "kind": "COIL",
       "address": 8,
       "unit": "",
       "operator_writable": true,
       "forceable": true,
       "encoding": "u16",
-      "description": "SOFT estop honored by logic only (defeatable contrast)"
+      "description": "Unassigned auxiliary protocol coil; no implicit VM binding"
     },
     {
-      "name": "cmd_run",
+      "name": "aux_coil1",
       "kind": "COIL",
       "address": 9,
       "unit": "",
       "operator_writable": true,
       "forceable": false,
       "encoding": "u16",
-      "description": "Operator/HMI run command (logic gates it with interlocks)"
+      "description": "Unassigned auxiliary protocol coil; no implicit VM binding"
     },
     {
-      "name": "di0_start",
+      "name": "di0",
       "kind": "DI",
       "address": 0,
       "unit": "",
       "operator_writable": false,
       "forceable": true,
       "encoding": "u16",
-      "description": "Start pushbutton input"
+      "description": "Digital input channel 0"
     },
     {
-      "name": "di1_stop",
+      "name": "di1",
       "kind": "DI",
       "address": 1,
       "unit": "",
       "operator_writable": false,
       "forceable": true,
       "encoding": "u16",
-      "description": "Stop pushbutton input"
+      "description": "Digital input channel 1"
     },
     {
-      "name": "di2_estop_in",
+      "name": "di2",
       "kind": "DI",
       "address": 2,
       "unit": "",
       "operator_writable": false,
       "forceable": true,
       "encoding": "u16",
-      "description": "Hardwired E-STOP status input"
+      "description": "Digital input channel 2"
     },
     {
       "name": "di3",
@@ -414,34 +387,34 @@
       "description": "Free-running PLC-alive counter"
     },
     {
-      "name": "setpoint_tempx10",
+      "name": "user_word0",
       "kind": "REG",
       "address": 30,
-      "unit": "0.1C",
-      "operator_writable": true,
-      "forceable": false,
-      "encoding": "s16",
-      "description": "Temperature request -> IW4; authored program must consume it (default demo does not)"
-    },
-    {
-      "name": "alarm_tempx10",
-      "kind": "REG",
-      "address": 31,
-      "unit": "0.1C",
-      "operator_writable": true,
-      "forceable": false,
-      "encoding": "s16",
-      "description": "High temperature limit -> IW5; new demo compares base IW0 against this value"
-    },
-    {
-      "name": "cycle_ms",
-      "kind": "REG",
-      "address": 32,
-      "unit": "ms",
+      "unit": "",
       "operator_writable": true,
       "forceable": false,
       "encoding": "u16",
-      "description": "Cycle request -> IW6; authored program must consume it (default demo does not)"
+      "description": "Unassigned protocol word; no implicit VM binding"
+    },
+    {
+      "name": "user_word1",
+      "kind": "REG",
+      "address": 31,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Unassigned protocol word; no implicit VM binding"
+    },
+    {
+      "name": "user_word2",
+      "kind": "REG",
+      "address": 32,
+      "unit": "",
+      "operator_writable": true,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Unassigned protocol word; no implicit VM binding"
     },
     {
       "name": "point_map_version",
@@ -451,7 +424,7 @@
       "operator_writable": false,
       "forceable": false,
       "encoding": "u16",
-      "description": "Canonical semantic map version; full SHA256 is registers43-58"
+      "description": "Hardware map version; SHA256 in registers43-58, application identity via project json"
     },
     {
       "name": "device_mac_word0",
@@ -482,22 +455,39 @@
       "forceable": false,
       "encoding": "u16",
       "description": "Public device identity word; credential-training input, high octet first"
-    }
-  ],
-  "bound_vm_words": [
-    {
-      "name": "process_role_1",
-      "index": 1
     },
     {
-      "name": "process_role_2",
-      "index": 2
+      "name": "tag_conflict_count",
+      "kind": "REG",
+      "address": 27,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Arbiter: cumulative two-master tag-write conflicts since boot"
     },
     {
-      "name": "process_role_3",
-      "index": 3
+      "name": "tag_conflict_key",
+      "kind": "REG",
+      "address": 28,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Arbiter: key of the most recent contested tag"
+    },
+    {
+      "name": "tag_conflict_src",
+      "kind": "REG",
+      "address": 29,
+      "unit": "",
+      "operator_writable": false,
+      "forceable": false,
+      "encoding": "u16",
+      "description": "Arbiter: source bitmask of the most recent conflict"
     }
   ],
+  "bound_vm_words": [],
   "process_bindings": {
     "schema": 1,
     "clock_register": 59,
@@ -692,6 +682,6 @@
         "kind": 5
       }
     ],
-    "admission": "Only explicitly configured valid fresh referenced IW1-3 may execute; referenced unbound IW7 is rejected. Changes to acquisition epoch/generation or regressed sequence stop executing programs. Clear fault and explicitly RUN after fresh recovery. Optional unreferenced sensors do not inhibit unrelated programs. Configuration is local PROGRAM-only and persistently read back before publication."
+    "admission": "Project-selected process1/process2/process3 sources may bind any IW0..7. Every selected source is required for RUN even if current instructions do not read it. Explicit typed route/identity and driver freshness are required; unknown or address-only devices are not admitted. Native acquisition topology is separately commissioned."
   }
 }

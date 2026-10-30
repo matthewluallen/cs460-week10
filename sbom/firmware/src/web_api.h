@@ -5,11 +5,12 @@
 #include <Arduino.h>
 
 String web_api_html();                                   // the HMI page (GET /)
-String web_api_points_json();                            // GET /api/points
-String web_api_log_json();                               // GET /api/log
-String web_api_mode_json(const char* set);               // GET /api/mode[?set=run|prog]
-String web_api_set_json(const char* tag, const char* val);            // GET /api/set
-String web_api_force_json(const char* tag, const char* on, const char* val); // GET /api/force
+String web_api_points_json(uint32_t peer);               // GET /api/points; filtered by socket peer
+String web_api_log_json(uint32_t peer);                  // GET /api/log
+String web_api_mode_json(const char* set, uint32_t peer); // GET /api/mode[?set=run|prog]
+String web_api_set_json(const char* tag, const char* val, uint32_t peer); // GET /api/set
+String web_api_force_json(const char* tag, const char* on, const char* val, uint32_t peer); // GET /api/force
+String web_api_raw_json(bool coil, const char* address, const char* value, uint32_t peer); // raw HTTP point alias
 String web_api_sys_json();                               // GET /api/sys  (device identity / IP banner)
 String web_api_login_json(const char* user, const char* pass); // GET /api/login (cleartext creds)
 String web_api_reboot_json();                            // GET /api/reboot (remote soft reboot)

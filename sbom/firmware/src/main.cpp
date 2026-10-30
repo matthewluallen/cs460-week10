@@ -108,7 +108,7 @@ static void comms_task(void*) {
 
 void setup() {
     diagnostic_log_begin(); // ordinary Arduino/IDF task logs never write USB
-    Serial.setRxBufferSize(4096);   // full 3072-byte console line + USB packet headroom
+    Serial.setRxBufferSize(8192);   // full 5500-byte project frame + USB packet headroom
     Serial.begin(115200);
     // Arduino HWCDC decrements an unsigned retry counter when the host stops
     // draining. A zero timeout underflows that counter and can stall until WDT.
@@ -135,8 +135,18 @@ void setup() {
     }
 
     display_ui_boot();   // LCD boot logo (orientation from M5.begin, not forced)
+
+#ifndef ENABLE_CWE_DEMOS
+    // Physical-presence recovery (maintainer escape hatch): holding button A through
+    // reset clears the provisioned operator password and returns to first-run
+    // enrollment. Covers a forgotten password or an engineer locked out of the box.
+    if (display_ui_btnA_held_at_boot()) {
+        plc_auth_clear_user_password();
+        Serial.println("[AUTH] button A held at boot - operator password cleared; set a new one with 'passwd <new>'");
+    }
+#endif
     for (int r = 0; r < 4; r++) io.relay_set(r, false);
-    Serial.println("[BOOT] outputs OFF; explicit RUN required (no relay pulse test)");
+    Serial.println("[BOOT] outputs OFF; validated project startup policy applies later (no relay pulse test)");
     if (ioexp_begin()) {
         Serial.printf("[IOEXP] StamPLC IO module online at 0x%02X (fw 0x%02X): 2 analog inputs + mechanical relay + 2 SSRs\n", ioexp_addr(), ioexp_fw());
     } else {
@@ -155,7 +165,7 @@ void setup() {
     // driving G14 (which corrupts W5500 SPI), then bring Ethernet up with RST
     // left untouched so we never reset the just-initialized display.
     eth_prepare_shared_int();
-    eth_begin(g_cfg.ip, g_cfg.gw, g_cfg.mask, g_cfg.use_static);
+    eth_begin(g_cfg.eth_ip, g_cfg.eth_gw, g_cfg.eth_mask, g_cfg.eth_use_static);
     time_sync_begin();   // network time client (default source = gateway; auto-sync off)
 #endif
     serial_config_menu(5000);
@@ -215,27 +225,27 @@ void setup() {
     }  // g_net_up
     #ifndef OPENPLC_GENERATED_CONTROLLER
     // Start OpenPLC runtime
-    openplc_runtime.start();
+    // The compatibility image shim does not execute an application.
+    // Only a validated project may enter the VM scan path.
 #ifdef ENABLE_PLC_VM
     g_engine.reset();
     g_prog_n = 0;
 #ifdef ENABLE_PLC_LOADER
     g_prog_n = plc::program_loader.begin(g_prog, 32);   // restore last-good program from NVS
 #endif
-    if (g_prog_n == 0) {
-        g_prog_n = plc::Engine::demo_process(g_prog, 32);
-        Serial.printf("[PLC] no stored program - loaded default process (%d instr)\n", g_prog_n);
-    } else {
-        Serial.printf("[PLC] stored program ready in PROGRAM (%d instr)\n", g_prog_n);
-    }
+    Serial.printf("[PLC] project instructions=%d; default PROGRAM; inspect startup policy with project json\n", g_prog_n);
 #endif
 
     #endif
 
     Serial.println("\n===== Startup complete =====");
     Serial.println("[Main] All services running");
+#ifdef ENABLE_CWE_DEMOS
     Serial.println("[WARNING] This firmware contains intentional vulnerabilities for educational purposes");
     Serial.println("[CWE] Embedded CWEs: 798, 319, 306, 494, 78, 489, 330, 22");
+#else
+    Serial.println("[PROFILE] Secure comparison build: selected remediation branches; see the residual-risk matrix");
+#endif
     plc_core_begin();
     acquisition_record_boot_begin(); // immutable before RTU/HTTP workers start
     plc_image_lock(); plc_image_unlock();  // initialize recursive mutex before any worker
@@ -253,19 +263,26 @@ void setup() {
     // Auto-recovery watchdog: subscribe the loop task now that boot is complete, so a
     // hang in loop() auto-reboots the board and prints a backtrace naming the stuck
     // task, instead of silently wedging until a manual power-cycle.
+    int wdt_init,wdt_config;bool wdt_reconfigured=false;
 #if ESP_IDF_VERSION_MAJOR >= 5
-    { esp_task_wdt_config_t wdt_cfg = { .timeout_ms = 8000, .idle_core_mask = 0, .trigger_panic = true };
-      if (esp_task_wdt_init(&wdt_cfg) == ESP_ERR_INVALID_STATE) esp_task_wdt_reconfigure(&wdt_cfg); }
+    { esp_task_wdt_config_t wdt_cfg = { .timeout_ms = execution::WatchdogTimeoutMs, .idle_core_mask = 0, .trigger_panic = true };
+      wdt_config=wdt_init=esp_task_wdt_init(&wdt_cfg);
+      if (wdt_init == ESP_ERR_INVALID_STATE) {
+          wdt_reconfigured=true;wdt_config=esp_task_wdt_reconfigure(&wdt_cfg);
+      } }
 #else
-    esp_task_wdt_init(8, true);
+    wdt_config=wdt_init=esp_task_wdt_init(execution::WatchdogTimeoutMs/1000, true);
 #endif
-    esp_task_wdt_add(NULL);
-    Serial.println("[WDT] loop task watchdog armed (8s, panic+reboot on hang)");
+    const int wdt_add=esp_task_wdt_add(NULL),wdt_status=esp_task_wdt_status(NULL);
+    plc_execution_watchdog_setup(wdt_init,wdt_reconfigured,wdt_config,wdt_add,wdt_status);
+    if (wdt_config==ESP_OK && wdt_status==ESP_OK)
+        Serial.println("[WDT] loop task watchdog armed (8s, panic+reboot on hang)");
+    else Serial.printf("[WDT] policy not confirmed: config=%d add=%d status=%d; inspect execution json\n",wdt_config,wdt_add,wdt_status);
 }
 
 void loop() {
     plc_timing_loop_begin(); // includes WDT, console, acquisition, scan, services and display
-    esp_task_wdt_reset();
+    plc_execution_watchdog_feed(esp_task_wdt_reset());
     unsigned long now = millis();
     plc_diag_loop(now);   // 1 Hz black-box checkpoint (cheap, throttled)
     plc_console_poll();   // USB debug console (also receives PLCLOAD program frames)
@@ -298,7 +315,7 @@ void loop() {
 #endif
         last_scan_ms = millis();
 #ifdef ENABLE_PLC_VM
-        plc_core_scan();   // read inputs -> solve logic -> write outputs (mode/force aware)
+        plc_core_scan_scheduled(); // separate periodic timing from loader inhibition scans
 #endif
     }
 
@@ -352,7 +369,7 @@ void loop() {
             (long)g.weight_raw, g.tempC, g.rh, g.hPa, g.env_ok?1:0); }
 #endif
         // Registers are published every scan by plc_core_scan(); telemetry only here.
-        if (!console_telemetry_muted()) diagnostic_log_printf(diagnostics::Origin::Telemetry,"[PLC] mode=%s scan=%luus(max %lu) faults=%d forces=%d estop=%d | CH1=%umV/%uuA CH2=%umV/%uuA\n",
+        if (!console_telemetry_muted()) diagnostic_log_printf(diagnostics::Origin::Telemetry,"[PLC] mode=%s scan=%luus(max %lu) faults=%d forces=%d expansion_relay=%d | CH1=%umV/%uuA CH2=%umV/%uuA\n",
             plc_mode_str(), (unsigned long)plc_scan_last_us(), (unsigned long)plc_scan_max_us(),
             plc_fault_active_count(), plc_force_count(), plc_coil_live(0)?1:0,
             modbus_server.get_register(10), modbus_server.get_register(11),
@@ -383,16 +400,28 @@ void loop() {
 
 void setup_wifi() {
     g_net_up = false;
-    if (g_cfg.wifi_mode == 0) {
+    if (g_cfg.wifi_mode == WMODE_OFF) {
         Serial.println("[WiFi] DISABLED by config (contained/serial-only). No radio, no network services.");
         WiFi.mode(WIFI_OFF);
         return;
     }
+    if (g_cfg.wifi_mode == WMODE_AP) {
+        // Setup/provisioning AP: host a network and serve the web config UI on it, so the
+        // device can be configured over WiFi (http://192.168.4.1:8080) as well as USB.
+        char apssid[33]; setup_ap_ssid(apssid, sizeof(apssid)); const char* appw = setup_ap_pass();
+        Serial.printf("[WiFi] SETUP-AP '%s' (default-cred provisioning - CWE-798/1392 if left unchanged)\n", apssid);
+        WiFi.mode(WIFI_AP);
+        WiFi.softAP(apssid, appw);
+        g_net_up = true;
+        Serial.print("[WiFi] AP IP: "); Serial.println(WiFi.softAPIP());
+        Serial.printf("[WiFi] Web config: http://%s:8080  (or configure over USB: netcfg)\n", WiFi.softAPIP().toString().c_str());
+        return;
+    }
     Serial.printf("[WiFi] Connecting to %s...\n", g_cfg.ssid);
     WiFi.mode(WIFI_STA);
-    if (g_cfg.use_static) {
+    if (g_cfg.wifi_use_static) {
         IPAddress ip, gw, mask;
-        ip.fromString(g_cfg.ip); gw.fromString(g_cfg.gw); mask.fromString(g_cfg.mask);
+        ip.fromString(g_cfg.wifi_ip); gw.fromString(g_cfg.wifi_gw); mask.fromString(g_cfg.wifi_mask);
         WiFi.config(ip, gw, mask);
     }
     WiFi.begin(g_cfg.ssid, g_cfg.pass);
@@ -425,7 +454,7 @@ void print_startup_banner() {
     Serial.println("╔═══════════════════════════════════════════╗");
     Serial.println("║  M5 StampLC OpenPLC + Tailscale Lab       ║");
     Serial.println("║  CWE-1358: ICS Security Teaching Platform ║");
-    Serial.println("║  Version 1.0 (Educational - Vulnerable)   ║");
+    Serial.println("║  Generic project runtime / VM32          ║");
     Serial.println("╚═══════════════════════════════════════════╝");
     Serial.println();
 #ifdef ENABLE_CWE_DEMOS
@@ -435,10 +464,10 @@ void print_startup_banner() {
     Serial.println("CWE Demonstration:");
     Serial.println("  [CWE-798]  Hardcoded password: admin:openplc");
     Serial.println("  [CWE-319]  Modbus TCP unencrypted on :502");
-    Serial.println("  [CWE-306]  E-stop coil accepts unauthenticated writes");
+    Serial.println("  [CWE-306]  Expansion output coil accepts unauthenticated writes");
     Serial.println("  [CWE-494]  OTA accepts unsigned firmware");
     Serial.println("  [CWE-78]   Command injection in diagnostic_ping()");
-    Serial.println("  [CWE-489]  Debug telnet on :23 (no auth)");
+    Serial.println("  [CWE-489]  Wi-Fi debug telnet on :23 (off in Ethernet profile)");
     Serial.println("  [CWE-330]  Session token predictable (millis-based)");
     Serial.println("  [CWE-22]   Path traversal in log viewer");
     Serial.println("  [CWE-521]  User password capped at 8 chars, A-Z0-9 only");
@@ -453,9 +482,9 @@ void print_startup_banner() {
     Serial.println("               service:<derived from MAC above>  <- backdoor");
     Serial.println("  Console    : 'login <user> <pass>', then 'passwd <new>' / 'svcinfo'");
 #else
-    Serial.println("✓  SECURE BUILD - intentional weaknesses compiled out");
-    Serial.println("   (ENABLE_CWE_DEMOS off). Hardened:");
-    Serial.println("  [CWE-798/259] no default/hardcoded/backdoor creds");
+    Serial.println("SECURE comparison profile - selected remediation branches");
+    Serial.println("   ENABLE_CWE_DEMOS off; this label is not a complete-security claim.");
+    Serial.println("  [CWE-798/259] operator credential branch changed; provisioning/residual credentials require review");
     Serial.println("  [CWE-306]  Modbus writes refused unless in supervised REMOTE mode");
     Serial.println("  [CWE-494]  OTA requires HMAC signature + authentication");
     Serial.println("  [CWE-78]   diagnostic ping input validated");

@@ -15,7 +15,7 @@ static const uint32_t NTP_UNIX_DELTA = 2208988800UL;   // 1900-01-01 -> 1970-01-
 // THE INTENTIONAL WEAKNESS (teaching build): kept in a *signed 32-bit* field. A
 // correct controller uses 64-bit time_t; this truncates the network-supplied time
 // (CWE-197), so any value past 2038-01-19 03:14:07 UTC wraps negative and the clock
-// reads 1902. The secure build (#else) stores the full 64-bit epoch and never wraps.
+// reads 1902 (1902-04-27). The secure build (#else) stores the full 64-bit epoch and never wraps.
 #ifdef ENABLE_CWE_DEMOS
 static int32_t  s_epoch32     = 0;
 #else
@@ -210,7 +210,7 @@ void time_sync_service() {
 
 void time_sync_begin() {
     if (!s_lock) s_lock = xSemaphoreCreateMutex();
-    const char* src = (g_cfg.ntp[0]) ? g_cfg.ntp : g_cfg.gw;
+    const char* src = (g_cfg.ntp[0]) ? g_cfg.ntp : g_cfg.eth_gw;
     if (src && src[0]) { strncpy(s_server, src, sizeof(s_server) - 1); s_server[sizeof(s_server) - 1] = 0; }
     s_port = g_cfg.ntp_port ? (uint16_t)g_cfg.ntp_port : 123;
     s_interval_ms = 0; s_last_auto = millis();

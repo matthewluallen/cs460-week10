@@ -1,3 +1,4 @@
+#include "network_access.h"
 #include "diagnostic_log.h"
 #include <Arduino.h>
 #include <cstring>
@@ -32,6 +33,10 @@ void OTAHandler::handle() {
 }
 
 void OTAHandler::handle_upload_post() {
+    PlcNetworkImageGuard guard;
+    if (plc_project_host_acl_enabled()) {
+        server.send(403, "application/json", PLC_ACL_ERROR); return;
+    }
     // CWE-494: No signature verification on uploaded firmware
     if (server.method() == HTTP_POST) {
         if (server.hasArg("plain")) {

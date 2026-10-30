@@ -1,8 +1,11 @@
 #include "dnp3_outstation.h"
+#include "tag_arbiter.h"
+#include "proto_common.h"
 #include "modbus_tcp_server.h"   // shared I/O image: get_register / set_coil (same path as Modbus)
 #include "plc_core.h"            // plc_di_live / plc_coil_live / plc_log / SRC_MODBUS
 #include <string.h>
 #include "esp_timer.h"
+#include "network_access.h"
 
 Dnp3Outstation dnp3_outstation;
 
@@ -17,7 +20,7 @@ static int dnp3_build_frame(uint8_t* out, uint16_t dest, uint16_t src, uint8_t c
 Dnp3Outstation::Dnp3Outstation() : server(DNP3_TCP_PORT) { cur_src_ip[0] = 0; }
 
 bool Dnp3Outstation::start() {
-    for (int i = 0; i < 3; i++) { server.begin(); delay(20); }  // 3x = boot retry robustness (begin() is best-effort); available() maintains one listener thereafter
+    net_listen_begin(server);  // (was a copy-pasted 3x begin() retry; see proto_common.h)
     Serial.printf("[DNP3] outstation (addr %d) started on TCP %d - no base auth (SAv5 is the defense)\n",
                   DNP3_ADDR, DNP3_TCP_PORT);
     return true;
@@ -42,8 +45,7 @@ int Dnp3Outstation::build_response(uint8_t* out, uint16_t dest) {
 
     // g30v2 16-bit analog input with flag: Vin(mV), current(mA), CH1, CH2
     app[a++] = 0x1E; app[a++] = 0x02; app[a++] = 0x00; app[a++] = 0x00; app[a++] = 0x03;
-    const uint16_t regs[4] = { modbus_server.get_register(0),  modbus_server.get_register(1),
-                               modbus_server.get_register(10), modbus_server.get_register(12) };
+    uint16_t regs[4]; plc_legacy_analog_snapshot(regs);
     for (int i = 0; i < 4; i++) { app[a++] = 0x01; app[a++] = regs[i] & 0xFF; app[a++] = regs[i] >> 8; }
 
     return dnp3_build_frame(out, dest, DNP3_ADDR, 0x44, app, a);
@@ -60,9 +62,22 @@ int Dnp3Outstation::build_control_reply(uint8_t* out, const uint8_t* obj, int ob
 
 // Apply a CROB (g12v1) DIRECT_OPERATE: actuate the target relay through the SAME
 // coil path as Modbus, with NO authentication (CWE-306) — the teaching point.
-void Dnp3Outstation::apply_crob(const uint8_t* obj, int len, const char* src_ip) {
-    if (len < 5 || obj[0] != 0x0C || obj[1] != 0x01) return;   // expect g12v1 CROB
+bool Dnp3Outstation::apply_crob(const uint8_t* obj, int len, const char* src_ip, uint32_t peer) {
+    PlcNetworkImageGuard guard;
+    if (len < 4 || obj[0] != 0x0C || obj[1] != 0x01 || obj[2] != 0x17) return false;
     uint8_t count = obj[3];                                    // qualifier 0x17: 1-byte count + index prefix
+    if (!count || len != 4 + int(count) * 12) return false;
+    // Preflight every object before the first write; a denied later point cannot
+    // leave a partially applied multi-object command.
+    for (int k = 0; k < count; ++k) {
+        const int pos = 4 + k * 12;
+        const uint8_t index = obj[pos], code = obj[pos + 1];
+        if (index >= 4 || (code != 0x03 && code != 0x41 && code != 0x04 && code != 0x81) ||
+            !plc_project_point_allowed(peer, point_policy::Kind::Coil, index, true)) {
+            plc_log(SRC_DNP3, src_ip, "ACL/FORMAT DENIED CROB coil %u", index);
+            return false;
+        }
+    }
     int p = 4;
     for (int k = 0; k < count && p + 12 <= len; k++) {
         uint8_t index = obj[p];
@@ -72,11 +87,16 @@ void Dnp3Outstation::apply_crob(const uint8_t* obj, int len, const char* src_ip)
         else if (code == 0x04 || code == 0x81) on = false;     // LATCH_OFF / PULSE_OFF (trip)
         else                                    on = true;
         if (index < 4) {
-            modbus_server.set_coil(index, on);                 // same actuation path as Modbus; no auth
-            plc_log(SRC_DNP3, src_ip, "DNP3 DIRECT_OPERATE relay %u = %d (CROB 0x%02X)", index, on ? 1 : 0, code);
+            if (arb::note_write(arb::coil_key(index), arb::SRC_DNP3)) {   // P3 arbiter: source + ownership
+                modbus_server.set_coil(index, on);             // same actuation path as Modbus; no auth
+                plc_log(SRC_DNP3, src_ip, "DNP3 DIRECT_OPERATE relay %u = %d (CROB 0x%02X)", index, on ? 1 : 0, code);
+            } else {
+                plc_log(SRC_DNP3, src_ip, "DNP3 relay %u REFUSED - tag owned by another protocol (arbiter)", index);
+            }
         }
         p += 12;                                               // index(1)+code(1)+opcount(1)+on(4)+off(4)+status(1)
     }
+    return true;
 }
 
 void Dnp3Outstation::handle() {
@@ -91,6 +111,8 @@ void Dnp3Outstation::handle() {
         active = candidate; stream.clear(); transport.clear(); link_seen = false;
     }
     if (!active || !active.connected()) return;
+    const uint32_t peer = plc_network_ipv4(active.remoteIP());
+    if (!plc_project_host_allowed(peer)) { active.stop(); return; }
     // Bounded work per comms iteration; a split TCP frame remains buffered.
     for (unsigned budget = 0; budget < 512 && active.available(); ++budget) {
         int byte = active.read(); if (byte < 0) break;
@@ -123,10 +145,14 @@ void Dnp3Outstation::handle() {
             response_sequence = app[0] & 15;
             active.remoteIP().toString().toCharArray(cur_src_ip, sizeof(cur_src_ip));
             if (app[1] == 1) {
+                PlcNetworkImageGuard guard;
+                if (!plc_network_legacy_snapshot_allowed(peer)) {
+                    plc_log(SRC_DNP3, cur_src_ip, "ACL DENIED class-0 snapshot"); active.stop(); return;
+                }
                 plc_log(SRC_DNP3, cur_src_ip, "DNP3 READ from addr %u", frame.source);
                 size = build_response(out, frame.source);
             } else if (app[1] == 5 || app[1] == 6) {
-                apply_crob(app + 2, int(n - 2), cur_src_ip);
+                if (!apply_crob(app + 2, int(n - 2), cur_src_ip, peer)) { active.stop(); return; }
                 // Function 6 explicitly forbids an application response.
                 size = app[1] == 6 ? 0 : build_control_reply(out, app + 2, int(n - 2), frame.source);
             } else if (app[1] != 0) {

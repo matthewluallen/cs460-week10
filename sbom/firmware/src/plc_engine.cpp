@@ -48,6 +48,8 @@ const char* validate_program(const Instr* prog, int n) {
 }
 
 void Engine::reset() {
+  for (int i=0;i<NDI;i++) ix_[i]=false;
+  for (int i=0;i<NIW;i++) iw_[i]=0;
   for (int i=0;i<NQ;i++) qx_[i]=false;
   for (int i=0;i<NMX;i++) mx_[i]=false;
   for (int i=0;i<NINST;i++) inst_[i]=FbInst();
@@ -101,40 +103,6 @@ bool Engine::scan(const Instr* prog, int n, uint32_t now_ms) {
     }
   }
   return true;
-}
-
-// Self-resetting 1 s TON blinker that toggles %MX0 -> %QX0 on each edge.
-// Proves the VM (timers, edges, memory, output) with NO inputs wired.
-//   IN(TON0) := NOT TON0.Q ; on rising edge of Q, MX0 := MX0 XOR 1 ; QX0 := MX0
-int Engine::demo_blinker(Instr* o, int cap) {
-  int n=0;
-  auto emit=[&](uint8_t op,int32_t a=0,int32_t b=0){ if(n<cap){o[n].op=op;o[n].a=a;o[n].b=b;n++;} };
-  emit(OP_FBQ, 0);          // push TON0.Q (previous)
-  emit(OP_NOT);             // IN = NOT Q
-  emit(OP_TON, 0, 1000);    // TON0(IN, PT=1000ms) -> push Q
-  emit(OP_RTRIG, 1);        // rising edge of Q (inst 1) -> pulse
-  emit(OP_LD_MX, 0);        // push MX0
-  emit(OP_XOR);             // MX0 XOR pulse
-  emit(OP_ST_MX, 0);        // MX0 := ...
-  emit(OP_LD_MX, 0);        // push MX0
-  emit(OP_ST_QX, 0);        // QX0 := MX0
-  emit(OP_HALT);
-  return n;
-}
-
-int Engine::demo_process(Instr* o, int cap) {
-  int n=0;
-  auto emit=[&](uint8_t op,int32_t a=0,int32_t b=0){ if(n<cap){o[n].op=op;o[n].a=a;o[n].b=b;n++;} };
-  // Motor demo. Matches the lab's "relay0 := di0" and the released twin image:
-  //   relay0 (motor)     = di0_start AND NOT di2_estop_in
-  //   relay1 (run light) = relay0 (motor)
-  //   relay3 (fault lamp) = di2_estop_in
-  // di1_stop/di2_estop_in use the hardwired-NC convention of the point map.
-  emit(OP_LD_IX,0); emit(OP_LD_IX,2); emit(OP_NOT); emit(OP_AND); emit(OP_ST_QX,0);  // motor
-  emit(OP_LD_QX,0); emit(OP_ST_QX,1);                                                // run light
-  emit(OP_LD_IX,2); emit(OP_ST_QX,3);                                                // fault/e-stop lamp
-  emit(OP_HALT);
-  return n;
 }
 
 } // namespace plc

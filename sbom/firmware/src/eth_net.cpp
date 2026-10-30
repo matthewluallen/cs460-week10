@@ -54,9 +54,9 @@ bool eth_begin(const char* ip, const char* gw, const char* mask, bool use_static
             // Adopt the leased gateway as the (in-memory) default: an NTP source of
             // "gateway" then follows whatever DHCP handed out - so a rogue DHCP server
             // that sets itself as the gateway also becomes the device's time source.
-            Ethernet.gatewayIP().toString().toCharArray(g_cfg.gw, sizeof(g_cfg.gw));
+            Ethernet.gatewayIP().toString().toCharArray(g_cfg.eth_gw, sizeof(g_cfg.eth_gw));
             Serial.printf("[ETH] DHCP lease: ip=%s gw=%s\n",
-                          Ethernet.localIP().toString().c_str(), g_cfg.gw);
+                          Ethernet.localIP().toString().c_str(), g_cfg.eth_gw);
         }
     }
     delay(200);

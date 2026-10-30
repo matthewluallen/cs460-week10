@@ -1,3 +1,5 @@
+#include "network_access.h"
+#include "proto_common.h"
 #include "opcua_server.h"
 #include "plc_core.h"          // plc_log / SRC_MODBUS
 #include <string.h>
@@ -48,7 +50,7 @@ static int nid_len(const uint8_t* b) {         // length of an encoded NodeId
 OpcUaServer::OpcUaServer() : server(OPCUA_TCP_PORT) { s_seq=1; s_endpoint[0]=0; cur_src_ip[0]=0; }
 
 bool OpcUaServer::start() {
-    for (int i = 0; i < 3; i++) { server.begin(); delay(20); }  // 3x = boot retry robustness (begin() is best-effort); available() maintains one listener thereafter
+    net_listen_begin(server);  // (was a copy-pasted 3x begin() retry; see proto_common.h)
 #ifdef ENABLE_ETHERNET
     String ips = eth_ip();
 #else
@@ -105,6 +107,7 @@ int OpcUaServer::build_gep_resp(uint8_t* out, uint32_t reqid, uint32_t reqhandle
 void OpcUaServer::handle() {
     NetClient client = server.available();
     if (!client) return;
+    if (!plc_project_host_allowed(plc_network_ipv4(client.remoteIP()))) { client.stop(); return; }
     if (!client.connected()) { client.stop(); return; }
     if (!client.available()) return;
 
@@ -121,31 +124,39 @@ void OpcUaServer::handle() {
         ol = build_ack(out);
         plc_log(SRC_OPCUA, cur_src_ip, "OPC-UA Hello (opc.tcp handshake)");
     } else if (buf[0]=='O' && buf[1]=='P' && buf[2]=='N') {
+        // Bounds-checked parse: a malformed OPN must never advance p past len (every
+        // length below is attacker-controlled). On any overrun we leave ol=0 (no reply).
         int p = 12;                                            // 8 hdr + 4 SecureChannelId
-        uint32_t l;
-        l = rd32(buf,p); p+=4; if (l!=0xFFFFFFFFu) p+=l;       // SecurityPolicyUri
-        l = rd32(buf,p); p+=4; if (l!=0xFFFFFFFFu) p+=l;       // SenderCertificate
-        l = rd32(buf,p); p+=4; if (l!=0xFFFFFFFFu) p+=l;       // ReceiverCertThumbprint
-        p += 4;                                                // SequenceNumber
-        uint32_t reqid = rd32(buf,p); p+=4;
-        p += nid_len(buf+p);                                   // TypeId
-        p += nid_len(buf+p);                                   // AuthenticationToken
-        p += 8;                                                // Timestamp
-        uint32_t reqhandle = (p+4<=len) ? rd32(buf,p) : 1;
-        ol = build_opn_resp(out, reqid, reqhandle, s_seq++);
-        plc_log(SRC_OPCUA, cur_src_ip, "OPC-UA OpenSecureChannel (SecurityPolicy None)");
+        bool ok = true;
+        for (int f = 0; f < 3 && ok; f++) {                    // SecurityPolicyUri, SenderCert, ReceiverThumbprint
+            if (p + 4 > len) { ok = false; break; }
+            uint32_t l = rd32(buf,p); p += 4;
+            if (l != 0xFFFFFFFFu) { if (l > (uint32_t)(len - p)) { ok = false; break; } p += (int)l; }
+        }
+        if (ok && p + 8 <= len) {                              // SequenceNumber(4) + RequestId(4)
+            p += 4;
+            uint32_t reqid = rd32(buf,p); p += 4;
+            if (p < len) p += nid_len(buf+p);                  // TypeId
+            if (p < len) p += nid_len(buf+p);                  // AuthenticationToken
+            p += 8;                                            // Timestamp
+            uint32_t reqhandle = (p >= 0 && p+4 <= len) ? rd32(buf,p) : 1;
+            ol = build_opn_resp(out, reqid, reqhandle, s_seq++);
+            plc_log(SRC_OPCUA, cur_src_ip, "OPC-UA OpenSecureChannel (SecurityPolicy None)");
+        }
     } else if (buf[0]=='M' && buf[1]=='S' && buf[2]=='G') {
         int p = 16;                                            // 8 hdr + channel + tokenid
-        p += 4;                                                // SequenceNumber
-        uint32_t reqid = rd32(buf,p); p+=4;
-        uint16_t typeid_num = (buf[p]==0x01) ? (uint16_t)(buf[p+2] | (buf[p+3]<<8)) : 0;
-        p += nid_len(buf+p);                                   // TypeId
-        p += nid_len(buf+p);                                   // AuthenticationToken
-        p += 8;                                                // Timestamp
-        uint32_t reqhandle = (p+4<=len) ? rd32(buf,p) : 1;
-        if (typeid_num == 428) {                               // GetEndpointsRequest
-            ol = build_gep_resp(out, reqid, reqhandle, s_seq++);
-            plc_log(SRC_OPCUA, cur_src_ip, "OPC-UA GetEndpoints (server enumeration)");
+        if (p + 8 <= len) {                                    // SequenceNumber(4) + RequestId(4)
+            p += 4;
+            uint32_t reqid = rd32(buf,p); p += 4;
+            uint16_t typeid_num = (p + 4 <= len && buf[p]==0x01) ? (uint16_t)(buf[p+2] | (buf[p+3]<<8)) : 0;
+            if (p < len) p += nid_len(buf+p);                  // TypeId
+            if (p < len) p += nid_len(buf+p);                  // AuthenticationToken
+            p += 8;                                            // Timestamp
+            uint32_t reqhandle = (p >= 0 && p+4 <= len) ? rd32(buf,p) : 1;
+            if (typeid_num == 428) {                           // GetEndpointsRequest
+                ol = build_gep_resp(out, reqid, reqhandle, s_seq++);
+                plc_log(SRC_OPCUA, cur_src_ip, "OPC-UA GetEndpoints (server enumeration)");
+            }
         }
     } else if (buf[0]=='C' && buf[1]=='L' && buf[2]=='O') {
         client.stop(); return;

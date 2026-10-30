@@ -109,7 +109,7 @@ static void publish(uint8_t value,bool observe) {
     }
     for(unsigned i=0;i<4;++i) {
         s_relay_cmd[i]=(value>>i)&1;
-        modbus_server.set_coil(pointmap::MOTOR+i,s_relay_cmd[i]);
+        modbus_server.set_coil(pointmap::RELAY0+i,s_relay_cmd[i]);
         if(observe && readback_valid) {
             s_relay_act[i]=(readback>>i)&1;
             if(s_relay_act[i]!=s_relay_cmd[i])fault(20+i,"generated relay readback");
@@ -199,8 +199,8 @@ static void owner_task(void*) {
                             request.input.input_force_mask=s_di_force_en;
                             request.input.input_force_values=s_di_force_val;
                             for(unsigned i=0;i<4;++i) {
-                                if((s_coil_force_en>>(pointmap::MOTOR+i))&1)request.input.output_force_mask|=1<<i;
-                                if((s_coil_force_val>>(pointmap::MOTOR+i))&1)request.input.output_force_values|=1<<i;
+                                if((s_coil_force_en>>(pointmap::RELAY0+i))&1)request.input.output_force_mask|=1<<i;
+                                if((s_coil_force_val>>(pointmap::RELAY0+i))&1)request.input.output_force_values|=1<<i;
                             }
                             request.input.run=true;
                             guard.output(esp_timer_get_time());

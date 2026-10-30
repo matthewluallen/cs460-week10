@@ -23,3 +23,7 @@ String plc_scan_json(const PlcSourceSnapshot& snapshot);
 String plc_scan_json();
 
 String plc_loop_phases_json();
+
+// Separate <=4096-byte cached execution report. No mode, bus or counter changes.
+String plc_execution_json();
+String plc_execution_json(const PlcExecutionSnapshot& snapshot);

@@ -8,6 +8,11 @@ void plc_bindings_begin();
 // Loop/scan owner only: the acquisition engine is owned by that same task.
 void plc_bindings_refresh();
 void plc_bindings_invalidate();
+// Complete project publication uses no independent binding persistence.
+void plc_bindings_activate_project(const bindings::Config& config,uint32_t generation);
+bool plc_bindings_project_ready(uint8_t mask,bool arm);
+const char* plc_bindings_project_reason(uint8_t mask);
+bool plc_bindings_project_values(uint8_t mask,bool executing,int32_t (&values)[bindings::Count]);
 bool plc_bindings_ready(const plc::Instr* program,int count,bool arm);
 void plc_bindings_scan(plc::Engine& engine,const plc::Instr* program,int count,bool executing);
 // Optional compare-and-set token protects the interactive assignment workflow.

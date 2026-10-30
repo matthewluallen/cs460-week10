@@ -4,6 +4,8 @@
 #pragma once
 void display_ui_boot();   // call once in setup() AFTER io.init() (display is up by then)
 void display_ui_tick();   // call from loop(); refreshes buttons + renders (self-throttled)
+void display_ui_inject(char btn); // inject an A/B/C panel button press (UI drives the on-device screen)
+bool display_ui_btnA_held_at_boot(); // true if button A is physically held (maintainer boot recovery)
 
 #include "display_capture_core.h"
 // Loop-task-only APIs. Optional candidate profile; unavailable on ordinary builds.

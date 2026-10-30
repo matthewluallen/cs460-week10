@@ -4,6 +4,7 @@
 #include "device_acquisition.h"
 #include "network_input.h"
 #include "plc_core.h"
+#include "plc_project.h"
 #include "modbus_tcp_server.h"
 #include <Preferences.h>
 #include <mbedtls/sha256.h>
@@ -24,6 +25,7 @@ network_input::State network_samples[bindings::Count];
 uint32_t armed_epoch[bindings::Count]{},armed_generation[bindings::Count]{},last_sequence[bindings::Count]{};
 uint32_t config_generation=0,published_ms=0;
 uint8_t status=0,digest[32]{};
+bindings::ProjectGate project_gate;
 char hash_text[65]{};
 // Buffers used only by the loop owner's PROGRAM configuration path.
 char canonical[bindings::JsonCapacity]{};
@@ -70,6 +72,7 @@ void plc_bindings_begin() {
     PublicationInputs publication;
 #endif
     config=bindings::Config{};status=0;config_generation=0;
+    #ifdef OPENPLC_GENERATED_CONTROLLER
     Preferences pref;
     // Create an empty namespace at first boot; inability to open is visible.
     if(!pref.begin("bindings",false))status=1;
@@ -77,8 +80,47 @@ void plc_bindings_begin() {
         String text=pref.getString("config","");pref.end();
         if(text.length() && !bindings::decode(text.c_str(),text.length(),config))status=2;
     }
+    #else
+    // A generic project never inherits an independently saved application binding.
+    if(plc_project_ready()){config=plc_project_active().definition.process_bindings;config_generation=plc_project_generation();}
+    #endif
+    project_gate={};
     size_t n=bindings::encode(config,canonical,sizeof(canonical));hash(canonical,n);
     for(auto& s:samples)s={};configure_network();plc_bindings_refresh();
+}
+void plc_bindings_activate_project(const bindings::Config& candidate,uint32_t generation) {
+    Guard guard;
+    config=candidate;config_generation=generation;status=0;project_gate={};
+    const size_t n=bindings::encode(config,canonical,sizeof(canonical));
+    if(!n)status=2;
+    hash(canonical,n);
+    for(auto& s:samples)s={};
+    configure_network();plc_bindings_refresh();
+}
+bool plc_bindings_project_ready(uint8_t mask,bool arm) {
+    Guard guard;return project_gate.ready(mask,samples,status,millis(),arm);
+}
+const char* plc_bindings_project_reason(uint8_t mask) {
+    Guard guard;
+    if(mask&&status)return "binding_config_invalid";
+    for(unsigned i=0;i<bindings::Count;++i)if(mask&(1u<<i)) {
+        const auto& s=samples[i];
+        if(s.usable(millis()))continue;
+        switch(s.quality) {
+        case bindings::Quality::Unbound:case bindings::Quality::Awaiting:case bindings::Quality::Missing:case bindings::Quality::Paused:
+            return "missing_or_uncommissioned_source";
+        case bindings::Quality::IdentityMismatch:return "source_identity_mismatch";
+        case bindings::Quality::Stale:case bindings::Quality::Valid:return "stale_source";
+        case bindings::Quality::Warmup:return "source_warming_up";
+        default:return "invalid_source";
+        }
+    }
+    return nullptr;
+}
+bool plc_bindings_project_values(uint8_t mask,bool executing,int32_t (&values)[bindings::Count]) {
+    Guard guard;const uint32_t now=millis();
+    for(unsigned i=0;i<bindings::Count;++i)values[i]=!status&&samples[i].usable(now)?samples[i].value:0;
+    return !executing||project_gate.check(mask,samples,status,now);
 }
 void plc_bindings_refresh() {
     // Main loop is the sole acquisition writer. Publish a small resolved copy;
@@ -131,6 +173,9 @@ void plc_bindings_scan(plc::Engine& engine,const plc::Instr* program,int count,b
 bool plc_bindings_load(const char* json,size_t size,const PlcBindingVersion* expected) {
     bindings::Config staged;if(!bindings::decode(json,size,staged))return false;
     Guard guard;if(plc_mode()!=PLC_PROGRAM||config_generation==UINT32_MAX)return false;
+#ifndef OPENPLC_GENERATED_CONTROLLER
+    if(plc_project_ready())return false; // edit and redeploy the complete project
+#endif
     if(expected&&(!acquisition_record_boot_id()[0]||expected->boot_id[32]||expected->config_sha256[64]||
         expected->generation!=config_generation||memcmp(expected->boot_id,acquisition_record_boot_id(),32)||
         memcmp(expected->config_sha256,hash_text,64)))return false;

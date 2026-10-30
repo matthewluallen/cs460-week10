@@ -1,3 +1,4 @@
+#include "network_access.h"
 // eth_ota.cpp - W5500-native firmware OTA upload on port 80, served over the
 // chip's own TCP stack so the QEMU twin and real Ethernet builds expose the
 // update path. ota_handler.cpp binds the Arduino WiFi WebServer (WiFi/lwIP) and
@@ -111,6 +112,9 @@ static void send_simple(NetClient& c, const char* status, const char* ctype, con
 void eth_ota_handle() {
     NetClient c = ota_httpd.available();
     if (!c) return;
+    if (plc_project_host_acl_enabled()) {
+        send_simple(c, "403 Forbidden", "application/json", PLC_ACL_ERROR); c.stop(); return;
+    }
     if (!c.connected()) { c.stop(); return; }
     if (!c.available()) return;
 
@@ -129,7 +133,11 @@ void eth_ota_handle() {
     char method[8] = {0}, target[256] = {0};
     sscanf(req, "%7s %255s", method, target);
     String ips = c.remoteIP().toString();
+    const uint32_t peer = plc_network_ipv4(c.remoteIP());
 
+    if (plc_project_host_acl_enabled()) {
+        send_simple(c, "403 Forbidden", "application/json", PLC_ACL_ERROR); c.stop(); return;
+    }
     if (!strcmp(method, "POST") && !strcmp(target, OTA_ENDPOINT)) {
 #ifdef ENABLE_CWE_DEMOS
         long clen = content_length(req);
@@ -137,12 +145,26 @@ void eth_ota_handle() {
 
         // CWE-306: no authentication is checked here at all.
         // CWE-494: no verification gate - verify_firmware() below is a no-op.
-        bool begun = Update.begin((size_t)clen);
+        bool begun = false;
+        uint32_t admitted_generation = 0;
+        {
+            PlcNetworkImageGuard guard;
+            if (plc_project_host_acl_enabled()) {
+                send_simple(c, "403 Forbidden", "application/json", PLC_ACL_ERROR); c.stop(); return;
+            }
+            admitted_generation = plc_project_generation();
+            begun = Update.begin((size_t)clen);
+        }
         size_t written = 0;
         uint8_t buf[512];
         unsigned long tb = millis();
         while (written < (size_t)clen && millis() - tb < 8000) {
             while (c.available() && written < (size_t)clen) {
+                PlcNetworkImageGuard guard;
+                if (!plc_network_deferred_allowed(peer, OTA_ENDPOINT, admitted_generation)) {
+                    if (begun) Update.abort();
+                    send_simple(c, "403 Forbidden", "application/json", PLC_ACL_ERROR); c.stop(); return;
+                }
                 int r = c.read(buf, sizeof(buf));
                 if (r <= 0) break;
                 if (begun) Update.write(buf, (size_t)r);
@@ -157,19 +179,29 @@ void eth_ota_handle() {
         (void)verify_firmware(buf, written);     // no-op "check"
         log_upload(ips.c_str(), written);
 
-        bool boot = begun && Update.end(true);   // loader format check, NOT a signature check
-        String body = "OTA endpoint accepted an UNSIGNED, UNAUTHENTICATED image (CWE-494/306/319).\n";
-        body += "bytes="; body += (int)written; body += " verified=NO\n";
-        if (boot) body += "image is bootable - rebooting into it now.\n";
-        else      body += "image not a valid ESP app (loader format check) - note: no signature was ever required.\n";
-        send_simple(c, "200 OK", "text/plain", body.c_str());
+        {
+            // Boot-partition selection and restart are one commit boundary.
+            // Releasing the image lock after Update.end would let a new project
+            // inherit an already-selected image or an old request's reboot.
+            PlcNetworkImageGuard guard;
+            if (!plc_network_deferred_allowed(peer, OTA_ENDPOINT, admitted_generation)) {
+                if (begun) Update.abort();
+                send_simple(c, "403 Forbidden", "application/json", PLC_ACL_ERROR); c.stop(); return;
+            }
+            const bool boot = begun && Update.end(true); // loader format check, NOT a signature check
+            String body = "OTA endpoint accepted an UNSIGNED, UNAUTHENTICATED image (CWE-494/306/319).\n";
+            body += "bytes="; body += (int)written; body += " verified=NO\n";
+            if (boot) body += "image is bootable - rebooting into it now.\n";
+            else      body += "image not a valid ESP app (loader format check) - note: no signature was ever required.\n";
+            send_simple(c, "200 OK", "text/plain", body.c_str());
 
-        if (boot) {
-            c.flush(); c.stop();
-            diagnostic_log_printf(diagnostics::Origin::Application,
-                                  "[OTA] rebooting into unsigned image from %s\n", ips.c_str());
-            delay(400);
-            ESP.restart();   // never returns - boots the attacker image (CWE-494 outcome)
+            if (boot) {
+                c.flush(); c.stop();
+                diagnostic_log_printf(diagnostics::Origin::Application,
+                                      "[OTA] rebooting into unsigned image from %s\n", ips.c_str());
+                delay(400);
+                ESP.restart();   // never returns - boots the attacker image (CWE-494 outcome)
+            }
         }
 #else
         // Hardened: authenticate the uploader (CWE-306) AND verify an HMAC-SHA256
@@ -191,10 +223,26 @@ void eth_ota_handle() {
         mbedtls_md_context_t md; mbedtls_md_init(&md);
         mbedtls_md_setup(&md, mdi, 1);
         mbedtls_md_hmac_starts(&md, (const unsigned char*)OTA_HMAC_KEY, strlen(OTA_HMAC_KEY));
-        bool begun = Update.begin((size_t)clen);
+        bool begun = false;
+        uint32_t admitted_generation = 0;
+        {
+            PlcNetworkImageGuard guard;
+            if (plc_project_host_acl_enabled()) {
+                mbedtls_md_free(&md);
+                send_simple(c, "403 Forbidden", "application/json", PLC_ACL_ERROR); c.stop(); return;
+            }
+            admitted_generation = plc_project_generation();
+            begun = Update.begin((size_t)clen);
+        }
         size_t written = 0; uint8_t buf[512]; unsigned long tb = millis();
         while (written < (size_t)clen && millis() - tb < 8000) {
             while (c.available() && written < (size_t)clen) {
+                PlcNetworkImageGuard guard;
+                if (!plc_network_deferred_allowed(peer, OTA_ENDPOINT, admitted_generation)) {
+                    if (begun) Update.abort();
+                    mbedtls_md_free(&md);
+                    send_simple(c, "403 Forbidden", "application/json", PLC_ACL_ERROR); c.stop(); return;
+                }
                 int r = c.read(buf, sizeof(buf));
                 if (r <= 0) break;
                 mbedtls_md_hmac_update(&md, buf, (size_t)r);   // hash as we go
@@ -213,16 +261,24 @@ void eth_ota_handle() {
                         "firmware signature INVALID - image rejected, not flashed (CWE-494).\n");
             c.stop(); return;
         }
-        bool boot = begun && Update.end(true);
-        String body = "OTA image authenticated + signature verified; ";
-        body += boot ? "rebooting into it now.\n" : "but loader format check failed.\n";
-        send_simple(c, "200 OK", "text/plain", body.c_str());
-        if (boot) {
-            c.flush(); c.stop();
-            diagnostic_log_printf(diagnostics::Origin::Application,
-                                  "[OTA] booting SIGNED, authenticated image from %s\n", ips.c_str());
-            delay(400);
-            ESP.restart();
+        {
+            // Keep final admission, boot selection and restart on this project.
+            PlcNetworkImageGuard guard;
+            if (!plc_network_deferred_allowed(peer, OTA_ENDPOINT, admitted_generation)) {
+                if (begun) Update.abort();
+                send_simple(c, "403 Forbidden", "application/json", PLC_ACL_ERROR); c.stop(); return;
+            }
+            const bool boot = begun && Update.end(true);
+            String body = "OTA image authenticated + signature verified; ";
+            body += boot ? "rebooting into it now.\n" : "but loader format check failed.\n";
+            send_simple(c, "200 OK", "text/plain", body.c_str());
+            if (boot) {
+                c.flush(); c.stop();
+                diagnostic_log_printf(diagnostics::Origin::Application,
+                                      "[OTA] booting SIGNED, authenticated image from %s\n", ips.c_str());
+                delay(400);
+                ESP.restart();
+            }
         }
 #endif
     } else if (!strcmp(method, "GET") && (!strcmp(target, "/") || !strcmp(target, "/ota"))) {

@@ -1,22 +1,13 @@
-// program_loader.h — receive an authored IR program over the USB-C serial
-// console, validate typed IR, operands and stack, persist it and install it in
-// PROGRAM at a scan boundary (explicit RUN required), so it survives a
-// reboot. License-clean, our own IP. See firmware/LOGIC_ENGINE_DESIGN.md.
-//
-// Wire frame (one text line, coexists with [IO] telemetry on the same port):
-//   PLCLOAD <crc32hex> <base64(ir-json)>\n
-// where ir-json is exactly what toolbase/plc_ir.py:to_json() emits, and crc32hex
-// is the little-endian zlib CRC-32 of those json bytes.
-//
-// Device reply (host verifies it is running exactly what was sent):
-//   [LOADER] OK instr=<n> crc=<hex> scan_ms=<ms>
-//   [LOADER] D <i> <op> <a> <b>        (one per instruction)
-//   [LOADER] END
-// or on failure:
-//   [LOADER] ERR <reason>
+// Complete project-v1 deployment over the shared USB console:
+//   PLCLOAD <eight hexadecimal CRC32 digits> <base64(project JSON)>\n
+// Maximum decoded payload4096 bytes. CRC is transfer integrity, not authentication.
+// A validated project is persisted as one raw JSON NVS blob, read back, then published
+// while stopped. No program-only fallback. Query `project json` independently
+// and compare payload_sha256 before an explicit `mode run`.
 #pragma once
 #include <Arduino.h>
 #include "plc_engine.h"
+#include "project_core.h"
 
 namespace plc {
 
@@ -38,9 +29,8 @@ class ProgramLoader {
   int  cap_  = 0;
   int  len_  = 0;
   bool discard_ = false;
-  char line_[3072];
+  char line_[project::FrameCapacity];
 
-  bool apply_json(const uint8_t* json, size_t jlen, Instr* prog, int& out_n, uint32_t* scan_ms_out);
   void handle_line(Engine& eng, Instr* prog, int& prog_n, bool* applied);
   void ack(const Instr* prog, int n, uint32_t crc, uint32_t scan_ms);
 };

@@ -24,6 +24,8 @@ void ioexp_set_ssr(uint8_t idx, bool on);
 // Control-register readback, not electrical/contact feedback. Returns false
 // on an absent module or failed I2C read. Bits 0/1=SSR, bit4=mechanical relay.
 bool ioexp_output_readback(uint8_t* bits);
+// Loop-owner identity/status observation, not a unique device serial or contact proof.
+bool ioexp_identity(uint8_t* address,uint8_t* revision);
 
 uint8_t ioexp_addr();  // current I2C address, 0 if absent
 uint8_t ioexp_fw();    // module firmware version, 0 if absent

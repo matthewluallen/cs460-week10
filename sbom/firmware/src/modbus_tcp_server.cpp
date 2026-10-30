@@ -154,7 +154,8 @@ void ModbusTCPServer::process_client(uint8_t idx) {
         // Unit 1 is the teaching PLC. 255 is the direct TCP device alias;
         // other units cannot accidentally address this controller.
         uint8_t unit = rx.data[6] == 255 ? 255 : 1;
-        if (handle_frame(rx.data, rx.used, response, sizeof(response), response_len, rx.source, unit)) {
+        if (handle_frame(rx.data, rx.used, response, sizeof(response), response_len, rx.source, unit,
+                         PlcAccessPeer::network(plc_network_ipv4(client.remoteIP())))) {
             // Do not replay a partly transmitted write reply (the write already
             // committed). A failed/short send terminates this connection.
             if (client.write(response, response_len) != response_len) { release(); return; }
@@ -165,7 +166,7 @@ void ModbusTCPServer::process_client(uint8_t idx) {
 
 bool ModbusTCPServer::handle_frame(const uint8_t* request, uint16_t req_len,
         uint8_t* response, size_t capacity, uint16_t& resp_len,
-        const char* source, uint8_t unit) {
+        const char* source, uint8_t unit, PlcAccessPeer peer) {
     resp_len = 0;
     if (!request || !response || req_len < 8 || req_len > MAX_ADU ||
         be16(request + 2) != 0 || be16(request + 4) != req_len - 6 ||
@@ -197,6 +198,20 @@ bool ModbusTCPServer::handle_frame(const uint8_t* request, uint16_t req_len,
     if (error) required = 9;
     // Capacity is checked BEFORE any read of process data, mutation or audit.
     if (capacity < required) return false;
+    struct ImageLock { ImageLock() { plc_image_lock(); } ~ImageLock() { plc_image_unlock(); } } lock;
+    if (!error) {
+        const bool coil = fc == 1 || fc == 5 || fc == 15;
+        const bool write = fc != 1 && fc != 3;
+        const uint16_t first = be16(pdu + 1);
+        const uint16_t count = (fc == 5 || fc == 6) ? 1 : be16(pdu + 3);
+        if (!plc_network_range_allowed(peer, coil ? point_policy::Kind::Coil : point_policy::Kind::Register,
+                                       first, count, write)) {
+            // Check the entire transaction before exposing data or changing any
+            // point. Illegal-data-address conveys no partial read/write result.
+            error = 2;
+            plc_log(SRC_MODBUS, source, "ACL DENIED FC%u %s %u count %u", fc, coil ? "coil" : "reg", first, count);
+        }
+    }
     memcpy(response, request, 7);
     response[7] = fc;
     if (error) {
@@ -204,7 +219,6 @@ bool ModbusTCPServer::handle_frame(const uint8_t* request, uint16_t req_len,
         response[7] = fc | 0x80; response[8] = error; resp_len = 9;
         return true;
     }
-    struct ImageLock { ImageLock() { plc_image_lock(); } ~ImageLock() { plc_image_unlock(); } } lock;
     uint16_t data_len = 0;
     switch (fc) {
         case 1: fc_read_coils(pdu, response + 8, data_len); break;
@@ -276,16 +290,12 @@ bool ModbusTCPServer::fc_write_single_coil(const uint8_t* req, uint8_t* resp, ui
         return true;
     }
 #endif
-    // P3 arbiter: record the source for conflict detection, and refuse if another protocol
-    // owns this tag. Runs inside the frame's ImageLock, so note + apply are atomic (the
-    // secure, TOCTOU-free path). Untracked coils are a no-op fast path.
-    if (!arb::note_write(arb::coil_key(coil_addr), arb::SRC_MODBUS)) {
-        plc_log(SRC_MODBUS, source, "REFUSED coil %u write - tag owned by another protocol (arbiter)", coil_addr);
-        resp[0]=req[1]; resp[1]=req[2]; resp[2]=req[3]; resp[3]=req[4]; resp_len=4;
-        return true;
-    }
     // CWE-306: Missing authentication for critical function
     // E-stop coil (0) can be written by anyone without permission check
+    if (!arb::note_write(arb::coil_key(coil_addr), arb::SRC_MODBUS)) {   // P3 arbiter: source + ownership
+        plc_log(SRC_MODBUS, source, "REFUSED coil %u write - tag owned by another protocol (arbiter)", coil_addr);
+        resp[0]=req[1]; resp[1]=req[2]; resp[2]=req[3]; resp[3]=req[4]; resp_len=4; return true;
+    }
     if (value == 0xFF00) {
         coils[coil_addr / 16] |= (1 << (coil_addr % 16));
     } else {
@@ -324,10 +334,9 @@ bool ModbusTCPServer::fc_write_single_register(const uint8_t* req, uint8_t* resp
         return true;
     }
 #endif
-    if (!arb::note_write(arb::reg_key(reg_addr), arb::SRC_MODBUS)) {   // P3 arbiter (see fc_write_single_coil)
+    if (!arb::note_write(arb::reg_key(reg_addr), arb::SRC_MODBUS)) {   // P3 arbiter
         plc_log(SRC_MODBUS, source, "REFUSED reg %u write - tag owned by another protocol (arbiter)", reg_addr);
-        resp[0]=req[1]; resp[1]=req[2]; resp[2]=req[3]; resp[3]=req[4]; resp_len=4;
-        return true;
+        resp[0]=req[1]; resp[1]=req[2]; resp[2]=req[3]; resp[3]=req[4]; resp_len=4; return true;
     }
     registers[reg_addr] = value;
     {
@@ -347,7 +356,6 @@ bool ModbusTCPServer::fc_write_single_register(const uint8_t* req, uint8_t* resp
 bool ModbusTCPServer::fc_write_multiple_coils(const uint8_t* req, uint8_t* resp, uint16_t& resp_len, const char* source) {
     uint16_t start_addr = (req[1] << 8) | req[2];
     uint16_t quantity = (req[3] << 8) | req[4];
-    uint8_t byte_count = req[5];
 
     if (quantity > 1968 || start_addr + quantity > 512) return false;
 
@@ -380,7 +388,6 @@ bool ModbusTCPServer::fc_write_multiple_coils(const uint8_t* req, uint8_t* resp,
 bool ModbusTCPServer::fc_write_multiple_registers(const uint8_t* req, uint8_t* resp, uint16_t& resp_len, const char* source) {
     uint16_t start_addr = (req[1] << 8) | req[2];
     uint16_t quantity = (req[3] << 8) | req[4];
-    uint8_t byte_count = req[5];
 
     if (quantity > 123 || start_addr + quantity > 256) return false;
 

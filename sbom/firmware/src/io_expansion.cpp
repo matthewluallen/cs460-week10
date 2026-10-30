@@ -48,3 +48,12 @@ bool ioexp_output_readback(uint8_t* bits) {
 
 uint8_t ioexp_addr() { return s_present ? s_io.getCurrentAddress() : 0; }
 uint8_t ioexp_fw()   { return s_present ? s_io.getFirmwareVersion() : 0; }
+bool ioexp_identity(uint8_t* address,uint8_t* revision) {
+    if(!s_present||!address||!revision)return false;
+    uint8_t status=0xff,version=0xff,reported_address=0;
+    const uint8_t addr=s_io.getCurrentAddress();
+    if(!m5::In_I2C.readRegister(addr,M5StamPLC_IO::REG_SYSTEM_STATUS,&status,1,100000)||status||
+       !m5::In_I2C.readRegister(addr,M5StamPLC_IO::REG_FIRMWARE_VER,&version,1,100000)||version==0xff||
+       !m5::In_I2C.readRegister(addr,M5StamPLC_IO::REG_ADDR_CONFIG,&reported_address,1,100000)||reported_address!=addr)return false;
+    *address=addr;*revision=version;return true;
+}

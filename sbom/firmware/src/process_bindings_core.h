@@ -79,6 +79,28 @@ struct Sample {
     uint32_t sampled=0, sequence=0, epoch=0, errors=0, losses=0, generation=0,max_age=0;
     bool usable(uint32_t now) const {return quality==Quality::Valid&&has_value&&now-sampled<=max_age;}
 };
+// Project-owned dependency gate. Shared with host tests; no bus or persistence.
+struct ProjectGate {
+    bool armed=false;
+    uint32_t epoch[Count]{}, generation[Count]{}, sequence[Count]{};
+    bool ready(uint8_t mask,const Sample (&samples)[Count],uint8_t status,uint32_t now,bool arm) {
+        if(mask & ~((1u<<Count)-1))return false;
+        for(unsigned i=0;i<Count;++i)if(mask&(1u<<i))
+            if(status||!samples[i].usable(now))return false;
+        if(arm){for(unsigned i=0;i<Count;++i){epoch[i]=samples[i].epoch;
+            generation[i]=samples[i].generation;sequence[i]=samples[i].sequence;}armed=true;}
+        return true;
+    }
+    bool check(uint8_t mask,const Sample (&samples)[Count],uint8_t status,uint32_t now) {
+        bool ok=!(mask & ~((1u<<Count)-1));
+        for(unsigned i=0;i<Count;++i)if(mask&(1u<<i)) {
+            const auto& s=samples[i];
+            if(!armed||status||!s.usable(now)||s.epoch!=epoch[i]||s.generation!=generation[i]||int32_t(s.sequence-sequence[i])<0)ok=false;
+            sequence[i]=s.sequence;
+        }
+        return ok;
+    }
+};
 inline Sample resolve_network(const Input& a,const network_input::State& state,uint32_t generation) {
     Sample s;if(!a.configured||!a.network)return s;
     using N=network_input::Status;
@@ -95,7 +117,7 @@ inline Sample resolve_network(const Input& a,const network_input::State& state,u
     }
     s.value=state.record.value;s.sampled=state.received_ms;s.sequence=state.record.sequence;
     s.epoch=state.record.epoch;s.generation=generation;s.errors=state.errors;
-    s.has_sample=s.has_value=state.has_sample;s.max_age=a.remote.max_age_ms;
+    s.has_sample=s.has_value=state.has_sample;s.max_age=state.max_usable_age(a.remote);
     return s;
 }
 inline bool convert(const acquisition::Values& v,Field field,int32_t& out) {

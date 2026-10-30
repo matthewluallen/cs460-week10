@@ -7,10 +7,15 @@
 #include "console_health.h"
 #include "plc_auth.h"
 #include "eth_net.h"
+#include "config_explain.h"
+#include "web_config.h"  // SETUP_PAGE (extern) + config_explain_json_str
+#include <WiFi.h>            // WiFi.softAPIP/status for the per-interface config JSON
 #include "config.h"
 #include "serial_config.h"   // g_cfg + serial_config_save (remote netcfg)
 #include "time_sync.h"       // push a changed NTP source live
 #include "plc_core.h"        // plc_log
+#include "plc_project.h"
+#include "network_access.h"
 #include "mbedtls/base64.h"  // decode HTTP Basic auth
 #include <LittleFS.h>
 
@@ -55,7 +60,7 @@ static bool qarg(const char* q, const char* key, char* out, size_t outsz) {
 }
 
 static void send_resp(NetClient& c, int code, const char* ctype, const String& body) {
-    String h = "HTTP/1.1 "; h += code; h += (code == 200 ? " OK" : (code == 404 ? " Not Found" : " Bad Request"));
+    String h = "HTTP/1.1 "; h += code; h += (code == 200 ? " OK" : (code == 403 ? " Forbidden" : (code == 404 ? " Not Found" : " Bad Request")));
     h += "\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: "; h += ctype;
     h += "\r\nContent-Length: "; h += body.length();
 #ifdef ENABLE_CWE_DEMOS
@@ -108,31 +113,10 @@ static bool config_authed(const char* req) {
     return strcmp((char*)dec, expect) == 0;
 }
 
-static String config_json() {
-    String j = "{\"mode\":\"";
-    j += g_cfg.use_static ? "static" : "dhcp";
-    j += "\",\"ip\":\"" + String(g_cfg.ip) + "\",\"gw\":\"" + String(g_cfg.gw) + "\",\"mask\":\"" + String(g_cfg.mask) + "\",";
-    j += "\"ntp\":\"" + String(g_cfg.ntp[0] ? g_cfg.ntp : g_cfg.gw) + "\",\"ntp_port\":" + String(g_cfg.ntp_port) + ",";
-    j += "\"cfg_user\":\"" + String(g_cfg.cfg_user) + "\",";        // password never returned
-    j += "\"link\":\"" + (eth_ok() ? eth_ip() : String("no-net")) + "\"}";
-    return j;
-}
+static String config_json() { return web_config_json(); }
 
-static String config_apply(const char* query, const char* client_ip) {
-    char v[48]; String ch = "";
-    if (qarg(query, "mode", v, sizeof(v))) { g_cfg.use_static = (!strcmp(v, "static")) ? 1 : 0; ch += "mode "; }
-    if (qarg(query, "ip",   v, sizeof(v))) { strncpy(g_cfg.ip,   v, sizeof(g_cfg.ip) - 1);   g_cfg.ip[sizeof(g_cfg.ip)-1]=0;     ch += "ip "; }
-    if (qarg(query, "gw",   v, sizeof(v))) { strncpy(g_cfg.gw,   v, sizeof(g_cfg.gw) - 1);   g_cfg.gw[sizeof(g_cfg.gw)-1]=0;     ch += "gw "; }
-    if (qarg(query, "mask", v, sizeof(v))) { strncpy(g_cfg.mask, v, sizeof(g_cfg.mask) - 1); g_cfg.mask[sizeof(g_cfg.mask)-1]=0; ch += "mask "; }
-    if (qarg(query, "ntp",  v, sizeof(v))) { strncpy(g_cfg.ntp,  v, sizeof(g_cfg.ntp) - 1);  g_cfg.ntp[sizeof(g_cfg.ntp)-1]=0;   ch += "ntp "; }
-    if (qarg(query, "ntp_port", v, sizeof(v))) { g_cfg.ntp_port = atoi(v); ch += "ntp_port "; }
-    if (qarg(query, "cfg_user", v, sizeof(v))) { strncpy(g_cfg.cfg_user, v, sizeof(g_cfg.cfg_user) - 1); g_cfg.cfg_user[sizeof(g_cfg.cfg_user)-1]=0; ch += "cfg_user "; }
-    if (qarg(query, "cfg_pass", v, sizeof(v))) { strncpy(g_cfg.cfg_pass, v, sizeof(g_cfg.cfg_pass) - 1); g_cfg.cfg_pass[sizeof(g_cfg.cfg_pass)-1]=0; ch += "cfg_pass "; }
-    serial_config_save();
-    if (ch.indexOf("ntp") >= 0)
-        time_sync_set_server(g_cfg.ntp[0] ? g_cfg.ntp : g_cfg.gw, (uint16_t)g_cfg.ntp_port, time_sync_interval_ms());
-    plc_log(SRC_WEB, client_ip, "REMOTE netcfg via /api/config: %s", ch.c_str());
-    return ch;
+static String config_apply(const char* query, const char* client_ip, bool commit) {
+    return web_config_apply([&](const char* k, char* o, size_t n){ return qarg(query, k, o, n); }, client_ip, commit);
 }
 
 static int hexnib(char ch) {
@@ -165,77 +149,114 @@ void eth_http_handle() {
     char* q = strchr(target, '?'); char query[400] = {0};
     if (q) { *q = 0; strncpy(query, q + 1, sizeof(query) - 1); }
 
-    char a1[96], a2[96], a3[16];
-    if (!strcmp(target, "/") || !strcmp(target, "/index.html")) {
-        send_resp(c, 200, "text/html; charset=utf-8", web_api_html());
-    } else if (!strcmp(target, "/api/console")) {
-        send_resp(c, 200, "application/json", console_health_json());
-    } else if (!strcmp(target, "/api/timing")) {
-        send_resp(c, 200, "application/json", plc_loop_phases_json());
-    } else if (!strcmp(target, "/api/scan")) {
-        send_resp(c, 200, "application/json", plc_scan_json());
-    } else if (!strcmp(target, "/api/source")) {
-        send_resp(c, 200, "application/json", plc_source_json());
-    } else if (!strcmp(target, "/api/bindings")) {
-        send_resp(c, 200, "application/json", plc_bindings_json());
-    } else if (!strcmp(target, "/api/points")) {
-        send_resp(c, 200, "application/json", web_api_points_json());
-    } else if (!strcmp(target, "/api/log")) {
-        send_resp(c, 200, "application/json", web_api_log_json());
-    } else if (!strcmp(target, "/api/mode")) {
-        qarg(query, "set", a1, sizeof(a1));
-        send_resp(c, 200, "application/json", web_api_mode_json(a1));
-    } else if (!strcmp(target, "/api/set")) {
-        qarg(query, "tag", a1, sizeof(a1)); qarg(query, "val", a2, sizeof(a2));
-        send_resp(c, 200, "application/json", web_api_set_json(a1, a2));
-    } else if (!strcmp(target, "/api/force")) {
-        qarg(query, "tag", a1, sizeof(a1)); qarg(query, "on", a3, sizeof(a3)); qarg(query, "val", a2, sizeof(a2));
-        send_resp(c, 200, "application/json", web_api_force_json(a1, a3, a2));
-    } else if (!strcmp(target, "/api/tag")) {
-        // [CWE-787] unauthenticated "set tag label": the attacker controls both the bytes
-        // and the length (hex in ?data=), copied into a fixed buffer with no bound. In the
-        // teaching build an overlong value overflows into the I/O force image and actuates a
-        // relay; the secure build bounds-checks the copy (see plc_tag_write).
-        char hx[256]; qarg(query, "data", hx, sizeof(hx));
-        uint8_t buf[128]; size_t nb = 0;
-        for (size_t i = 0; hx[i] && hx[i+1] && nb < sizeof(buf); i += 2) {
-            int hi = hexnib(hx[i]), lo = hexnib(hx[i+1]);
-            if (hi < 0 || lo < 0) break;
-            buf[nb++] = (uint8_t)((hi << 4) | lo);
+    const uint32_t peer = plc_network_ipv4(c.remoteIP());
+    char a1[96] = {}, a2[96] = {}, a3[16] = {};
+    int code = 200; const char* type = "application/json"; String body;
+    bool challenge = false, reboot = false, config_dirty = false;
+    uint32_t admitted_generation = 0;
+    auto respond = [&](int status, const char* content_type, const String& value) {
+        code = status; type = content_type; body = value;
+        if (body == PLC_ACL_ERROR) code = 403;
+    };
+    // Keep admission, any point access and response construction on one project
+    // generation. Socket writes happen after releasing the image lock.
+    {
+        PlcNetworkImageGuard guard;
+        admitted_generation = plc_project_generation();
+        const bool mutation = (!strcmp(target, "/api/mode") && qarg(query, "set", a1, sizeof(a1)) && a1[0]) ||
+            (!strcmp(target, "/api/proto") && qarg(query, "name", a1, sizeof(a1)) && a1[0]) ||
+            (!strcmp(target, "/api/config") && !strcmp(method, "POST"));
+        if (!plc_network_http_allowed(peer, target, mutation)) respond(403, "application/json", PLC_ACL_ERROR);
+        else {
+            if (!strcmp(target, "/") || !strcmp(target, "/index.html")) {
+                respond(200, "text/html; charset=utf-8", web_api_html());
+            } else if (!strcmp(target, "/api/console")) {
+                respond(200, "application/json", console_health_json());
+            } else if (!strcmp(target, "/api/timing")) {
+                respond(200, "application/json", plc_loop_phases_json());
+            } else if (!strcmp(target, "/api/scan")) {
+                respond(200, "application/json", plc_scan_json());
+            } else if (!strcmp(target, "/api/execution")) {
+                respond(200, "application/json", plc_execution_json());
+            } else if (!strcmp(target, "/api/source")) {
+                respond(200, "application/json", plc_source_json());
+            } else if (!strcmp(target, "/api/bindings")) {
+                respond(200, "application/json", plc_bindings_json());
+            } else if (!strcmp(target, "/api/project")) {
+                respond(200, "application/json", plc_project_json());
+            } else if (!strcmp(target, "/api/points")) {
+                respond(200, "application/json", web_api_points_json(peer));
+            } else if (!strcmp(target, "/setup")) {
+                respond(200, "text/html; charset=utf-8", SETUP_PAGE);
+            } else if (!strcmp(target, "/api/explain")) {
+                respond(200, "application/json", config_explain_json_str());
+            } else if (!strcmp(target, "/api/log")) {
+                respond(200, "application/json", web_api_log_json(peer));
+            } else if (!strcmp(target, "/api/mode")) {
+                qarg(query, "set", a1, sizeof(a1));
+                respond(200, "application/json", web_api_mode_json(a1, peer));
+            } else if (!strcmp(target, "/api/set")) {
+                qarg(query, "tag", a1, sizeof(a1)); qarg(query, "val", a2, sizeof(a2));
+                respond(200, "application/json", web_api_set_json(a1, a2, peer));
+            } else if (!strcmp(target, "/api/force")) {
+                qarg(query, "tag", a1, sizeof(a1)); qarg(query, "on", a3, sizeof(a3)); qarg(query, "val", a2, sizeof(a2));
+                respond(200, "application/json", web_api_force_json(a1, a3, a2, peer));
+            } else if (!strcmp(target, "/api/tag")) {
+                // [CWE-787] unauthenticated "set tag label": the attacker controls both the bytes
+                // and the length (hex in ?data=), copied into a fixed buffer with no bound. In the
+                // teaching build an overlong value overflows into the I/O force image and actuates a
+                // relay; the secure build bounds-checks the copy (see plc_tag_write).
+                char hx[256]; qarg(query, "data", hx, sizeof(hx));
+                uint8_t buf[128]; size_t nb = 0;
+                for (size_t i = 0; hx[i] && hx[i+1] && nb < sizeof(buf); i += 2) {
+                    int hi = hexnib(hx[i]), lo = hexnib(hx[i+1]);
+                    if (hi < 0 || lo < 0) break;
+                    buf[nb++] = (uint8_t)((hi << 4) | lo);
+                }
+                plc_tag_write(buf, nb);
+                respond(200, "application/json", String("{\"tag_bytes\":") + (int)nb + "}");
+            } else if (!strcmp(target, "/api/sys")) {
+                respond(200, "application/json", web_api_sys_json());
+            } else if (!strcmp(target, "/api/proto")) {
+                qarg(query, "name", a1, sizeof(a1));
+                if (a1[0]) { qarg(query, "on", a3, sizeof(a3)); respond(200, "application/json", web_api_proto_set_json(a1, a3)); }
+                else respond(200, "application/json", web_api_proto_json());
+            } else if (!strcmp(target, "/api/login")) {
+                qarg(query, "user", a1, sizeof(a1)); qarg(query, "pass", a2, sizeof(a2));
+                respond(200, "application/json", web_api_login_json(a1, a2));
+            } else if (!strcmp(target, "/api/config")) {
+                if (!config_authed(req)) {
+                    challenge = true;
+                } else if (!strcmp(method, "POST")) {
+                    String cip = c.remoteIP().toString();
+                    String ch = config_apply(query, cip.c_str(), /*commit=*/false);   // D1: defer the flash write to outside the image lock
+                    config_dirty = true;
+                    respond(200, "application/json", String("{\"saved\":true,\"applied\":\"reboot\",\"changed\":\"") + ch + "\"}");
+                } else {
+                    respond(200, "application/json", config_json());
+                }
+            } else if (!strcmp(target, "/api/reboot")) {
+                respond(200, "application/json", web_api_reboot_json());
+                reboot = true;
+            } else if (!strcmp(target, "/logs")) {
+                qarg(query, "file", a1, sizeof(a1));
+                respond(200, "text/plain", read_logfile(a1[0] ? a1 : "config.txt"));
+            } else {
+                respond(404, "application/json", "{\"err\":\"nf\"}");
+            }
         }
-        plc_tag_write(buf, nb);
-        send_resp(c, 200, "application/json", String("{\"tag_bytes\":") + (int)nb + "}");
-    } else if (!strcmp(target, "/api/sys")) {
-        send_resp(c, 200, "application/json", web_api_sys_json());
-    } else if (!strcmp(target, "/api/proto")) {
-        qarg(query, "name", a1, sizeof(a1));
-        if (a1[0]) { qarg(query, "on", a3, sizeof(a3)); send_resp(c, 200, "application/json", web_api_proto_set_json(a1, a3)); }
-        else send_resp(c, 200, "application/json", web_api_proto_json());
-    } else if (!strcmp(target, "/api/login")) {
-        qarg(query, "user", a1, sizeof(a1)); qarg(query, "pass", a2, sizeof(a2));
-        send_resp(c, 200, "application/json", web_api_login_json(a1, a2));
-    } else if (!strcmp(target, "/api/config")) {
-        if (!config_authed(req)) {
-            c.print(F("HTTP/1.1 401 Unauthorized\r\n"
-                      "WWW-Authenticate: Basic realm=\"StamPLC Config - default admin:openplc (CWE-798/1392), change it\"\r\n"
-                      "Access-Control-Allow-Origin: *\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"));
-        } else if (!strcmp(method, "POST")) {
-            String cip = c.remoteIP().toString();
-            String ch = config_apply(query, cip.c_str());
-            send_resp(c, 200, "application/json", String("{\"saved\":true,\"applied\":\"reboot\",\"changed\":\"") + ch + "\"}");
-        } else {
-            send_resp(c, 200, "application/json", config_json());
-        }
-    } else if (!strcmp(target, "/api/reboot")) {
-        send_resp(c, 200, "application/json", web_api_reboot_json());
-        c.flush(); c.stop();
-        delay(400);          // let the TCP response drain to the client
-        ESP.restart();       // never returns
-    } else if (!strcmp(target, "/logs")) {
-        qarg(query, "file", a1, sizeof(a1));
-        send_resp(c, 200, "text/plain", read_logfile(a1[0] ? a1 : "config.txt"));
-    } else {
-        send_resp(c, 404, "application/json", "{\"err\":\"nf\"}");
+    }
+    if (challenge) {
+        c.print(F("HTTP/1.1 401 Unauthorized\r\n"
+                  "WWW-Authenticate: Basic realm=\"StamPLC Config - default admin:openplc (CWE-798/1392), change it\"\r\n"
+                  "Access-Control-Allow-Origin: *\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"));
+    } else send_resp(c, code, type, body);
+    if (config_dirty) web_config_commit();   // D1: NVS write + NTP apply now run with the image lock released
+    if (reboot) {
+        c.flush(); c.stop(); delay(400);
+        PlcNetworkImageGuard guard;
+        if (plc_network_deferred_allowed(peer, "/api/reboot", admitted_generation)) ESP.restart();
+        else plc_log(SRC_WEB, "", "REBOOT cancelled: project or network policy changed after admission");
     }
     delay(1);
     c.stop();

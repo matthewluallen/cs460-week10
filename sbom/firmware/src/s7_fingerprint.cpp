@@ -1,3 +1,5 @@
+#include "network_access.h"
+#include "proto_common.h"
 #include "s7_fingerprint.h"
 #include "plc_core.h"          // plc_log / SRC_MODBUS
 #include <string.h>
@@ -16,7 +18,7 @@ static const char    S7_SERIAL[]      = "S C-C2UR28922012";
 S7Fingerprint::S7Fingerprint() : server(S7_TCP_PORT) { cur_src_ip[0] = 0; }
 
 bool S7Fingerprint::start() {
-    for (int i = 0; i < 3; i++) { server.begin(); delay(20); }  // 3x = boot retry robustness (begin() is best-effort); available() maintains one listener thereafter
+    net_listen_begin(server);  // (was a copy-pasted 3x begin() retry; see proto_common.h)
     Serial.printf("[S7] S7comm/ISO-TSAP responder on TCP %d - CPU 315-2 PN/DP (lab honeypot, unauth)\n", S7_TCP_PORT);
     return true;
 }
@@ -85,6 +87,7 @@ int S7Fingerprint::build_szl(uint8_t* out, uint16_t seq, uint16_t szl_id) {
 void S7Fingerprint::handle() {
     NetClient client = server.available();
     if (!client) return;
+    if (!plc_project_host_allowed(plc_network_ipv4(client.remoteIP()))) { client.stop(); return; }
     if (!client.connected()) { client.stop(); return; }
     if (!client.available()) return;
 
@@ -116,8 +119,8 @@ void S7Fingerprint::handle() {
     } else if (cotp_type == 0xF0 && len >= 9 && req[7] == 0x32) {
         const int s7 = 7;
         uint8_t  rosctr = req[s7 + 1];
-        uint16_t seq    = ((uint16_t)req[s7 + 4] << 8) | req[s7 + 5];
-        uint16_t parlen = ((uint16_t)req[s7 + 6] << 8) | req[s7 + 7];
+        uint16_t seq    = (len > s7 + 5) ? (uint16_t)(((uint16_t)req[s7 + 4] << 8) | req[s7 + 5]) : 0;
+        uint16_t parlen = (len > s7 + 7) ? (uint16_t)(((uint16_t)req[s7 + 6] << 8) | req[s7 + 7]) : 0;  // bound: len>=9 only was checked
         if (rosctr == 0x01 && len > s7 + 10 && req[s7 + 10] == 0xF0) {
             // S7 Communication Setup -> ack. Echo the client's parallel-job counts
             // and PDU length (Snap7 fidelity), defaulting to 240 if absent.

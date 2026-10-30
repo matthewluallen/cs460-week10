@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def generate(data):
-    assert data['schema'] in ('tbd.plc-point-map/v2', 'tbd.plc-point-map/v3')
+    assert data['schema'] in ('tbd.plc-point-map/v2', 'tbd.plc-point-map/v3', 'tbd.plc-point-map/v4')
     assert data['schema'].endswith('/v' + str(data['version']))
     assert type(data['version']) is int and 1 <= data['version'] <= 65535
     points = data['points']; by_name = {}; occupied = set()
@@ -55,9 +55,11 @@ def generate(data):
          'constexpr uint16_t DIGEST_WORDS[] = {' + ','.join('0x' + sha[i:i+4] for i in range(0,64,4)) + '};']
     h += [f'constexpr uint16_t {p["name"].upper()} = {p["address"]};' for p in points]
     h += [f'constexpr int IW_{v["name"].upper()} = {v["index"]};' for v in vm + data.get('bound_vm_words', [])]
-    h += ['struct ParameterDefault { uint16_t address, value; };', 'constexpr ParameterDefault PARAMETERS[] = {']
-    h += ['    {' + d['point'].upper() + ',' + str(d['value'] & 65535) + '},' for d in defaults]
-    h += ['};', 'struct Metric { const char* name; uint16_t address; bool coil, signed_value; };', 'constexpr Metric SPARKPLUG_METRICS[] = {']
+    if defaults:
+        h += ['struct ParameterDefault { uint16_t address, value; };', 'constexpr ParameterDefault PARAMETERS[] = {']
+        h += ['    {' + d['point'].upper() + ',' + str(d['value'] & 65535) + '},' for d in defaults]
+        h += ['};']
+    h += ['struct Metric { const char* name; uint16_t address; bool coil, signed_value; };', 'constexpr Metric SPARKPLUG_METRICS[] = {']
     metric_names = set()
     for m in data['sparkplug_metrics']:
         assert type(m['name']) is str and re.fullmatch('[A-Za-z0-9/_]+',m['name']) and len(m['name']) < 24 and m['name'] not in metric_names

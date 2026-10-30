@@ -166,7 +166,7 @@ static void handle_request(const uint8_t* frame, size_t flen) {
 
     uint8_t  resp[300];
     uint16_t resp_len = 0;
-    if (modbus_server.handle_frame(mbap, (uint16_t)(7 + pdu_len), resp, sizeof(resp), resp_len, "rs485", s_id) && resp_len > 7) {
+    if (modbus_server.handle_frame(mbap, (uint16_t)(7 + pdu_len), resp, sizeof(resp), resp_len, "rs485", s_id, PlcAccessPeer::serial()) && resp_len > 7) {
         uint16_t rpdu = (uint16_t)(resp_len - 7);
         uint8_t  out[300];
         out[0] = addr;

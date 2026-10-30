@@ -33,13 +33,14 @@ enum Source : uint8_t {
     SRC_MQTT    = 1u << 4,
     SRC_DNP3    = 1u << 5,
     SRC_OTHER   = 1u << 6,
+    SRC_IEC104  = 1u << 7,
 };
 
 // Priority order (highest first) used to pick the winner when a tag is contested.
 // force always wins (it is the operator's deliberate override); then the local console;
 // then the network protocols. Keep in sync with the Source bits.
 static const uint8_t PRIORITY[] = {
-    SRC_FORCE, SRC_CONSOLE, SRC_MODBUS, SRC_MQTT, SRC_DNP3, SRC_OTHER, SRC_LADDER
+    SRC_FORCE, SRC_CONSOLE, SRC_MODBUS, SRC_MQTT, SRC_DNP3, SRC_IEC104, SRC_OTHER, SRC_LADDER
 };
 
 static const int MAX_TAGS = 32;   // tracked command tags (small, fixed, no heap)

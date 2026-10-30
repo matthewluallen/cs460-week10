@@ -74,7 +74,7 @@ void modbus_serial_poll() {
         }
         if (s_len < frame) break;                 // wait for the rest of the frame
         s_tx_pos = 0;
-        modbus_server.handle_frame(s_buf, frame, s_tx, sizeof(s_tx), s_tx_len);
+        modbus_server.handle_frame(s_buf, frame, s_tx, sizeof(s_tx), s_tx_len, "usb-serial", 1, PlcAccessPeer::serial());
         size_t rem = s_len - frame;
         if (rem) memmove(s_buf, s_buf + frame, rem);
         s_len = rem;

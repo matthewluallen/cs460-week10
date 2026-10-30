@@ -2,24 +2,24 @@
 #pragma once
 #include <stdint.h>
 namespace pointmap {
-constexpr uint16_t VERSION = 3;
-constexpr char SHA256[] = "c3bca9af0f2bb77821fe16669f9558abc62131614b38a17a8a5529bed0c21f19";
+constexpr uint16_t VERSION = 4;
+constexpr char SHA256[] = "402a896362ad6614b6580b3a8c3a1b07947ab768909ddb5d88908739fb7f2252";
 constexpr uint16_t DIGEST_BASE = 43;
 constexpr uint16_t DI_MIRROR_BASE = 100;
 constexpr int VM_WORD_COUNT = 8;
-constexpr uint16_t DIGEST_WORDS[] = {0xc3bc,0xa9af,0x0f2b,0xb778,0x21fe,0x1666,0x9f95,0x58ab,0xc621,0x3161,0x4b38,0xa17a,0x8a55,0x29be,0xd0c2,0x1f19};
-constexpr uint16_t ESTOP = 0;
+constexpr uint16_t DIGEST_WORDS[] = {0x402a,0x8963,0x62ad,0x6614,0xb658,0x0b3a,0x8c3a,0x1b07,0x947a,0xb768,0x909d,0xdb5d,0x8890,0x8739,0xfb7f,0x2252};
+constexpr uint16_t EXPANSION_RELAY = 0;
 constexpr uint16_t RELAY0 = 1;
 constexpr uint16_t RELAY1 = 2;
 constexpr uint16_t RELAY2 = 3;
 constexpr uint16_t RELAY3 = 4;
 constexpr uint16_t SSR1 = 5;
 constexpr uint16_t SSR2 = 6;
-constexpr uint16_t SOFT_ESTOP = 8;
-constexpr uint16_t CMD_RUN = 9;
-constexpr uint16_t DI0_START = 0;
-constexpr uint16_t DI1_STOP = 1;
-constexpr uint16_t DI2_ESTOP_IN = 2;
+constexpr uint16_t AUX_COIL0 = 8;
+constexpr uint16_t AUX_COIL1 = 9;
+constexpr uint16_t DI0 = 0;
+constexpr uint16_t DI1 = 1;
+constexpr uint16_t DI2 = 2;
 constexpr uint16_t DI3 = 3;
 constexpr uint16_t DI4 = 4;
 constexpr uint16_t DI5 = 5;
@@ -38,30 +38,16 @@ constexpr uint16_t SCAN_MAX_US = 22;
 constexpr uint16_t FAULT_COUNT = 23;
 constexpr uint16_t FORCES_ACTIVE = 24;
 constexpr uint16_t HEARTBEAT = 25;
-// Scan-boundary arbiter telemetry (P3): the Studio reads these to show the concurrency state.
-constexpr uint16_t TAG_CONFLICT_COUNT = 27;   // cumulative two-master conflicts since boot
-constexpr uint16_t TAG_CONFLICT_KEY   = 28;    // key of the most recent contested tag
-constexpr uint16_t TAG_CONFLICT_SRC   = 29;    // Source bitmask of the most recent conflict
-constexpr uint16_t SETPOINT_TEMPX10 = 30;
-constexpr uint16_t ALARM_TEMPX10 = 31;
-constexpr uint16_t CYCLE_MS = 32;
+constexpr uint16_t USER_WORD0 = 30;
+constexpr uint16_t USER_WORD1 = 31;
+constexpr uint16_t USER_WORD2 = 32;
 constexpr uint16_t POINT_MAP_VERSION = 26;
 constexpr uint16_t DEVICE_MAC_WORD0 = 40;
 constexpr uint16_t DEVICE_MAC_WORD1 = 41;
 constexpr uint16_t DEVICE_MAC_WORD2 = 42;
-constexpr int IW_BASE_TEMPERATURE = 0;
-constexpr int IW_TEMPERATURE_SETPOINT = 4;
-constexpr int IW_HIGH_TEMPERATURE_LIMIT = 5;
-constexpr int IW_CYCLE_MS = 6;
-constexpr int IW_PROCESS_ROLE_1 = 1;
-constexpr int IW_PROCESS_ROLE_2 = 2;
-constexpr int IW_PROCESS_ROLE_3 = 3;
-struct ParameterDefault { uint16_t address, value; };
-constexpr ParameterDefault PARAMETERS[] = {
-    {SETPOINT_TEMPX10,250},
-    {ALARM_TEMPX10,400},
-    {CYCLE_MS,1000},
-};
+constexpr uint16_t TAG_CONFLICT_COUNT = 27;
+constexpr uint16_t TAG_CONFLICT_KEY = 28;
+constexpr uint16_t TAG_CONFLICT_SRC = 29;
 struct Metric { const char* name; uint16_t address; bool coil, signed_value; };
 constexpr Metric SPARKPLUG_METRICS[] = {
     {"DI/IN0",100,true,false},

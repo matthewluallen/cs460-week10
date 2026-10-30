@@ -2,6 +2,9 @@
 #include "program_loader.h"
 #include "plc_core.h"
 #include "modbus_tcp_server.h"
+#include "plc_project.h"
+#include "project_json.h"
+#include <mbedtls/sha256.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <mbedtls/base64.h>
@@ -11,7 +14,7 @@ namespace plc {
 ProgramLoader program_loader;
 
 static const char* NVS_NS   = "plc";
-static const char* NVS_PROG = "prog";   // stored base64 ir-json
+static const char* NVS_PROG = "project_v1"; // one complete, validated project envelope
 
 // zlib-compatible CRC-32 (little-endian, reflected poly 0xEDB88320).
 uint32_t crc32_le(const uint8_t* p, size_t n) {
@@ -24,60 +27,10 @@ uint32_t crc32_le(const uint8_t* p, size_t n) {
   return ~crc;
 }
 
-// Parse IR-json -> Instr[] in the caller's staging buffer (never the live
-// program). Validates opcode range and length; returns false on anything
-// malformed/oversized so the running program is left untouched.
-bool ProgramLoader::apply_json(const uint8_t* json, size_t jlen,
-                               Instr* out, int& out_n, uint32_t* scan_ms_out) {
-  struct Reader {
-    const uint8_t* data; size_t size; size_t pos = 0;
-    int read() { return pos < size ? data[pos++] : -1; }
-    size_t readBytes(char* dst, size_t n) {
-      size_t count = 0;
-      while (count < n && pos < size) dst[count++] = data[pos++];
-      return count;
-    }
-  } reader{json, jlen};
-  StaticJsonDocument<4096> doc;
-  DeserializationError e = deserializeJson(doc, reader);
-  if (e) return false;
-  while (reader.pos < jlen) {
-    const int c = reader.read();
-    if (c != ' ' && c != '\t' && c != '\r' && c != '\n') return false;
-  }
-  const char* magic = doc["magic"] | "";
-  if (strcmp(magic, "TBD-IR") != 0 || doc["magic"].as<JsonString>().size() != 8) return false;
-  uint32_t period = OPENPLC_SCAN_CYCLE_MS;
-  if (doc.containsKey("scan_ms")) {
-    if (!doc["scan_ms"].is<uint32_t>()) return false;
-    const uint32_t requested = doc["scan_ms"].as<uint32_t>();
-    if (requested != 0 && requested != period) return false;
-  }
-  JsonArray code = doc["code"].as<JsonArray>();
-  if (code.isNull()) return false;
-  int n = 0;
-  for (JsonVariant value : code) {
-    if (!value.is<JsonArray>()) return false;
-    JsonArray ins = value.as<JsonArray>();
-    if (n >= cap_) return false;               // program too long for buffer
-    if (ins.size() < 1 || ins.size() > 3) return false;
-    for (JsonVariant operand : ins) if (!operand.is<int32_t>()) return false;
-    int op = ins[0].as<int32_t>();
-    int a = ins.size() > 1 ? ins[1].as<int32_t>() : 0;
-    int b = ins.size() > 2 ? ins[2].as<int32_t>() : 0;
-    if (op < OP_HALT || op > OP_DROP) return false;   // unknown opcode -> reject
-    const bool arg = (op >= OP_PUSH_I && op <= OP_LD_IW) ||
-                     (op >= OP_TON && op <= OP_FBQ);
-    if ((arg && ins.size() < 2) || (op == OP_TON && ins.size() < 3)) return false;
-    out[n].op = (uint8_t)op;
-    out[n].a  = a;
-    out[n].b  = b;
-    n++;
-  }
-  if (validate_program(out, n)) return false;
-  out_n = n;
-  if (scan_ms_out) *scan_ms_out = period;
-  return true;
+static void payload_digest(const uint8_t* data, size_t size, char (&out)[65]) {
+  unsigned char digest[32];
+  mbedtls_sha256(data, size, digest, 0);
+  for (unsigned i = 0; i < 32; ++i) snprintf(out + i * 2, 3, "%02x", digest[i]);
 }
 
 // decode base64 -> caller buffer; returns decoded length or 0 on failure.
@@ -94,28 +47,42 @@ static size_t b64_decode(const char* b64, size_t b64len, uint8_t* out, size_t ca
 int ProgramLoader::begin(Instr* prog, int cap) {
   cap_ = (prog && cap > 0 && cap <= MAX_INSTRUCTIONS) ? cap : 0;
   len_ = 0; discard_ = false;
-  if (!cap_) return 0;
+  plc_project_boot_status(project::Status::Unconfigured);
+  if (!cap_) {plc_project_boot_status(project::Status::Invalid); return 0;}
+  memset(prog, 0, cap_ * sizeof(Instr));
   Preferences pref;
-  if (!pref.begin(NVS_NS, true)) return 0;      // read-only; ns may not exist yet
-  String b64 = pref.getString(NVS_PROG, "");
+  if (!pref.begin(NVS_NS, false)) {
+    plc_project_boot_status(project::Status::Invalid);
+    Serial.println("[LOADER] ERR project storage unavailable; PROGRAM"); return 0;
+  }
+  const bool present = pref.isKey(NVS_PROG);
+  const bool legacy = pref.isKey("prog");
+  static uint8_t buf[project::PayloadCapacity];
+  const size_t stored = present ? pref.getBytesLength(NVS_PROG) : 0;
+  const size_t size = stored && stored <= sizeof(buf) && pref.getBytes(NVS_PROG, buf, stored) == stored ? stored : 0;
   pref.end();
-  if (b64.length() == 0) return 0;
-  if (b64.length() >= sizeof(line_) - 17) {
-    Serial.println("[LOADER] ERR stored length"); return 0;
+  if (!present) {
+    if (legacy) {
+      plc_project_boot_status(project::Status::Invalid);
+      Serial.println("[LOADER] legacy program requires migration: open a .csco project and deploy TBD-PROJECT v1");
+    } else Serial.println("[LOADER] UNCONFIGURED; open and load a project before RUN");
+    return 0;
   }
-
-  static uint8_t buf[4096];
-  size_t olen = b64_decode(b64.c_str(), b64.length(), buf, sizeof(buf));
-  if (olen == 0) { Serial.println("[LOADER] ERR stored b64"); return 0; }
-
-  static Instr staging[64];
-  int n = 0;
-  if (!apply_json(buf, olen, staging, n, nullptr)) {
-    Serial.println("[LOADER] ERR stored ir"); return 0;
+  static project::Definition staging;
+  char digest[65];
+  const char* error = size ? project::decode(buf, size, staging) : "stored project blob type/length/read";
+  if (error || staging.code_count > unsigned(cap_)) {
+    plc_project_boot_status(project::Status::Invalid);
+    Serial.printf("[LOADER] INVALID_PROJECT %s; PROGRAM, no fallback\n", error ? error : "program capacity"); return 0;
   }
-  memcpy(prog, staging, n * sizeof(Instr));
-  Serial.printf("[LOADER] restored validated program from NVS (%d instr); PROGRAM until explicit RUN\n", n);
-  return n;
+  payload_digest(buf, size, digest);
+  if (!plc_project_install(staging, digest, true, true)) {
+    plc_project_boot_status(project::Status::Invalid); return 0;
+  }
+  memcpy(prog, staging.code, staging.code_count * sizeof(Instr));
+  Serial.printf("[LOADER] restored project %s sha256=%s; %s\n", staging.id, digest,
+      staging.startup == project::StartupMode::Run ? "PROGRAM; startup RUN pending readiness (30s maximum)" : "PROGRAM until explicit RUN");
+  return int(staging.code_count);
 }
 
 void ProgramLoader::ack(const Instr* prog, int n, uint32_t crc, uint32_t scan_ms) {
@@ -141,54 +108,52 @@ void ProgramLoader::handle_line(Engine& eng, Instr* prog, int& prog_n, bool* app
   uint32_t want_crc = (uint32_t)strtoul(p, nullptr, 16);
   char* b64 = sp + 1;
 
-  static uint8_t buf[4096];
+  static uint8_t buf[project::PayloadCapacity];
   size_t olen = b64_decode(b64, strlen(b64), buf, sizeof(buf));
-  if (olen == 0) { Serial.println("[LOADER] ERR b64"); return; }
-
+  if (!olen) { Serial.println("[LOADER] ERR base64/payload capacity (4096 bytes)"); return; }
   uint32_t got_crc = crc32_le(buf, olen);
   if (got_crc != want_crc) {
-    Serial.printf("[LOADER] ERR crc want=%08x got=%08x\n", want_crc, got_crc);
-    return;
+    Serial.printf("[LOADER] ERR crc want=%08x got=%08x\n", want_crc, got_crc); return;
   }
-
+  plc_project_startup_cancel("project_download");
   if (!plc_mode_allows_download(SRC_USB)) {
-    Serial.printf("[LOADER] ERR mode %s (key to PROGRAM or REMOTE to download)\n", plc_mode_str());
-    return;
+    Serial.printf("[LOADER] ERR mode %s (PROGRAM or REMOTE required)\n", plc_mode_str()); return;
   }
-  static Instr staging[64];
-  int n = 0;
-  uint32_t scan_ms = 0;
-  if (!apply_json(buf, olen, staging, n, &scan_ms)) {
-    Serial.println("[LOADER] ERR ir");
-    return;
+  static project::Definition staging;
+  if (const char* error = project::decode(buf, olen, staging)) {
+    Serial.printf("[LOADER] ERR %s\n", error); return;
   }
-
-  // Serialize the second mode check, save and publication with mode commands.
-  // The console runs between scans; stop and command OFF before flash I/O.
+  if (staging.code_count > unsigned(cap_)) {Serial.println("[LOADER] ERR program capacity"); return;}
+  char digest[65]; payload_digest(buf, olen, digest);
   plc_image_lock();
-  if (!plc_mode_allows_download(SRC_USB)) {
-    plc_image_unlock(); Serial.println("[LOADER] ERR mode changed"); return;
+  if (!plc_mode_allows_download(SRC_USB) || plc_project_generation() == UINT32_MAX) {
+    plc_image_unlock(); Serial.println("[LOADER] ERR mode changed or generation exhausted"); return;
   }
-  plc_set_mode(PLC_PROGRAM, SRC_USB, "download");
-  plc_core_scan();
-  // One committed NVS key includes the period in the validated JSON. Never
-  // publish a live program then silently ignore a save failure.
+  plc_set_mode(PLC_PROGRAM, SRC_USB, "project download");
+  plc_core_scan(); // inhibit outputs before flash I/O; never hot-swap a running application
   Preferences pref;
   if (!pref.begin(NVS_NS, false)) {
-    plc_image_unlock(); Serial.println("[LOADER] ERR persist open"); return;
+    plc_image_unlock(); Serial.println("[LOADER] ERR persist open; prior project retained in PROGRAM"); return;
   }
-  const bool saved = pref.putString(NVS_PROG, b64) == strlen(b64);
+  // NVS strings are limited to4000 bytes including the terminator. Persist the
+  // decoded JSON as one blob; wire base64 must not reduce the4096-byte contract.
+  const bool written = pref.putBytes(NVS_PROG, buf, olen) == olen;
+  static uint8_t readback[project::PayloadCapacity];
+  const bool saved = written && pref.getBytesLength(NVS_PROG) == olen &&
+      pref.getBytes(NVS_PROG, readback, olen) == olen && !memcmp(readback, buf, olen);
   pref.end();
-  if (!saved) {
-    plc_image_unlock(); Serial.println("[LOADER] ERR persist write"); return;
+  if (!plc_project_install(staging, digest, saved)) {
+    plc_image_unlock(); Serial.println("[LOADER] ERR persist/readback; prior project retained in PROGRAM"); return;
   }
-  memcpy(prog, staging, n * sizeof(Instr));
-  prog_n = n;
+  memset(prog, 0, cap_ * sizeof(Instr));
+  memcpy(prog, staging.code, staging.code_count * sizeof(Instr));
+  prog_n = int(staging.code_count);
   eng.reset();
+  plc_clear_all_forces(SRC_USB, "new project");
   plc_image_unlock();
-
-  ack(prog, n, got_crc, scan_ms);
-  Serial.println("[LOADER] PROGRAM; explicit RUN required");
+  ack(prog, prog_n, got_crc, staging.scan_ms);
+  Serial.printf("[LOADER] PROJECT id=%s revision=%lu sha256=%s\n", staging.id, (unsigned long)staging.revision, digest);
+  Serial.println("[LOADER] PROGRAM; verify project json, then explicit RUN");
   if (applied) *applied = true;
 }
 

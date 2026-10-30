@@ -4,6 +4,7 @@
 
 #include "net_types.h"
 #include "config.h"
+#include "network_access.h"
 
 // Modbus TCP Server with intentional vulnerabilities
 // CWE-798: Hardcoded credentials
@@ -27,7 +28,8 @@ public:
     // returns false, resp_len=0, without modifying the process image.
     bool handle_frame(const uint8_t* req, uint16_t len, uint8_t* resp,
                       size_t capacity, uint16_t& resp_len,
-                      const char* source = "usb-serial", uint8_t unit = 1);
+                      const char* source = "unknown", uint8_t unit = 1,
+                      PlcAccessPeer peer = {});
     void set_coil(uint16_t addr, bool state);
     bool get_coil(uint16_t addr);
     void set_register(uint16_t addr, uint16_t val);

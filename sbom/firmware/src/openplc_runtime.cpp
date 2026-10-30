@@ -32,36 +32,8 @@ void OpenPLCRuntime::scan_cycle() {
 
     uint32_t start = millis();
 
-    // TODO: Call actual OpenPLC interpreter with bytecode
-    // For now, this is a stub that demonstrates the latching logic
-
-    // Demo ladder logic: simple latching relay with E-stop
-    // DI 0 (set input) -> latch relay 0
-    // DI 1 (reset input) -> unlatch relay 0
-    // DI 2 (E-stop) -> force all relays OFF
-
-    bool di_set = get_coil(100);    // DI 0 mapped to coil 100
-    bool di_reset = get_coil(101);  // DI 1 mapped to coil 101
-    bool di_estop = get_coil(102);  // DI 2 (E-stop) mapped to coil 102
-
-    static bool relay_state = false;
-
-    if (di_estop) {
-        // E-stop: force all relays OFF (CWE-306: no auth check)
-        relay_state = false;
-        set_coil(0, false);
-        set_coil(1, false);
-    } else {
-        // Normal latch/unlatch logic
-        if (di_set && !relay_state) {
-            relay_state = true;
-            set_coil(0, true);   // Latched ON
-        }
-        if (di_reset && relay_state) {
-            relay_state = false;
-            set_coil(0, false);  // Latched OFF
-        }
-    }
+    // Compatibility image/timing shim only. Applications are loaded through
+    // the project-v1 VM loader; no process behavior is compiled here.
 
     last_cycle_time = millis() - start;
     cycle_count++;
@@ -94,14 +66,14 @@ uint16_t OpenPLCRuntime::get_register(uint16_t addr) {
 }
 
 bool OpenPLCRuntime::load_program(const uint8_t* bytecode, size_t len) {
-    // TODO: Parse and load OpenPLC bytecode
-    Serial.printf("[OpenPLC] Loading program (%u bytes)\n", len);
-    return true;
+    (void)bytecode; (void)len;
+    Serial.println("[OpenPLC] legacy bytecode loader unsupported; deploy a TBD-PROJECT v1 project");
+    return false;
 }
 
 bool OpenPLCRuntime::start_program() {
-    start();
-    return true;
+    Serial.println("[OpenPLC] legacy start unsupported; use project loading and explicit mode RUN");
+    return false;
 }
 
 void OpenPLCRuntime::stop_program() {

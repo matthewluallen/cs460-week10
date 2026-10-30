@@ -1,3 +1,4 @@
+#include "network_access.h"
 #include "diagnostic_log.h"
 #include "plc_point_map.h"
 #include "mqtt_sparkplug.h"
@@ -78,9 +79,8 @@ static uint32_t s_lastPub = 0;
 static uint32_t s_lastTry = 0;
 static uint32_t s_lastRgb = 0;
 
-// Publish the ladder-driven display color (relay0->R, relay1->G, relay2->B) so a phone that
-// subscribes to stamplc/display/rgb paints its background from the PLC logic. Retained so a
-// freshly-connected phone gets the current color immediately.
+// Publish the ladder-driven display color (relay0->R, relay1->G, relay2->B) so a phone
+// subscribed to stamplc/display/rgb paints its background from the PLC logic. Retained.
 static void sp_publish_rgb() {
     uint8_t r = modbus_server.get_coil(1) ? 255 : 0;   // RELAY0 -> R
     uint8_t g = modbus_server.get_coil(2) ? 255 : 0;   // RELAY1 -> G
@@ -96,19 +96,18 @@ static void topic(char* out, size_t n, const char* msgtype) {
 
 // Legacy DCMD writes raw coil0; it is not the canonical base relay QX0 mapping.
 static void on_message(const char* t, const uint8_t* payload, size_t len) {
-    // Phone-sensor bridge: phone/<id>/{light,accel,orient} -> %IW input words.
     if (!strncmp(t, "phone/", 6)) { mqtt_sensors_ingest(t, payload, len); return; }
+    PlcNetworkImageGuard guard;
+    // A broker connection does not identify the original command publisher.
+    if (plc_project_host_acl_enabled()) return;
     if (!strstr(t, "/DCMD/")) return;
     if (g_bustrace) plc_bus_log(0x00, 'W', "Sparkplug DCMD (MQTT) -> relay", len, true);
     // Legacy teaching decoder: a boolean-value byte pattern writes raw coil0. A hardened
     // build would require broker auth + ACLs + Sparkplug host/state before acting.
     for (unsigned int i = 0; i + 1 < len; i++) {
         if (payload[i] == 0x70) {                                     // boolean_value [14] key
-            // P3 arbiter: MQTT runs on core 1; take the image lock so note+apply are atomic
-            // vs. the core-0 Modbus writer. A Modbus client writing coil 0 in the same scan
-            // now raises TAG_CONFLICT instead of silently last-writer-wins.
-            plc_image_lock();
-            if (arb::note_write(arb::coil_key(pointmap::ESTOP), arb::SRC_MQTT))
+            plc_image_lock();   // P3: MQTT on core 1 vs. Modbus on core 0 — atomic note+apply
+            if (arb::note_write(arb::coil_key(pointmap::EXPANSION_RELAY), arb::SRC_MQTT))
                 modbus_server.set_coil(0, payload[i + 1] ? true : false);
             plc_image_unlock();
             break;
@@ -117,9 +116,16 @@ static void on_message(const char* t, const uint8_t* payload, size_t len) {
 }
 
 static bool sp_publish(const char* msgtype) {
-    uint8_t buf[512];
-    size_t n = sp_build_payload(buf, (uint64_t)millis(), s_seq++);
-    char t[64]; topic(t, sizeof(t), msgtype);
+    uint8_t buf[512]; size_t n; char t[64];
+    {
+        PlcNetworkImageGuard guard;
+        if (plc_project_host_acl_enabled()) return false;
+        n = sp_build_payload(buf, (uint64_t)millis(), s_seq++);
+        topic(t, sizeof(t), msgtype);
+    }
+    // Keep the point snapshot coherent, but release its lock before taking any
+    // ESP-MQTT API mutex. The MQTT worker may be waiting for the W5500 owner,
+    // which itself needs the image lock to inspect the current project policy.
     return mqtt_runtime_publish(t, buf, n, 1, false) >= 0;
 }
 

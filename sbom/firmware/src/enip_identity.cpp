@@ -1,3 +1,5 @@
+#include "network_access.h"
+#include "proto_common.h"
 #include "enip_identity.h"
 #include "plc_core.h"          // plc_log / SRC_MODBUS
 #include <string.h>
@@ -88,7 +90,7 @@ int EnipIdentity::sendrrdata_identity_reply(uint8_t* out, uint32_t session, cons
 EnipIdentity::EnipIdentity() : server(ENIP_TCP_PORT) { cur_src_ip[0] = 0; }
 
 bool EnipIdentity::start() {
-    for (int i = 0; i < 3; i++) { server.begin(); delay(20); }  // 3x = boot retry robustness (begin() is best-effort); available() maintains one listener thereafter
+    net_listen_begin(server);  // (was a copy-pasted 3x begin() retry; see proto_common.h)
     Serial.printf("[ENIP] EtherNet/IP identity responder on TCP %d - unauth enumeration target\n", ENIP_TCP_PORT);
     return true;
 }
@@ -96,6 +98,7 @@ bool EnipIdentity::start() {
 void EnipIdentity::handle() {
     NetClient client = server.available();
     if (!client) return;
+    if (!plc_project_host_allowed(plc_network_ipv4(client.remoteIP()))) { client.stop(); return; }
     if (!client.connected()) { client.stop(); return; }
     if (!client.available()) return;
 

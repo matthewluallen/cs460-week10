@@ -13,6 +13,8 @@
 #include "plc_auth.h"
 #include "eth_net.h"
 #include "loop_timing.h"
+#include "device_acquisition.h"
+#include <cstring>
 #include <esp_timer.h>
 #include <esp_system.h>
 #include <cstdlib>
@@ -36,6 +38,14 @@ static display_capture::Snapshot* s_capture=nullptr;
 static uint8_t* s_capture_bytes=nullptr;
 static bool s_capture_pending=false;
 static bool s_canvas_frozen=false;
+static volatile bool s_injA=false,s_injB=false,s_injC=false; // UI-injected panel button presses
+void display_ui_inject(char b){ if(b=='a'||b=='A')s_injA=true; else if(b=='b'||b=='B')s_injB=true; else if(b=='c'||b=='C')s_injC=true; }
+// Maintainer physical-presence check: sample button A after the panel is up.
+// Used by the secure build's boot recovery (hold A at reset to clear the password).
+bool display_ui_btnA_held_at_boot(){
+  M5StamPLC.update(); delay(25); M5StamPLC.update();
+  return M5.BtnA.isPressed();
+}
 static display_capture::Ticket s_capture_ticket{};
 static bool s_surface_attempted=false;
 #ifdef ENABLE_DISPLAY_CAPTURE
@@ -102,11 +112,12 @@ static uint32_t s_bootT=0; static bool s_bootDrawn=false, s_built=false;
 // color565 computed directly, so palette setup never touches the (maybe-not-ready) panel
 #define RGB565(r,g,b) ((uint16_t)((((r)&0xF8)<<8)|(((g)&0xFC)<<3)|((b)>>3)))
 
-enum Scr { S_BOOT, S_HOME, S_MODE, S_IO, S_FORCES, S_INFO, S_LOG };
+enum Scr { S_BOOT, S_HOME, S_MODE, S_IO, S_GROVE, S_FORCES, S_INFO, S_LOG };
 static Scr s_scr=S_BOOT;
-static int s_menu=0;                 // HOME menu cursor: 0 MODE 1 I/O 2 FORCE 3 INFO
+static int s_menu=0;                 // HOME menu cursor: 0 MODE 1 I/O 2 GROVE 3 FORCE 4 INFO
 static int s_target=PLC_RUN;         // MODE target
 static int s_iocur=0;                // I/O list cursor
+static int s_grovecur=0;             // GROVE (Grove/expansion sensor) list cursor
 static uint32_t s_lastBtn=0, s_lastDraw=0, s_sig=0;
 static int s_ledMode=-1;
 static PlcPanelInputs s_inputs;
@@ -227,8 +238,8 @@ static void renderHome(){
   int fc=plc_force_count(); if(fc>0){ char f[18]; snprintf(f,18,"%d FORCED",fc); tL(f,8,80,1,VIO); }
   input_stamp(88);
   // menu
-  const char* items[4]={"MODE","I/O","FORCE","INFO"};
-  int x=6; for(int i=0;i<4;i++){ bool on=i==s_menu; int w=D.textWidth(items[i])+10;
+  const char* items[5]={"MODE","I/O","GROVE","FORCE","INFO"};
+  int x=6; for(int i=0;i<5;i++){ bool on=i==s_menu; int w=D.textWidth(items[i])+10;
     if(on) D.fillRoundRect(x,98,w,16,4,ACC); tL(items[i],x+5,101,1,on?BG:MUTED); x+=w+6; }
   chin("next","open","-");
 }
@@ -306,6 +317,57 @@ static void renderLog(){
   chin("-","-","back");
 }
 
+// ---- GROVE: Grove / expansion sensors on the PORT.A sensor bus (Wire1) ----
+// The on-panel analog of the `sensors` console command: these modules live on the
+// sensor plane (PORT.A / Wire1), NOT the relay/DI control plane the I/O screen shows,
+// which is why a plugged-in ENV/NCIR/ToF never appeared under I/O. Read-only glance;
+// A scrolls, C goes back. Data read from the acquisition engine on the loop task.
+static void renderGrove(){
+  D.fillScreen(BG);
+  tL("GROVE SENSORS",6,6,2,UIWHITE);
+  auto& e=device_acquisition_state(); uint32_t now=millis();
+  int total=(int)e.count;
+  char sub[48]; snprintf(sub,sizeof(sub),"PORT.A bus  %d found  sampling %s",total,e.enabled?"on":"off");
+  tL(sub,6,26,1,e.enabled?MUTED:WARNC);
+  if(total==0){
+    tL("No Grove module detected.",8,46,1,MUTED);
+    tL("Plug into PORT.A (red port),",8,62,1,MUTED);
+    tL("then console:  devices scan",8,76,1,ACC);
+    chin("-","-","back"); return;
+  }
+  if(s_grovecur>=total) s_grovecur=0;
+  int topv=s_grovecur-1; if(topv>total-3)topv=total-3; if(topv<0)topv=0;
+  int y=40;
+  for(int r=0;r<3 && topv+r<total;r++){ int i=topv+r; const auto& s=e.slots[i]; const auto& d=s.device; const auto& v=s.value;
+    acquisition::Quality q=s.current(now,e.enabled);
+    bool sel=i==s_grovecur;
+    uint16_t qc = q==acquisition::Quality::Valid?OKC
+                : (q==acquisition::Quality::Warmup||q==acquisition::Quality::Stale||q==acquisition::Quality::Paused||q==acquisition::Quality::Awaiting)?WARNC
+                : FAULTC;
+    if(sel) D.fillRoundRect(2,y-1,236,25,3,SURF);
+    char name[20]; snprintf(name,sizeof(name),"%s",d.driver);
+    char* dash=strstr(name,"-candidate"); if(dash)*dash=0;
+    char hdr[34]; snprintf(hdr,sizeof(hdr),"%s 0x%02X %s",d.bus?"IN":"PA",d.address,name);
+    tL(hdr,8,y,1,sel?UIWHITE:MUTED);
+    const char* qn=acquisition::name(q); D.setTextSize(1); int qw=D.textWidth(qn); tL(qn,232-qw,y,1,qc);
+    char rd[64];
+    if(!s.has_sample) snprintf(rd,sizeof(rd),"(awaiting first sample)");
+    else switch(s.kind){
+      case acquisition::Kind::Env:  snprintf(rd,sizeof(rd),"%.1fC  %.0f%%RH  %.0fhPa",
+                                      double(v.temp_c),double(v.rh_pct),double(v.pressure_pa)/100.0); break;
+      case acquisition::Kind::Ncir: snprintf(rd,sizeof(rd),"obj %.1fC  amb %.1fC",
+                                      double(v.object_centi_c)/100.0,double(v.ambient_centi_c)/100.0); break;
+      case acquisition::Kind::Tof:  snprintf(rd,sizeof(rd),"dist %ld mm",(long)v.distance_mm); break;
+      case acquisition::Kind::Sgp:  snprintf(rd,sizeof(rd),"eCO2 %u  TVOC %u",v.eco2_ppm,v.tvoc_ppb); break;
+      case acquisition::Kind::Heart:snprintf(rd,sizeof(rd),"IR %u  RED %u",v.ir,v.red); break;
+      default:                      snprintf(rd,sizeof(rd),"ch1 %dmV  ch2 %dmV",v.mv1,v.mv2); break;
+    }
+    tL(rd,14,y+12,1,s.has_sample?UIWHITE:MUTED);
+    y+=26;
+  }
+  chin(total>3?"next":"-","-","back");
+}
+
 // ---- input ----
 static void act_io(){
   if(s_iocur<0||s_iocur>=s_nel) return; const Elem&e=s_el[s_iocur];
@@ -329,13 +391,13 @@ static void handle(){
   // stable isPressed() level is correct regardless of how often/where update runs.
   static bool s_pA=false, s_pB=false, s_pC=false;
   bool cA=M5.BtnA.isPressed(), cB=M5.BtnB.isPressed(), cC=M5.BtnC.isPressed();
-  bool a = cA && !s_pA, b = cB && !s_pB, c = cC && !s_pC;
-  s_pA=cA; s_pB=cB; s_pC=cC;
+  bool a = (cA && !s_pA)||s_injA, b = (cB && !s_pB)||s_injB, c = (cC && !s_pC)||s_injC;
+  s_pA=cA; s_pB=cB; s_pC=cC; s_injA=s_injB=s_injC=false;
   if(!a&&!b&&!c) return;
   switch(s_scr){
     case S_HOME:
-      if(a) s_menu=(s_menu+1)%4;
-      else if(b){ if(s_menu==0){s_scr=S_MODE;s_target=plc_mode();} else if(s_menu==1){s_scr=S_IO;s_iocur=0;} else if(s_menu==2)s_scr=S_FORCES; else s_scr=S_INFO; }
+      if(a) s_menu=(s_menu+1)%5;
+      else if(b){ if(s_menu==0){s_scr=S_MODE;s_target=plc_mode();} else if(s_menu==1){s_scr=S_IO;s_iocur=0;} else if(s_menu==2){s_scr=S_GROVE;s_grovecur=0;} else if(s_menu==3)s_scr=S_FORCES; else s_scr=S_INFO; }
       break;
     case S_MODE:
       if(a) s_target=(s_target+1)%3;
@@ -347,6 +409,11 @@ static void handle(){
       else if(b) act_io();
       else if(c) s_scr=S_HOME;
       break;
+    case S_GROVE:{
+      int n=(int)device_acquisition_state().count;
+      if(a){ if(n>0) s_grovecur=(s_grovecur+1)%n; }
+      else if(c) s_scr=S_HOME;
+      break; }
     case S_FORCES:
       if(b){ plc_clear_all_forces(SRC_SYSTEM,"panel"); M5StamPLC.tone(880,120); }
       else if(c) s_scr=S_HOME;
@@ -358,12 +425,28 @@ static void handle(){
   s_sig=0; // force redraw after any input
 }
 
+// Content signature of the GROVE screen, quantized to what it actually displays, so
+// the screen redraws only when a shown value changes — no periodic full-clear flicker
+// (same change-detection the HOME screen uses). Stable readings hash the same → no redraw.
+static uint32_t grove_sig(){
+  auto& e=device_acquisition_state(); uint32_t now=millis();
+  uint32_t s=2166136261u ^ (uint32_t)e.count ^ (e.enabled?0x55u:0u);
+  for(size_t i=0;i<e.count;++i){ const auto& sl=e.slots[i]; const auto& v=sl.value;
+    s=s*131u + sl.device.address + (uint32_t)sl.current(now,e.enabled)*7u + (sl.has_sample?3u:0u);
+    s=s*131u + (uint32_t)(int32_t)(v.temp_c*10.0f) + (uint32_t)v.rh_pct
+            + (uint32_t)(v.pressure_pa/100.0f) + (uint32_t)(v.gas_ohm/1000.0f);
+    s=s*131u + (uint32_t)v.object_centi_c + (uint32_t)v.ambient_centi_c + (uint32_t)(v.distance_mm+1)
+            + v.eco2_ppm + v.tvoc_ppb + v.ir + (uint32_t)v.mv1 + (uint32_t)v.mv2;
+  }
+  return s;
+}
 static uint32_t sig(){
-  uint32_t s=(uint32_t)s_scr*131 + s_menu*17 + s_iocur*7 + plc_mode()*3 + s_target;
+  uint32_t s=(uint32_t)s_scr*131 + s_menu*17 + s_iocur*7 + s_grovecur*11 + plc_mode()*3 + s_target;
   s=s*257+s_inputs.available;
   s=s*257+s_inputs.values; s=s*257+s_inputs.force_mask;
   for(int i=0;i<4;i++) s=s*2+ (plc_relay_commanded(i)?1:0);
   s+=plc_force_count()*1009;
+  if(s_scr==S_GROVE) s=s*1000003u + grove_sig();   // redraw GROVE on reading change, not on a timer
   return s;
 }
 
@@ -388,10 +471,16 @@ void display_ui_tick(){
   if(g!=s_sig || s_capture_pending){ s_sig=g; s_lastDraw=now;   // redraw only when content changes -> no periodic flicker
     PanelTiming measurement(timing::NORMAL_RENDER);
     switch(s_scr){ case S_MODE:renderMode();break; case S_IO:renderIO();break;
+      case S_GROVE:renderGrove();break;
       case S_FORCES:renderForces();break; case S_INFO:renderInfo();break; case S_LOG:renderLog();break; default:renderHome(); }
     present_surface();
     s_lastInputStamp=now;
   } else if(now-s_lastInputStamp>=250 && (s_scr==S_HOME||s_scr==S_IO)) {
-    s_lastInputStamp=now;input_stamp(s_scr==S_HOME?88:111);present_surface();
+    // Live-refresh only the small provenance strip (HOME/IO). The GROVE screen is
+    // driven by grove_sig() in the change-detection path above, so it redraws when a
+    // reading changes rather than on a 250 ms timer — which was the flicker source.
+    s_lastInputStamp=now;
+    input_stamp(s_scr==S_HOME?88:111);
+    present_surface();
   }
 }

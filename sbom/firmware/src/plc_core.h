@@ -10,7 +10,8 @@ enum WriteSource : uint8_t { SRC_SYSTEM = 0, SRC_MODBUS = 1, SRC_USB = 2, SRC_WE
 struct FaultEntry { uint16_t code; uint32_t t_ms; bool active; char msg[40]; };
 
 void plc_core_begin();
-void plc_core_scan();     // one PLC scan; call every OPENPLC_SCAN_CYCLE_MS from loop()
+void plc_core_scan();             // maintenance/inhibition scan (e.g. before project persistence)
+void plc_core_scan_scheduled();   // periodic loop scan; same execution/mode/output rules
 
 PlcMode     plc_mode();
 const char* plc_mode_str();
@@ -78,6 +79,7 @@ struct PlcScanSnapshot {
     uint64_t phase_end_us[7]{};
     plc::Instr program[32]{};
     int program_count=0;
+    uint32_t project_generation=0;
     uint8_t raw_di=0, input_di=0, logic_outputs=0, applied_outputs=0;
     uint8_t register_readback=0, di_force_mask=0;
     uint64_t coil_force_mask=0;
@@ -86,6 +88,39 @@ struct PlcScanSnapshot {
     uint32_t binding_generation=0, sample_sequence[3]{}, sample_ms[3]{};
 };
 void plc_scan_capture(PlcScanSnapshot& out);
+
+// Boot-local execution diagnostics, captured together under the image lock.
+// Reading/clearing the active fault table never resets this historical evidence.
+#include "execution_diagnostics.h"
+struct PlcFirstFailure {
+    bool recorded=false, cleared=false, during_scan=false;
+    uint16_t code=0;
+    uint64_t at_us=0, cleared_us=0, scan_sequence=0;
+    uint32_t project_generation=0;
+    PlcMode mode_before=PLC_PROGRAM;
+    execution::Phase phase=execution::Phase::OutsideScan;
+    char message[40]{};
+};
+struct PlcExecutionSnapshot {
+    bool supported=true;
+    uint64_t captured_us=0;
+    uint32_t project_generation=0;
+    PlcMode mode=PLC_PROGRAM;
+    unsigned active_faults=0;
+    execution::Snapshot timing;
+    execution::Watchdog watchdog;
+    PlcFirstFailure first_failure;
+    bool scan_available=false;
+    uint64_t scan_sequence=0;
+    uint32_t scan_project_generation=0;
+    PlcMode scan_mode_at_solve=PLC_PROGRAM, scan_mode_after=PLC_PROGRAM;
+};
+void plc_execution_capture(PlcExecutionSnapshot& out);
+// All SDK operations are done by the loop outside the image lock. These calls
+// retain their results only; zero denotes ESP_OK, including in host tests.
+void plc_execution_watchdog_setup(int init_result, bool reconfigured, int configuration_result,
+                                  int subscription_result, int status_result);
+void plc_execution_watchdog_feed(int result);
 
 // Compact completed-scan DI view for the panel; no direct bus sampling.
 struct PlcPanelInputs {

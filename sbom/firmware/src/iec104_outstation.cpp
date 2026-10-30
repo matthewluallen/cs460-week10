@@ -1,7 +1,10 @@
 #include "iec104_outstation.h"
+#include "tag_arbiter.h"
+#include "proto_common.h"
 #include "modbus_tcp_server.h"   // shared I/O image: get_register / set_coil (same path as Modbus)
 #include "plc_core.h"            // plc_di_live / plc_coil_live / plc_log / SRC_MODBUS
 #include <string.h>
+#include "network_access.h"
 
 Iec104Outstation iec104_outstation;
 
@@ -12,7 +15,7 @@ Iec104Outstation::Iec104Outstation() : server(IEC104_TCP_PORT) {
 }
 
 bool Iec104Outstation::start() {
-    for (int i = 0; i < 3; i++) { server.begin(); delay(20); }  // 3x = boot retry robustness (begin() is best-effort); available() maintains one listener thereafter
+    net_listen_begin(server);  // (was a copy-pasted 3x begin() retry; see proto_common.h)
     Serial.printf("[IEC104] IEC 60870-5-104 outstation on TCP %d (CA %d) - no base auth\n",
                   IEC104_TCP_PORT, IEC104_CA);
     return true;
@@ -65,8 +68,7 @@ int Iec104Outstation::build_me(uint8_t* a, uint8_t cot) {
     a[n++] = 4;                                  // 4 objects
     a[n++] = cot; a[n++] = 0;
     a[n++] = IEC104_CA & 0xFF; a[n++] = (IEC104_CA >> 8) & 0xFF;
-    uint16_t regs[4] = { modbus_server.get_register(0),  modbus_server.get_register(1),
-                         modbus_server.get_register(10), modbus_server.get_register(12) };
+    uint16_t regs[4]; plc_legacy_analog_snapshot(regs);
     for (int i = 0; i < 4; i++) {                // analog at IOA 21..24
         uint32_t ioa = 21 + i;
         a[n++] = ioa & 0xFF; a[n++] = (ioa >> 8) & 0xFF; a[n++] = (ioa >> 16) & 0xFF;
@@ -91,6 +93,8 @@ void Iec104Outstation::handle() {
     NetClient client = server.available();
     if (!client) return;
     if (!client.connected()) { client.stop(); return; }
+    const uint32_t peer = plc_network_ipv4(client.remoteIP());
+    if (!plc_project_host_allowed(peer)) { client.stop(); return; }
     if (!client.available()) return;
 
     uint8_t buf[512];
@@ -101,7 +105,7 @@ void Iec104Outstation::handle() {
     int i = 0;
     while (i + 2 <= len && buf[i] == 0x68) {
         int alen = buf[i + 1];
-        if (i + 2 + alen > len) break;                       // incomplete APDU
+        if (alen < 4 || i + 2 + alen > len) break;            // incomplete/malformed APDU
         const uint8_t* apci = buf + i + 2;                    // 4 control octets
         uint8_t c1 = apci[0];
 
@@ -117,20 +121,36 @@ void Iec104Outstation::handle() {
             if (asdulen >= 6) {
                 uint8_t type = asdu[0];
                 if (type == 100) {                            // C_IC_NA_1: General Interrogation
+                    uint8_t first[16], sp[128], me[64], last[16];
+                    int nfirst, nsp, nme, nlast;
+                    {
+                        PlcNetworkImageGuard guard;
+                        if (!plc_network_legacy_snapshot_allowed(peer)) {
+                            plc_log(SRC_IEC104, cur_src_ip, "ACL DENIED interrogation snapshot"); client.stop(); return;
+                        }
+                        nfirst = build_ic(first, 0x07); nsp = build_sp(sp, 0x14);
+                        nme = build_me(me, 0x14); nlast = build_ic(last, 0x0A);
+                    }
                     plc_log(SRC_IEC104, cur_src_ip, "IEC-104 General Interrogation (C_IC_NA_1)");
-                    uint8_t a[128]; int l;
-                    l = build_ic(a, 0x07); send_i(client, a, l);   // actcon (COT 7)
-                    l = build_sp(a, 0x14); send_i(client, a, l);   // single points (COT 20)
-                    l = build_me(a, 0x14); send_i(client, a, l);   // measured values (COT 20)
-                    l = build_ic(a, 0x0A); send_i(client, a, l);   // actterm (COT 10)
+                    send_i(client, first, nfirst); send_i(client, sp, nsp);
+                    send_i(client, me, nme); send_i(client, last, nlast);
                 } else if (type == 45) {                      // C_SC_NA_1: single command
+                    if (asdulen < 10) { client.stop(); return; }
                     uint32_t ioa = (uint32_t)asdu[6] | ((uint32_t)asdu[7] << 8) | ((uint32_t)asdu[8] << 16);
                     uint8_t sco = asdu[9];
                     bool on = sco & 0x01;                     // SCS: command state
                     int relay = (int)ioa - 11;
                     if (relay >= 0 && relay < 4) {
-                        modbus_server.set_coil(relay, on);    // same actuation path as Modbus; no auth
-                        plc_log(SRC_IEC104, cur_src_ip, "IEC-104 C_SC_NA_1 relay %d = %d (IOA %u, unauth)", relay, on ? 1 : 0, ioa);
+                        PlcNetworkImageGuard guard;
+                        if (!plc_project_point_allowed(peer, point_policy::Kind::Coil, uint16_t(relay), true)) {
+                            plc_log(SRC_IEC104, cur_src_ip, "ACL DENIED coil %d", relay); client.stop(); return;
+                        }
+                        if (arb::note_write(arb::coil_key(uint16_t(relay)), arb::SRC_IEC104)) {   // P3 arbiter
+                            modbus_server.set_coil(relay, on);    // same actuation path as Modbus; no auth
+                            plc_log(SRC_IEC104, cur_src_ip, "IEC-104 C_SC_NA_1 relay %d = %d (IOA %u, unauth)", relay, on ? 1 : 0, ioa);
+                        } else {
+                            plc_log(SRC_IEC104, cur_src_ip, "IEC-104 relay %d REFUSED - tag owned by another protocol (arbiter)", relay);
+                        }
                     }
                     uint8_t a[16]; int n = 0;                 // actcon: echo the command, COT 7
                     a[n++] = 45; a[n++] = 1; a[n++] = 0x07; a[n++] = 0;

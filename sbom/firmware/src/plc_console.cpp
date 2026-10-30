@@ -7,6 +7,7 @@
 #include "mqtt_sensors.h"
 #include "port_c.h"
 #include "eth_net.h"
+#include <WiFi.h>
 #include "plc_diag.h"
 #include "plc_auth.h"
 #include "modbus_serial.h"
@@ -14,9 +15,12 @@
 #include "plc_core.h"
 #include "time_sync.h"
 #include "serial_config.h"
+#include "config_explain.h"
 #include "process_bindings.h"
 #include "acquisition_record.h"
 #include "diagnostic_log.h"
+#include "diagnostic_log_core.h"
+void display_ui_inject(char btn);  // on-device panel button inject (A/B/C)
 #include "record_frame.h"
 #include "plc_tags.h"
 #include "m5stamplc_io.h"
@@ -24,6 +28,8 @@
 #include "io_expansion.h"
 #include "program_loader.h"
 #include "plc_engine.h"
+#include "plc_project.h"
+#include "source_snapshot.h"
 #include <cstring>
 #include <cstdlib>
 #include <ctype.h>
@@ -32,11 +38,13 @@ extern plc::Engine g_engine;
 extern plc::Instr  g_prog[32];
 extern int         g_prog_n;
 
-static char s_line[3072]; // same bounded capacity as ProgramLoader, including IR
+static char s_line[project::FrameCapacity]; // complete project JSON + base64 frame
 static int  s_len = 0;
 static char s_last_eol = 0;
 static uint32_t s_last_input_ms = 0;   // millis() of the last received byte
 static bool     s_quiet = false;       // 'quiet on' silences periodic telemetry
+static bool     s_busstream = false;   // 'busstream on' live-streams decoded bus events as @BUS lines
+static uint64_t s_bus_stream_seq = 0;  // next diagnostic-log sequence to stream
 
 // Keep generated readback stable while USB drains it across loop visits.
 #ifdef OPENPLC_GENERATED_CONTROLLER
@@ -87,13 +95,7 @@ bool console_telemetry_muted() {
     return acquisition_record_busy() || diagnostic_log_console_busy() || runtime_busy() || display_capture_console_busy() || s_quiet || (s_last_input_ms != 0 && (uint32_t)(millis() - s_last_input_ms) < 4000);
 }
 
-static int32_t tag_value(const TagDef* t) {
-    switch (t->kind) {
-        case TK_COIL: return plc_coil_live(t->addr) ? 1 : 0;
-        case TK_DI:   return plc_di_live((uint8_t)t->addr) ? 1 : 0;
-        default:      return plc_tag_decode(t, modbus_server.get_register(t->addr));
-    }
-}
+static int32_t tag_value(const TagDef* t) { return plc_tag_value(t); }
 
 static void print_point(const TagDef* t) {
     int32_t v = tag_value(t);
@@ -105,13 +107,36 @@ static void print_point(const TagDef* t) {
     Serial.println();
 }
 
+// USB-Serial/JTAG drops the un-drained tail of a single large write once the CDC
+// TX timeout (setTxTimeoutMs) expires. That truncated multi-hundred-byte readbacks
+// (`project json`/`execution json`) at a host-timing-dependent offset, leaving
+// invalid JSON no client could parse. Emit long replies in small chunks and flush
+// each one so the FIFO drains between writes - the same pacing the incremental
+// status/points prints get for free - so delivery is complete regardless of how
+// fast the host reads. Bounded so a silent host can never wedge the console.
+static void console_emit_json(const String& s) {
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(s.c_str());
+    size_t n = s.length(), off = 0;
+    uint32_t start = millis();
+    while (off < n && (millis() - start) < 3000) {
+        size_t chunk = n - off; if (chunk > 48) chunk = 48;
+        size_t w = Serial.write(p + off, chunk);
+        Serial.flush();                 // block until this chunk leaves the FIFO
+        if (w) off += w; else delay(1); // short write: let USB catch up, then retry
+    }
+    Serial.write('\n');
+    Serial.flush();
+}
+
 static void cmd_help() {
     Serial.println(F("commands:"));
 #ifdef OPENPLC_GENERATED_CONTROLLER
     Serial.println(F("  Ctrl-C during runtime reply: cancel and request PROGRAM (not an emergency stop)"));
 #endif
     Serial.println(F("  status               CPU mode, scan time, faults, forces, comms"));
-    Serial.println(F("  points               list every named point and live value"));
+    Serial.println(F("  points               list installed project tags and live values"));
+    Serial.println(F("  project json         independent installed project identity, profile and logical state"));
+    Serial.println(F("  execution json       cached scan timing, watchdog status and historical first failure"));
     Serial.println(F("  show <tag>           one point in detail"));
     Serial.println(F("  io                   digital inputs and relay commanded/actual"));
     Serial.println(F("  set <tag> <val>      write a writable point (logged source=USB)"));
@@ -128,8 +153,12 @@ static void cmd_help() {
     Serial.println(F("  mqtt connect <host>  subscribe phone sensors -> %IW1..3 (mqtt status to read)"));
     Serial.println(F("  clk                  show the wall-clock (stored as 32-bit - Y2038 target)"));
     Serial.println(F("  ntpsync [ip] [port] | auto [ip] [sec] | off   sync time from the net (unauth)"));
-    Serial.println(F("  netcfg [json] | dhcp | static <ip> <gw> <mask> | ntp <ip> [port] | auth <u> <p> | save"));
+    Serial.println(F("  netcfg [json]        per-interface net config: eth/wifi static|dhcp, wifi sta|ap, ntp, auth, save, explain"));
+    Serial.println(F("  explain <setting>    learn a config setting + what the firmware does ('explain' lists them)"));
+    Serial.println(F("  learn                a guided walk through every config setting"));
     Serial.println(F("  bustrace on|off      retain decoded bus diagnostics (see logs)"));
+    Serial.println(F("  busstream on|off     live-stream decoded bus events as @BUS lines"));
+    Serial.println(F("  btn a|b|c            inject an on-device panel button press (drives the LCD)"));
     Serial.println(F("  rtudiag              RTU worker counters and longest poll gap (us)"));
     Serial.println(F("  portc [status|profile disabled|hx711|h2-uart|hall|baud N|read|send HEX]"));
     Serial.println(F("  proto [name on|off]  selectable protocols/services + attack surface"));
@@ -212,16 +241,11 @@ static void cmd_set(char* tagn, char* valn) {
     const TagDef* t = plc_tag_find(tagn);
     if (!t) { Serial.println("? unknown tag"); return; }
     if (!t->writable) { Serial.println("? not writable (use force for inputs)"); return; }
-    long v = strtol(valn, nullptr, 0);
-    if (t->kind == TK_COIL) {
-        modbus_server.set_coil(t->addr, v != 0);
-        plc_log(SRC_USB, "", "SET %s(coil %u) = %d", t->name, t->addr, v ? 1 : 0);
-        Serial.printf("ok %s = %d\n", t->name, v ? 1 : 0);
-    } else {
-        modbus_server.set_register(t->addr, (uint16_t)v);
-        plc_log(SRC_USB, "", "SET %s(reg %u) = %ld", t->name, t->addr, v);
-        Serial.printf("ok %s = %ld\n", t->name, v);
-    }
+    char* end=nullptr;const long long v=strtoll(valn,&end,0);
+    if(!valn[0]||!end||*end||v<INT32_MIN||v>INT32_MAX){Serial.println("? int32 value required");return;}
+    if(!plc_tag_set(t,int32_t(v))){Serial.println("? point write refused");return;}
+    plc_log(SRC_USB,"","SET %s = %ld (live value)",t->name,(long)v);
+    Serial.printf("ok %s = %ld (project defaults change only on deployment)\n",t->name,(long)v);
 }
 
 static bool force_by_addr(const char* tagn, bool on, bool v) {
@@ -232,12 +256,12 @@ static bool force_by_addr(const char* tagn, bool on, bool v) {
     int idx = atoi(p + 2);
     if (t0 == 'I') {                                  // %IX digital input
         if (idx < 0 || idx > 7) { Serial.println("? IX0-7"); return true; }
-        if (on) plc_force_di((uint8_t)idx, v, SRC_USB, ""); else plc_unforce_di((uint8_t)idx, SRC_USB, "");
+        if (on) plc_force_di(plc_project_di(uint8_t(idx)), v, SRC_USB, ""); else plc_unforce_di(plc_project_di(uint8_t(idx)), SRC_USB, "");
         Serial.printf("%sforced %%IX%d%s\n", on ? "" : "un", idx, on ? (v ? " = 1" : " = 0") : "");
     } else {                                          // %QX relay/coil
         if (idx < 0 || idx > 3) { Serial.println("? QX0-3"); return true; }
-        // QX is zero-based relay numbering; protocol coils start at MOTOR.
-        const uint16_t address = pointmap::RELAY0 + (uint16_t)idx;
+        // Logical QX follows the installed project, including expansion outputs.
+        const uint16_t address = project::output_coil(plc_project_qx(uint8_t(idx)));
         if (on) plc_force_coil(address, v, SRC_USB, ""); else plc_unforce_coil(address, SRC_USB, "");
         Serial.printf("%sforced %%QX%d%s\n", on ? "" : "un", idx, on ? (v ? " = 1" : " = 0") : "");
     }
@@ -307,6 +331,18 @@ static void cmd_login(char* user, char* pass) {
 }
 
 static void cmd_passwd(char* np) {
+#ifndef ENABLE_CWE_DEMOS
+    // Secure first-run enrollment: no credential ships, so the FIRST operator
+    // password may be set without a prior login. Policy is still enforced; once
+    // provisioned, changing it requires being logged in (below).
+    if (!plc_authed() && !plc_auth_is_provisioned()) {
+        if (!np) { Serial.println("enroll: passwd <new>   (policy: >=12 chars, >=3 of lower/upper/digit/symbol)"); return; }
+        String msg;
+        if (plc_auth_set_user_password(np, msg)) Serial.printf("[AUTH] operator enrolled - %s. 'login operator <pass>' to sign in.\n", msg.c_str());
+        else Serial.printf("[AUTH] rejected: %s\n", msg.c_str());
+        return;
+    }
+#endif
     if (!plc_authed()) { Serial.println("[AUTH] not logged in - 'login operator <pass>' first"); return; }
     if (!np) { Serial.println("usage: passwd <new>   (policy: max 8 chars, A-Z 0-9 only)"); return; }
     String msg;
@@ -327,7 +363,7 @@ static void cmd_svcinfo() {
 }
 
 static void cmd_mqtt(const char* sub, const char* host) {
-    // Point the twin at the phone-sensor MQTT broker and subscribe phone/+/… -> %IW.
+    // Point the twin at the phone-sensor MQTT broker and subscribe phone/+/... -> %IW.
     if (sub && !strcmp(sub, "connect") && host && host[0]) {
         if (!svc_set(SVC_MQTT, true)) { Serial.println("{\"mqtt\":\"error\",\"reason\":\"service budget full (disable a network service)\"}"); return; }
         mqtt_sparkplug_begin(host, 1883, "TBD", "stamplc");
@@ -431,52 +467,114 @@ static void cmd_ntpsync(const char* a1, const char* a2, const char* a3) {
 // ---- network config (DHCP/static/IP/NTP + remote-config creds) ----
 // Same NVS the boot serial menu writes; also the back-end for the Logic Studio
 // config page (over USB) and the authenticated /api/config endpoint (over the net).
+static const char* wmode_str(int m){return m==WMODE_STA?"sta":(m==WMODE_AP?"ap":"off");}
+
 static void cmd_netcfg(const char* a1, const char* a2) {
     char* a3 = strtok(nullptr, " \t");
     char* a4 = strtok(nullptr, " \t");
+    char* a5 = strtok(nullptr, " \t");
+
+    if (a1 && !strcmp(a1, "explain")) { if (a2 && !strcmp(a2,"json")) config_explain_json(); else config_explain(a2); return; }
+
     if (!a1 || !strcmp(a1, "json")) {
+        char apn[33]; setup_ap_ssid(apn, sizeof(apn));
+        bool present = eth_ok();
+        String wlive = (g_cfg.wifi_mode==WMODE_AP) ? WiFi.softAPIP().toString()
+                     : (WiFi.status()==WL_CONNECTED ? WiFi.localIP().toString() : String("no-net"));
         if (a1 && !strcmp(a1, "json")) {
-            Serial.printf("{\"mode\":\"%s\",\"ip\":\"%s\",\"gw\":\"%s\",\"mask\":\"%s\",\"ntp\":\"%s\","
-                          "\"ntp_port\":%d,\"cfg_user\":\"%s\",\"link\":\"%s\"}\n",
-                g_cfg.use_static ? "static" : "dhcp", g_cfg.ip, g_cfg.gw, g_cfg.mask,
-                g_cfg.ntp[0] ? g_cfg.ntp : g_cfg.gw, g_cfg.ntp_port, g_cfg.cfg_user,
-                eth_ok() ? eth_ip().c_str() : "no-net");
+            Serial.printf("{\"eth\":{\"present\":%s,\"mode\":\"%s\",\"ip\":\"%s\",\"gw\":\"%s\",\"mask\":\"%s\",\"link\":\"%s\"},",
+                present?"true":"false", g_cfg.eth_use_static?"static":"dhcp",
+                g_cfg.eth_ip, g_cfg.eth_gw, g_cfg.eth_mask, present?eth_ip().c_str():"absent");
+            Serial.printf("\"wifi\":{\"mode\":\"%s\",\"ssid\":\"%s\",\"ap_ssid\":\"%s\",\"addr\":\"%s\",\"ip\":\"%s\",\"gw\":\"%s\",\"mask\":\"%s\",\"link\":\"%s\",\"rssi\":%d},",
+                wmode_str(g_cfg.wifi_mode), g_cfg.ssid, apn, g_cfg.wifi_use_static?"static":"dhcp",
+                g_cfg.wifi_ip, g_cfg.wifi_gw, g_cfg.wifi_mask, wlive.c_str(), (int)WiFi.RSSI());
+            Serial.printf("\"ntp\":\"%s\",\"ntp_port\":%d,\"cfg_user\":\"%s\"}\n",
+                g_cfg.ntp[0]?g_cfg.ntp:g_cfg.eth_gw, g_cfg.ntp_port, g_cfg.cfg_user);
         } else {
-            Serial.printf("net : %s  ip=%s gw=%s mask=%s\n",
-                          g_cfg.use_static ? "static" : "dhcp", g_cfg.ip, g_cfg.gw, g_cfg.mask);
-            Serial.printf("  live ip : %s\n", eth_ok() ? eth_ip().c_str() : "no-net");
-            Serial.printf("  ntp     : %s:%d\n", g_cfg.ntp[0] ? g_cfg.ntp : g_cfg.gw, g_cfg.ntp_port);
-            Serial.printf("  cfg auth: %s:%s  [CWE-798/1392 default - change it!]\n", g_cfg.cfg_user, g_cfg.cfg_pass);
-            Serial.println("  set: netcfg dhcp | static <ip> <gw> <mask> | ntp <ip> [port] | auth <user> <pass> | save");
-            Serial.println("  (changes persist on 'save'; network addressing applies on reboot)");
+            Serial.printf("ETH  : %s  present=%s ip=%s gw=%s mask=%s  live=%s\n",
+                g_cfg.eth_use_static?"static":"dhcp", present?"yes":"no",
+                g_cfg.eth_ip, g_cfg.eth_gw, g_cfg.eth_mask, present?eth_ip().c_str():"absent");
+            Serial.printf("WiFi : %s  ssid=%s ap=%s addr=%s %s\n",
+                wmode_str(g_cfg.wifi_mode), g_cfg.ssid, apn,
+                g_cfg.wifi_use_static?"static":"dhcp", g_cfg.wifi_use_static?g_cfg.wifi_ip:"(DHCP)");
+            Serial.printf("  ntp : %s:%d   cfg auth: %s:%s  [CWE-798/1392 default!]\n",
+                g_cfg.ntp[0]?g_cfg.ntp:g_cfg.eth_gw, g_cfg.ntp_port, g_cfg.cfg_user, g_cfg.cfg_pass);
+            Serial.println("  set: netcfg eth static <ip> <gw> <mask> | eth dhcp");
+            Serial.println("       netcfg wifi off | sta <ssid> <pass> | static <ip> <gw> <mask> | dhcp | ap [<ssid> <pass>]");
+            Serial.println("       netcfg ntp <ip> [port] | auth <user> <pass> | save   (addressing applies on reboot)");
         }
         return;
     }
-    if (!strcmp(a1, "dhcp"))   { g_cfg.use_static = 0; Serial.println("mode=dhcp (save + reboot to apply)"); return; }
-    if (!strcmp(a1, "static")) {
-        if (!a2 || !a3 || !a4) { Serial.println("usage: netcfg static <ip> <gw> <mask>"); return; }
-        g_cfg.use_static = 1;
-        strncpy(g_cfg.ip, a2, sizeof(g_cfg.ip) - 1);  g_cfg.ip[sizeof(g_cfg.ip)-1]=0;
-        strncpy(g_cfg.gw, a3, sizeof(g_cfg.gw) - 1);  g_cfg.gw[sizeof(g_cfg.gw)-1]=0;
-        strncpy(g_cfg.mask, a4, sizeof(g_cfg.mask) - 1); g_cfg.mask[sizeof(g_cfg.mask)-1]=0;
-        Serial.printf("mode=static ip=%s gw=%s mask=%s (save + reboot)\n", g_cfg.ip, g_cfg.gw, g_cfg.mask); return;
+
+    if (!strcmp(a1, "eth")) {
+        if (!eth_ok()) { Serial.println("eth: W5500 not present (no PoE module detected)"); return; }
+        if (a2 && !strcmp(a2,"dhcp")) { g_cfg.eth_use_static=0; Serial.println("eth=dhcp (save + reboot)"); return; }
+        if (a2 && !strcmp(a2,"static")) {
+            if(!a3||!a4||!a5){Serial.println("usage: netcfg eth static <ip> <gw> <mask>");return;}
+            g_cfg.eth_use_static=1;
+            strncpy(g_cfg.eth_ip,a3,sizeof(g_cfg.eth_ip)-1);g_cfg.eth_ip[sizeof(g_cfg.eth_ip)-1]=0;
+            strncpy(g_cfg.eth_gw,a4,sizeof(g_cfg.eth_gw)-1);g_cfg.eth_gw[sizeof(g_cfg.eth_gw)-1]=0;
+            strncpy(g_cfg.eth_mask,a5,sizeof(g_cfg.eth_mask)-1);g_cfg.eth_mask[sizeof(g_cfg.eth_mask)-1]=0;
+            Serial.printf("eth=static ip=%s gw=%s mask=%s (save + reboot)\n",g_cfg.eth_ip,g_cfg.eth_gw,g_cfg.eth_mask);return;
+        }
+        Serial.println("usage: netcfg eth static <ip> <gw> <mask> | eth dhcp"); return;
     }
-    if (!strcmp(a1, "ntp")) {
-        if (!a2) { Serial.println("usage: netcfg ntp <ip> [port]"); return; }
-        strncpy(g_cfg.ntp, a2, sizeof(g_cfg.ntp) - 1); g_cfg.ntp[sizeof(g_cfg.ntp)-1]=0;
-        g_cfg.ntp_port = a3 ? atoi(a3) : 123;
-        time_sync_set_server(g_cfg.ntp, (uint16_t)g_cfg.ntp_port, time_sync_interval_ms());  // live now
-        Serial.printf("ntp=%s:%d (live; 'save' to persist)\n", g_cfg.ntp, g_cfg.ntp_port); return;
+
+    if (!strcmp(a1, "wifi")) {
+        if (a2 && !strcmp(a2,"off"))  { g_cfg.wifi_mode=WMODE_OFF; Serial.println("wifi=off (save + reboot)"); return; }
+        if (a2 && !strcmp(a2,"dhcp")) { g_cfg.wifi_use_static=0; Serial.println("wifi addr=dhcp (save + reboot)"); return; }
+        if (a2 && !strcmp(a2,"sta")) {
+            if(!a3){Serial.println("usage: netcfg wifi sta <ssid> <pass>");return;}
+            g_cfg.wifi_mode=WMODE_STA;
+            strncpy(g_cfg.ssid,a3,sizeof(g_cfg.ssid)-1);g_cfg.ssid[sizeof(g_cfg.ssid)-1]=0;
+            if(a4){strncpy(g_cfg.pass,a4,sizeof(g_cfg.pass)-1);g_cfg.pass[sizeof(g_cfg.pass)-1]=0;}
+            Serial.printf("wifi=sta ssid=%s (save + reboot)\n",g_cfg.ssid);return;
+        }
+        if (a2 && !strcmp(a2,"static")) {
+            if(!a3||!a4||!a5){Serial.println("usage: netcfg wifi static <ip> <gw> <mask>");return;}
+            g_cfg.wifi_use_static=1;
+            strncpy(g_cfg.wifi_ip,a3,sizeof(g_cfg.wifi_ip)-1);g_cfg.wifi_ip[sizeof(g_cfg.wifi_ip)-1]=0;
+            strncpy(g_cfg.wifi_gw,a4,sizeof(g_cfg.wifi_gw)-1);g_cfg.wifi_gw[sizeof(g_cfg.wifi_gw)-1]=0;
+            strncpy(g_cfg.wifi_mask,a5,sizeof(g_cfg.wifi_mask)-1);g_cfg.wifi_mask[sizeof(g_cfg.wifi_mask)-1]=0;
+            Serial.printf("wifi=static ip=%s gw=%s mask=%s (save + reboot)\n",g_cfg.wifi_ip,g_cfg.wifi_gw,g_cfg.wifi_mask);return;
+        }
+        if (a2 && !strcmp(a2,"ap")) {
+            g_cfg.wifi_mode=WMODE_AP;
+            if(a3){strncpy(g_cfg.ap_ssid,a3,sizeof(g_cfg.ap_ssid)-1);g_cfg.ap_ssid[sizeof(g_cfg.ap_ssid)-1]=0;}
+            if(a4){strncpy(g_cfg.ap_pass,a4,sizeof(g_cfg.ap_pass)-1);g_cfg.ap_pass[sizeof(g_cfg.ap_pass)-1]=0;}
+            char apn[33]; setup_ap_ssid(apn,sizeof(apn));
+            Serial.printf("wifi=ap ssid=%s pass=%s (web config http://192.168.4.1:8080) (save + reboot)\n",apn,setup_ap_pass());return;
+        }
+        Serial.println("usage: netcfg wifi off | sta <ssid> <pass> | static <ip> <gw> <mask> | dhcp | ap [<ssid> <pass>]"); return;
     }
-    if (!strcmp(a1, "auth")) {
-        if (!a2 || !a3) { Serial.println("usage: netcfg auth <user> <pass>"); return; }
-        strncpy(g_cfg.cfg_user, a2, sizeof(g_cfg.cfg_user) - 1); g_cfg.cfg_user[sizeof(g_cfg.cfg_user)-1]=0;
-        strncpy(g_cfg.cfg_pass, a3, sizeof(g_cfg.cfg_pass) - 1); g_cfg.cfg_pass[sizeof(g_cfg.cfg_pass)-1]=0;
-        Serial.println("remote-config creds changed ('save' to persist) - good: the DEFAULT was the weakness"); return;
+
+    if (!strcmp(a1,"ntp")) {
+        if(!a2){Serial.println("usage: netcfg ntp <ip> [port]");return;}
+        strncpy(g_cfg.ntp,a2,sizeof(g_cfg.ntp)-1);g_cfg.ntp[sizeof(g_cfg.ntp)-1]=0;
+        g_cfg.ntp_port=a3?atoi(a3):123;
+        time_sync_set_server(g_cfg.ntp,(uint16_t)g_cfg.ntp_port,time_sync_interval_ms());
+        Serial.printf("ntp=%s:%d (live; 'save' to persist)\n",g_cfg.ntp,g_cfg.ntp_port);return;
     }
-    if (!strcmp(a1, "save")) { serial_config_save(); plc_log(SRC_USB, "", "netcfg saved"); return; }
-    Serial.println("netcfg: json | dhcp | static <ip> <gw> <mask> | ntp <ip> [port] | auth <user> <pass> | save");
+    if (!strcmp(a1,"auth")) {
+        if(!a2||!a3){Serial.println("usage: netcfg auth <user> <pass>");return;}
+        strncpy(g_cfg.cfg_user,a2,sizeof(g_cfg.cfg_user)-1);g_cfg.cfg_user[sizeof(g_cfg.cfg_user)-1]=0;
+        strncpy(g_cfg.cfg_pass,a3,sizeof(g_cfg.cfg_pass)-1);g_cfg.cfg_pass[sizeof(g_cfg.cfg_pass)-1]=0;
+        Serial.println("remote-config creds changed ('save' to persist) - good: the DEFAULT was the weakness");return;
+    }
+    if (!strcmp(a1,"save")) { serial_config_save(); plc_log(SRC_USB,"","netcfg saved"); return; }
+
+    if (!strcmp(a1,"dhcp")) { g_cfg.eth_use_static=0; Serial.println("eth=dhcp (save + reboot) [alias: netcfg eth dhcp]"); return; }
+    if (!strcmp(a1,"static")) {
+        if(!a2||!a3||!a4){Serial.println("usage: netcfg static <ip> <gw> <mask>  (alias for eth)");return;}
+        g_cfg.eth_use_static=1;
+        strncpy(g_cfg.eth_ip,a2,sizeof(g_cfg.eth_ip)-1);g_cfg.eth_ip[sizeof(g_cfg.eth_ip)-1]=0;
+        strncpy(g_cfg.eth_gw,a3,sizeof(g_cfg.eth_gw)-1);g_cfg.eth_gw[sizeof(g_cfg.eth_gw)-1]=0;
+        strncpy(g_cfg.eth_mask,a4,sizeof(g_cfg.eth_mask)-1);g_cfg.eth_mask[sizeof(g_cfg.eth_mask)-1]=0;
+        Serial.printf("eth=static ip=%s gw=%s mask=%s (save + reboot)\n",g_cfg.eth_ip,g_cfg.eth_gw,g_cfg.eth_mask);return;
+    }
+    Serial.println("netcfg: json | eth ... | wifi ... | ntp <ip> [port] | auth <u> <p> | save");
 }
+
 
 static void cmd_pjson() {
     Serial.print("{\"mode\":\""); Serial.print(plc_mode_str());
@@ -493,17 +591,17 @@ static void cmd_pjson() {
         int32_t val; bool forced=false, fv=false;
         if (t->kind==TK_COIL){ val=plc_coil_live(t->addr)?1:0; forced=plc_coil_is_forced(t->addr); fv=plc_coil_forced_val(t->addr); }
         else if (t->kind==TK_DI){ val=plc_di_live((uint8_t)t->addr)?1:0; forced=plc_di_is_forced((uint8_t)t->addr); fv=plc_di_forced_val((uint8_t)t->addr); }
-        else val=plc_tag_decode(t, modbus_server.get_register(t->addr));
+        else val=plc_tag_value(t);
         if (i) Serial.print(",");
-        Serial.print("{\"n\":\""); Serial.print(t->name);
+        Serial.print("{\"n\":\""); Serial.print(plc_json_text(t->name));
         Serial.print("\",\"k\":"); Serial.print((int)t->kind);
         Serial.print(",\"v\":"); Serial.print(val);
-        Serial.print(",\"u\":\""); Serial.print(t->unit);
+        Serial.print(",\"u\":\""); Serial.print(plc_json_text(t->unit));
         Serial.print("\",\"w\":"); Serial.print(t->writable?1:0);
         Serial.print(",\"c\":"); Serial.print(t->forceable?1:0);
         Serial.print(",\"f\":"); Serial.print(forced?1:0);
         Serial.print(",\"fv\":"); Serial.print(fv?1:0);
-        Serial.print(",\"d\":\""); Serial.print(t->desc); Serial.print("\"}");
+        Serial.print(",\"d\":\""); Serial.print(plc_json_text(t->desc)); Serial.print("\"}");
     }
     Serial.print("]");
     Serial.print(",\"fb\":[");
@@ -584,6 +682,7 @@ static void process(char* line) {
         device_inventory_console(a1, a2, strtok(nullptr, " \t") != nullptr);
         return;
     }
+    if (!strcmp(cmd, "sensors")) { device_inventory_sensors_text(); return; }
     if (!strcmp(cmd, "portc")) {
         port_c_console(a1, a2, strtok(nullptr, " \t") != nullptr);
         return;
@@ -591,6 +690,8 @@ static void process(char* line) {
     if      (!strcmp(cmd, "help") || !strcmp(cmd, "?")) cmd_help();
     else if (!strcmp(cmd, "status")) cmd_status();
     else if (!strcmp(cmd, "points")) cmd_points();
+    else if (!strcmp(cmd, "project")) { if(a1 && !strcmp(a1,"json") && !a2)console_emit_json(plc_project_json()); else Serial.println("usage: project json"); }
+    else if (!strcmp(cmd, "execution")) { if(a1 && !strcmp(a1,"json") && !a2)console_emit_json(plc_execution_json()); else Serial.println("usage: execution json"); }
     else if (!strcmp(cmd, "show") && a1) { const TagDef* t = plc_tag_find(a1); if (t) { print_point(t); Serial.printf("    %s\n", t->desc); } else Serial.println("? unknown tag"); }
     else if (!strcmp(cmd, "io")) cmd_io();
     else if (!strcmp(cmd, "program")) {
@@ -622,11 +723,15 @@ static void process(char* line) {
     else if (!strcmp(cmd, "rtudiag")) modbus_rtu_diag();
     else if (!strcmp(cmd,"logs")) diagnostic_log_console(a1,a2,strtok(nullptr," \t")!=nullptr);
     else if (!strcmp(cmd, "bustrace")) { g_bustrace = a1 && !strcmp(a1, "on"); Serial.printf("bus trace %s\n", g_bustrace ? "ON" : "OFF"); }
+    else if (!strcmp(cmd, "busstream")) { s_busstream = a1 && !strcmp(a1, "on"); if (s_busstream) { g_bustrace = true; s_bus_stream_seq = diagnostic_log_status().next_sequence; } Serial.printf("bus stream %s\n", s_busstream ? "ON (live @BUS lines)" : "OFF"); }
+    else if (!strcmp(cmd, "btn") && a1) { char k = a1[0]; display_ui_inject(k); Serial.printf("panel button %c injected\n", (k>='a'&&k<='z')?k-32:k); }
     else if (!strcmp(cmd, "mqtt")) cmd_mqtt(a1, a2);
     else if (!strcmp(cmd, "cwe")) cmd_cwe();
     else if (!strcmp(cmd, "clk")) cmd_clk();
     else if (!strcmp(cmd, "ntpsync")) cmd_ntpsync(a1, a2, strtok(nullptr, " \t"));
     else if (!strcmp(cmd, "netcfg")) cmd_netcfg(a1, a2);
+    else if (!strcmp(cmd, "explain")) config_explain(a1);
+    else if (!strcmp(cmd, "learn")) config_learn();
     else if (!strcmp(cmd, "ver")) Serial.println("StamPLC teaching firmware - PLC core v2 (mode/force/audit/console)");
     else if (!strcmp(cmd, "quiet")) { s_quiet = (a1 && !strcmp(a1, "on")); Serial.printf("telemetry %s\n", s_quiet ? "MUTED (quiet on)" : "streaming (quiet off)"); }
     else if (!strcmp(cmd, "console")) cmd_console();
@@ -668,8 +773,37 @@ void plc_console_begin() {
 //  - ignores stray control bytes instead of storing them
 //  - reports (not silently drops) an over-long line and resyncs the prompt
 //  - every received byte defers the telemetry firehose (console_telemetry_muted)
+// Live decoded-bus stream for the Studio hero: drain NEW Bus-origin diagnostic
+// entries from the console task (safe - no Serial writes from worker tasks) and
+// emit each as a compact @BUS line. Bounded per poll; never interleaves with a
+// framed reader. This is the controller's self-report, distinct from an
+// independent Cardputer tap.
+static void bus_stream_poll() {
+    if (!s_busstream) return;
+    if (acquisition_record_busy() || runtime_busy() || display_capture_console_busy() || diagnostic_log_console_busy()) return;
+    const auto st = diagnostic_log_status();
+    if (s_bus_stream_seq < st.first_sequence) s_bus_stream_seq = st.first_sequence;
+    unsigned budget = 8;
+    for (uint64_t seq = s_bus_stream_seq; seq <= st.last_sequence && budget; ++seq) {
+        s_bus_stream_seq = seq + 1;
+        diagnostics::Entry e;
+        if (!diagnostic_log_read(seq, e)) continue;
+        if (e.origin != diagnostics::Origin::Bus) continue;
+        char text[diagnostics::Entry::MaxBytes + 1];
+        diagnostics::ascii_preview(e, text);
+        const char* p = text;
+        if (!strncmp(p, "[BUS] ", 6)) p += 6;
+        size_t n = strlen(p);
+        while (n && (p[n-1] == '\n' || p[n-1] == '\r')) --n;
+        Serial.print(F("@BUS "));
+        Serial.write(reinterpret_cast<const uint8_t*>(p), n);
+        Serial.print('\n');
+        --budget;
+    }
+}
 void plc_console_poll() {
     console_health_poll();
+    bus_stream_poll();
     if (modbus_serial_active()) { modbus_serial_poll(); return; }
     if (acquisition_record_busy() || diagnostic_log_console_busy() || runtime_busy() || display_capture_console_busy()) {
         acquisition_record_poll();

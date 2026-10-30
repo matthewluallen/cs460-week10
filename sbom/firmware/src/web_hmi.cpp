@@ -10,9 +10,81 @@
 #include "modbus_tcp_server.h"
 #include "plc_core.h"
 #include "plc_tags.h"
+#include "plc_project.h"
+#include "network_access.h"
 #include "serial_config.h"
 #include "eth_net.h"
+#include "config_explain.h"
+#include "web_config.h"
+#include <WiFi.h>
 #include <LittleFS.h>
+
+namespace {
+void send_json(WebServer& server, const String& body) {
+    server.send(body == PLC_ACL_ERROR ? 403 : 200, "application/json", body);
+}
+template<class Build> void send_checked(WebServer& server, const char* path, Build build) {
+    send_json(server, plc_network_json(plc_network_ipv4(server.client().remoteIP()), path, build));
+}
+}
+
+// On-device provisioning page (served at /setup over the setup-AP at
+// http://192.168.4.1:8080/setup). Educational: each field's ⓘ pulls teaching from the
+// device's own /api/explain (the same table the console 'explain' command uses).
+const char SETUP_PAGE[] = R"HTML(<!doctype html><html><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1"><title>StampLC Setup</title><style>
+body{font:15px system-ui,sans-serif;margin:0;background:#0f1419;color:#e6edf3}.wrap{max-width:600px;margin:0 auto;padding:16px}
+h1{font-size:19px}fieldset{border:1px solid #2a3340;border-radius:10px;margin:14px 0;padding:12px}legend{color:#7ee787;padding:0 6px}
+.lbl{display:flex;align-items:center;gap:6px;margin:10px 0 2px;color:#9da7b3}
+.ig{cursor:pointer;color:#a371f7;font-weight:700;font-size:10px;border:1px solid #2a3340;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center}
+.tc{display:none;margin:3px 0 6px;padding:8px 10px;border-left:2px solid #a371f7;background:#161b22;border-radius:0 6px 6px 0;font-size:12.5px;line-height:1.5;color:#9da7b3}
+.tc.show{display:block}.tc b{color:#e6edf3}.tc .s{color:#e3b341}
+input,select{width:100%;box-sizing:border-box;padding:9px;border-radius:7px;border:1px solid #2a3340;background:#161b22;color:#e6edf3}
+button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:8px;background:#238636;color:#fff;font-size:16px}
+.learn{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#9da7b3;margin-left:12px}.muted{color:#6b7684;font-size:13px}.ok{color:#7ee787}
+.note{margin:8px 0;padding:8px 10px;border-radius:6px;background:#161b22;border:1px solid #2a3340;font-size:12.5px;color:#9da7b3;display:none}
+</style></head><body><div class=wrap>
+<h1>StampLC network setup <label class=learn><input type=checkbox id=learn> Learn mode</label></h1>
+<p class=muted>Configure each interface, Save, then reboot. Tap the i on any setting to learn what it is and what the firmware does.</p>
+<div id=note class=note></div>
+<fieldset><legend>WiFi (always present)</legend>
+<div class=lbl>Mode <i class=ig data-ck=wifi_mode>i</i></div><div class=tc data-tk=wifi_mode></div>
+<select id=wifi_mode onchange=tgl()><option value=off>Off (contained)</option><option value=sta>STA - join a network</option><option value=ap>AP - setup/provisioning</option></select>
+<div id=sta_box>
+<div class=lbl>SSID <i class=ig data-ck=ssid>i</i></div><div class=tc data-tk=ssid></div><input id=ssid>
+<div class=lbl>Password <i class=ig data-ck=pass>i</i></div><div class=tc data-tk=pass></div><input id=pass type=password>
+<div class=lbl>Addressing <i class=ig data-ck=wifi_addr>i</i></div><div class=tc data-tk=wifi_addr></div>
+<select id=wifi_addr onchange=tgl()><option value=dhcp>DHCP</option><option value=static>Static</option></select>
+<div id=wsta_box>
+<div class=lbl>IP <i class=ig data-ck=wifi_ip>i</i></div><div class=tc data-tk=wifi_ip></div><input id=wifi_ip>
+<div class=lbl>Gateway <i class=ig data-ck=wifi_gw>i</i></div><div class=tc data-tk=wifi_gw></div><input id=wifi_gw>
+<div class=lbl>Subnet mask <i class=ig data-ck=wifi_mask>i</i></div><div class=tc data-tk=wifi_mask></div><input id=wifi_mask>
+</div></div>
+<div id=ap_box class=muted>AP broadcasts <b id=apn></b>; connect and reload this page at http://192.168.4.1:8080/setup.</div>
+</fieldset>
+<fieldset><legend>Ethernet (W5500) <span id=ethp class=muted></span></legend><div id=eth_box>
+<div class=lbl>Addressing <i class=ig data-ck=eth_mode>i</i></div><div class=tc data-tk=eth_mode></div>
+<select id=eth_mode onchange=tgl()><option value=dhcp>DHCP</option><option value=static>Static</option></select>
+<div id=esta_box>
+<div class=lbl>IP <i class=ig data-ck=eth_ip>i</i></div><div class=tc data-tk=eth_ip></div><input id=eth_ip>
+<div class=lbl>Gateway <i class=ig data-ck=eth_gw>i</i></div><div class=tc data-tk=eth_gw></div><input id=eth_gw>
+<div class=lbl>Subnet mask <i class=ig data-ck=eth_mask>i</i></div><div class=tc data-tk=eth_mask></div><input id=eth_mask>
+</div></div></fieldset>
+<button onclick=save()>Save</button><p id=msg class=muted></p>
+</div><script>
+function g(i){return document.getElementById(i)}
+function tgl(){g('sta_box').style.display=g('wifi_mode').value=='sta'?'':'none';g('ap_box').style.display=g('wifi_mode').value=='ap'?'':'none';g('wsta_box').style.display=(g('wifi_mode').value=='sta'&&g('wifi_addr').value=='static')?'':'none';g('esta_box').style.display=g('eth_mode').value=='static'?'':'none';note()}
+function note(){var m=[];if(g('wifi_mode').value=='ap')m.push('⚠ Setup-AP uses a default password (CWE-798/1392) - change it or use AP only briefly.');if(g('eth_mode').value=='dhcp'||(g('wifi_mode').value=='sta'&&g('wifi_addr').value=='dhcp'))m.push('ℹ DHCP trusts whoever answers first - a rogue server can become your gateway and time source.');var n=g('note');if(m.length){n.style.display='';n.innerHTML=m.join('<br>')}else n.style.display='none'}
+var EX={};
+fetch('/api/explain').then(r=>r.json()).then(d=>{(d.items||[]).forEach(function(it){EX[it.k]=it});paint()}).catch(function(){});
+function card(k){var e=EX[k];if(!e)return 'No description.';var h='<b>'+e.what+'</b>';if(e.fw)h+='<br><b>In the firmware:</b> '+e.fw;if(e.sec)h+='<br><span class=s><b>Security:</b> '+e.sec+'</span>';if(e.cmd)h+='<br><b>Console:</b> '+e.cmd;return h}
+function paint(){document.querySelectorAll('.tc').forEach(function(d){d.innerHTML=card(d.getAttribute('data-tk'))})}
+document.querySelectorAll('.ig').forEach(function(b){b.onclick=function(){var t=document.querySelector('.tc[data-tk="'+b.getAttribute('data-ck')+'"]');if(t)t.classList.toggle('show')}});
+g('learn').onchange=function(){var on=g('learn').checked;document.querySelectorAll('.tc').forEach(function(t){t.classList.toggle('show',on)})};
+fetch('/api/config').then(r=>r.json()).then(c=>{g('wifi_mode').value=c.wifi.mode;g('ssid').value=c.wifi.ssid;g('wifi_addr').value=c.wifi.addr;g('wifi_ip').value=c.wifi.ip;g('wifi_gw').value=c.wifi.gw;g('wifi_mask').value=c.wifi.mask;g('apn').textContent=c.wifi.ap_ssid;g('ethp').textContent=c.eth.present?'(present, link '+c.eth.link+')':'(not present)';g('eth_box').style.display=c.eth.present?'':'none';g('eth_mode').value=c.eth.mode;g('eth_ip').value=c.eth.ip;g('eth_gw').value=c.eth.gw;g('eth_mask').value=c.eth.mask;tgl()}).catch(e=>{g('msg').textContent='load failed: '+e});
+function save(){var b=new URLSearchParams();['wifi_mode','ssid','pass','wifi_addr','wifi_ip','wifi_gw','wifi_mask','eth_mode','eth_ip','eth_gw','eth_mask'].forEach(function(k){b.append(k,g(k).value)});fetch('/api/config?'+b.toString(),{method:'POST'}).then(r=>r.json()).then(j=>{g('msg').className='ok';g('msg').textContent='Saved ('+j.changed+'). Reboot to apply.'}).catch(e=>{g('msg').textContent='save failed: '+e})}
+</script></body></html>)HTML";
+
 
 WebHMI web_hmi;
 
@@ -24,17 +96,30 @@ bool WebHMI::start() {
     server.on("/api/registers", [this]() { handle_registers(); });
     server.on("/logs", [this]() { handle_logs(); });      // CWE-22: Vulnerable path traversal
     server.on("/api/upload", HTTP_POST, [this]() { handle_api(); });
-    server.on("/api/bindings", [this]() { server.send(200,"application/json",plc_bindings_json()); });
-    server.on("/api/timing", HTTP_GET, [this]() { server.send(200,"application/json",plc_loop_phases_json()); });
-    server.on("/api/scan", HTTP_GET, [this]() { server.send(200,"application/json",plc_scan_json()); });
-    server.on("/api/source", HTTP_GET, [this]() { server.send(200,"application/json",plc_source_json()); });
-    server.on("/api/console", HTTP_GET, [this]() { server.send(200,"application/json",console_health_json()); });
+    server.on("/api/bindings", [this]() { send_checked(server,"/api/bindings",[](){return plc_bindings_json();}); });
+    server.on("/api/timing", HTTP_GET, [this]() { send_checked(server,"/api/timing",[](){return plc_loop_phases_json();}); });
+    server.on("/api/scan", HTTP_GET, [this]() { send_checked(server,"/api/scan",[](){return plc_scan_json();}); });
+    server.on("/api/execution", HTTP_GET, [this]() { send_checked(server,"/api/execution",[](){return plc_execution_json();}); });
+    server.on("/api/source", HTTP_GET, [this]() { send_checked(server,"/api/source",[](){return plc_source_json();}); });
+    server.on("/api/console", HTTP_GET, [this]() { send_checked(server,"/api/console",[](){return console_health_json();}); });
     server.on("/api/points", [this]() { handle_points(); });
+    server.on("/api/project", [this]() { send_checked(server,"/api/project",[](){return plc_project_json();}); });
     server.on("/api/set", [this]() { handle_set(); });
     server.on("/api/force", [this]() { handle_force(); });
     server.on("/api/mode", [this]() { handle_mode(); });
     server.on("/api/log", [this]() { handle_hlog(); });
     server.on("/api/config", HTTP_ANY, [this]() { handle_config(); });   // authed-by-default-cred remote config
+    server.on("/setup", [this]() { server.send(200, "text/html", SETUP_PAGE); });  // on-device provisioning UI (reachable over the setup-AP)
+    server.on("/api/explain", [this]() { server.sendHeader("Access-Control-Allow-Origin","*"); server.send(200, "application/json", config_explain_json_str()); });  // teaching table for the /setup UI (same as console explain)
+    // Parity with the W5500 server: the shared HMI page calls these over WiFi too.
+    server.on("/api/sys",   [this]() { send_checked(server,"/api/sys",  [](){ return web_api_sys_json(); }); });
+    server.on("/api/login", [this]() { String u=server.arg("user"),p=server.arg("pass"); send_checked(server,"/api/login",[&](){ return web_api_login_json(u.c_str(),p.c_str()); }); });
+    server.on("/api/proto", [this]() { String name=server.arg("name"),on=server.arg("on");
+        if (name.length()) send_checked(server,"/api/proto",[&](){ return web_api_proto_set_json(name.c_str(),on.c_str()); });
+        else               send_checked(server,"/api/proto",[](){ return web_api_proto_json(); }); });
+    server.on("/api/reboot",[this]() {
+        if (!plc_network_http_allowed(plc_network_ipv4(server.client().remoteIP()), "/api/reboot", true)) { send_json(server, PLC_ACL_ERROR); return; }
+        server.send(200, "application/json", web_api_reboot_json()); delay(150); ESP.restart(); });
 
     server.begin();
     Serial.printf("[Web HMI] Server started on port %d\n", WEB_HMI_PORT);
@@ -46,58 +131,26 @@ void WebHMI::handle() {
 }
 
 void WebHMI::handle_root() {
+    if (!plc_network_http_allowed(plc_network_ipv4(server.client().remoteIP()), "/")) { send_json(server, PLC_ACL_ERROR); return; }
     server.send(200, "text/html", get_html_page());
 }
 
 void WebHMI::handle_coils() {
-    // Read/write coils via web
-    if (server.hasArg("addr") && server.hasArg("state")) {
-        uint16_t addr = server.arg("addr").toInt();
-        bool state = server.arg("state").toInt() ? true : false;
-
-        modbus_server.set_coil(addr, state);
-        server.send(200, "application/json", "{\"status\":\"ok\"}");
-    } else if (server.hasArg("addr")) {
-        uint16_t addr = server.arg("addr").toInt();
-        bool state = modbus_server.get_coil(addr);
-
-        String response = "{\"addr\":";
-        response += addr;
-        response += ",\"state\":";
-        response += state ? "1" : "0";
-        response += "}";
-        server.send(200, "application/json", response);
-    } else {
-        server.send(400, "text/plain", "Missing parameters");
-    }
+    const String address = server.arg("addr"), value = server.arg("state");
+    send_json(server, web_api_raw_json(true, address.c_str(), server.hasArg("state") ? value.c_str() : nullptr,
+                                      plc_network_ipv4(server.client().remoteIP())));
 }
 
 void WebHMI::handle_registers() {
-    // Read/write registers via web
-    if (server.hasArg("addr") && server.hasArg("value")) {
-        uint16_t addr = server.arg("addr").toInt();
-        uint16_t value = server.arg("value").toInt();
-
-        modbus_server.set_register(addr, value);
-        server.send(200, "application/json", "{\"status\":\"ok\"}");
-    } else if (server.hasArg("addr")) {
-        uint16_t addr = server.arg("addr").toInt();
-        uint16_t value = modbus_server.get_register(addr);
-
-        String response = "{\"addr\":";
-        response += addr;
-        response += ",\"value\":";
-        response += value;
-        response += "}";
-        server.send(200, "application/json", response);
-    } else {
-        server.send(400, "text/plain", "Missing parameters");
-    }
+    const String address = server.arg("addr"), value = server.arg("value");
+    send_json(server, web_api_raw_json(false, address.c_str(), server.hasArg("value") ? value.c_str() : nullptr,
+                                      plc_network_ipv4(server.client().remoteIP())));
 }
 
 // CWE-22: Path traversal vulnerability in log viewer
 // Student can request "/logs?file=../../config.txt" to read arbitrary files
 void WebHMI::handle_logs() {
+    if (!plc_network_http_allowed(plc_network_ipv4(server.client().remoteIP()), "/logs")) { send_json(server, PLC_ACL_ERROR); return; }
     if (server.hasArg("file")) {
         String filename = server.arg("file");
 
@@ -139,47 +192,19 @@ void WebHMI::handle_logs() {
 }
 
 void WebHMI::handle_api() {
+    if (!plc_network_http_allowed(plc_network_ipv4(server.client().remoteIP()), "/api/upload")) { send_json(server, PLC_ACL_ERROR); return; }
     // Generic API endpoint (stub)
     server.send(200, "text/plain", "API OK");
 }
 
 void WebHMI::handle_points() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
-    String j = "{\"mode\":\""; j += plc_mode_str();
-    j += "\",\"scan\":"; j += plc_scan_last_us();
-    j += ",\"scanmax\":"; j += plc_scan_max_us();
-    j += ",\"faults\":"; j += plc_fault_active_count();
-    j += ",\"forces\":"; j += plc_force_count();
-    j += ",\"hb\":"; j += plc_heartbeat();
-    j += ",\"map_version\":"; j += pointmap::VERSION;
-    j += ",\"map_sha256\":\""; j += pointmap::SHA256;
-    j += "\",\"pts\":[";
-    for (int i = 0; i < PLC_TAG_COUNT; i++) {
-        const TagDef* t = &PLC_TAGS[i];
-        int32_t val; bool forced = false, fv = false;
-        if (t->kind == TK_COIL) { val = plc_coil_live(t->addr) ? 1 : 0; forced = plc_coil_is_forced(t->addr); fv = plc_coil_forced_val(t->addr); }
-        else if (t->kind == TK_DI) { val = plc_di_live((uint8_t)t->addr) ? 1 : 0; forced = plc_di_is_forced((uint8_t)t->addr); fv = plc_di_forced_val((uint8_t)t->addr); }
-        else val = plc_tag_decode(t, modbus_server.get_register(t->addr));
-        if (i) j += ",";
-        j += "{\"n\":\""; j += t->name; j += "\",\"k\":"; j += (int)t->kind;
-        j += ",\"v\":"; j += val; j += ",\"u\":\""; j += t->unit;
-        j += "\",\"w\":"; j += t->writable ? 1 : 0; j += ",\"c\":"; j += t->forceable ? 1 : 0;
-        j += ",\"f\":"; j += forced ? 1 : 0; j += ",\"fv\":"; j += fv ? 1 : 0;
-        j += ",\"d\":\""; j += t->desc; j += "\"}";
-    }
-    j += "]}";
-    server.send(200, "application/json", j);
+    send_json(server,web_api_points_json(plc_network_ipv4(server.client().remoteIP())));
 }
 
 void WebHMI::handle_set() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
-    if (!server.hasArg("tag") || !server.hasArg("val")) { server.send(400, "application/json", "{\"err\":\"args\"}"); return; }
-    const TagDef* t = plc_tag_find(server.arg("tag").c_str());
-    if (!t || !t->writable) { server.send(400, "application/json", "{\"err\":\"not writable\"}"); return; }
-    long v = server.arg("val").toInt();
-    if (t->kind == TK_COIL) { modbus_server.set_coil(t->addr, v != 0); plc_log(SRC_WEB, "", "SET %s(coil %u) = %d", t->name, t->addr, v ? 1 : 0); }
-    else { modbus_server.set_register(t->addr, (uint16_t)v); plc_log(SRC_WEB, "", "SET %s(reg %u) = %ld", t->name, t->addr, v); }
-    server.send(200, "application/json", "{\"ok\":1}");
+    send_json(server,web_api_set_json(server.arg("tag").c_str(),server.arg("val").c_str(),plc_network_ipv4(server.client().remoteIP())));
 }
 
 // Remote network+NTP config, "protected" by a DEFAULT credential (admin:openplc)
@@ -188,71 +213,39 @@ void WebHMI::handle_set() {
 // rogue-config -> rogue-time AiTM that steps the clock past 2038. The fix is to
 // change the default (`netcfg auth <u> <p>`), and to not expose config off-box.
 void WebHMI::handle_config() {
+    bool allowed;
+    { PlcNetworkImageGuard guard;   // D1: hold the image lock only for the ACL check
+      allowed = plc_network_http_allowed(plc_network_ipv4(server.client().remoteIP()), "/api/config", server.method() == HTTP_POST); }
+    if (!allowed) { send_json(server, PLC_ACL_ERROR); return; }
     server.sendHeader("Access-Control-Allow-Origin", "*");
     if (!server.authenticate(g_cfg.cfg_user, g_cfg.cfg_pass)) {
         return server.requestAuthentication(BASIC_AUTH, "StamPLC Config",
             "default admin:openplc (CWE-798/1392) - change it with 'netcfg auth'");
     }
     if (server.method() == HTTP_POST) {
-        String ch = "";
-        if (server.hasArg("mode")) { g_cfg.use_static = (server.arg("mode") == "static") ? 1 : 0; ch += "mode "; }
-        if (server.hasArg("ip"))   { server.arg("ip").toCharArray(g_cfg.ip, sizeof(g_cfg.ip));     ch += "ip "; }
-        if (server.hasArg("gw"))   { server.arg("gw").toCharArray(g_cfg.gw, sizeof(g_cfg.gw));     ch += "gw "; }
-        if (server.hasArg("mask")) { server.arg("mask").toCharArray(g_cfg.mask, sizeof(g_cfg.mask)); ch += "mask "; }
-        if (server.hasArg("ntp"))  { server.arg("ntp").toCharArray(g_cfg.ntp, sizeof(g_cfg.ntp));   ch += "ntp "; }
-        if (server.hasArg("ntp_port")) { g_cfg.ntp_port = server.arg("ntp_port").toInt(); ch += "ntp_port "; }
-        if (server.hasArg("cfg_user")) { server.arg("cfg_user").toCharArray(g_cfg.cfg_user, sizeof(g_cfg.cfg_user)); ch += "cfg_user "; }
-        if (server.hasArg("cfg_pass")) { server.arg("cfg_pass").toCharArray(g_cfg.cfg_pass, sizeof(g_cfg.cfg_pass)); ch += "cfg_pass "; }
-        serial_config_save();
         String ip = server.client().remoteIP().toString();
-        plc_log(SRC_WEB, ip.c_str(), "REMOTE netcfg via /api/config: %s", ch.c_str());
+        // apply + commit run with the image lock released (the flash write would jitter the scan)
+        String ch = web_config_apply([this](const char* k, char* o, size_t n){
+            if (!server.hasArg(k)) return false; server.arg(k).toCharArray(o, n); return true;
+        }, ip.c_str());
         server.send(200, "application/json", "{\"saved\":true,\"applied\":\"reboot\",\"changed\":\"" + ch + "\"}");
         return;
     }
-    String j = "{\"mode\":\"";
-    j += g_cfg.use_static ? "static" : "dhcp";
-    j += "\",\"ip\":\"" + String(g_cfg.ip) + "\",\"gw\":\"" + String(g_cfg.gw) + "\",\"mask\":\"" + String(g_cfg.mask) + "\",";
-    j += "\"ntp\":\"" + String(g_cfg.ntp[0] ? g_cfg.ntp : g_cfg.gw) + "\",\"ntp_port\":" + String(g_cfg.ntp_port) + ",";
-    j += "\"cfg_user\":\"" + String(g_cfg.cfg_user) + "\",";
-    j += "\"link\":\"" + (eth_ok() ? eth_ip() : String("no-net")) + "\"}";
-    server.send(200, "application/json", j);
+    server.send(200, "application/json", web_config_json());
 }
-
 void WebHMI::handle_force() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
-    if (!server.hasArg("tag")) { server.send(400, "application/json", "{\"err\":\"args\"}"); return; }
-    const TagDef* t = plc_tag_find(server.arg("tag").c_str());
-    if (!t || !t->forceable) { server.send(400, "application/json", "{\"err\":\"not forceable\"}"); return; }
-    bool on = server.arg("on").toInt() != 0;
-    bool v = server.arg("val").toInt() != 0;
-    if (on) { if (t->kind == TK_COIL) plc_force_coil(t->addr, v, SRC_WEB, ""); else plc_force_di((uint8_t)t->addr, v, SRC_WEB, ""); }
-    else    { if (t->kind == TK_COIL) plc_unforce_coil(t->addr, SRC_WEB, ""); else plc_unforce_di((uint8_t)t->addr, SRC_WEB, ""); }
-    server.send(200, "application/json", "{\"ok\":1}");
+    send_json(server,web_api_force_json(server.arg("tag").c_str(),server.arg("on").c_str(),server.arg("val").c_str(),plc_network_ipv4(server.client().remoteIP())));
 }
 
 void WebHMI::handle_mode() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
-    if (server.hasArg("set")) {
-        String m = server.arg("set");
-        if (m == "run") plc_set_mode(PLC_RUN, SRC_WEB, "");
-        else if (m == "prog") plc_set_mode(PLC_PROGRAM, SRC_WEB, "");
-    }
-    String j = "{\"mode\":\""; j += plc_mode_str(); j += "\"}";
-    server.send(200, "application/json", j);
+    send_json(server, web_api_mode_json(server.arg("set").c_str(), plc_network_ipv4(server.client().remoteIP())));
 }
 
 void WebHMI::handle_hlog() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
-    String j = "["; char buf[112]; int n = plc_log_count();
-    for (int i = 0; i < n; i++) {
-        if (!plc_log_get(i, buf, sizeof(buf))) continue;
-        if (j.length() > 1) j += ",";
-        j += "\"";
-        for (char* p = buf; *p; p++) { if (*p == '"' || *p == '\\') j += '\\'; j += *p; }
-        j += "\"";
-    }
-    j += "]";
-    server.send(200, "application/json", j);
+    send_json(server, web_api_log_json(plc_network_ipv4(server.client().remoteIP())));
 }
 
 // CWE-330: Predictable PRNG for session tokens

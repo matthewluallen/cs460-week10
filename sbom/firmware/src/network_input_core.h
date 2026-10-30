@@ -43,8 +43,14 @@ struct State {
     Record record{};
     uint32_t received_ms=0, errors=0;
     bool has_sample=false, quarantined=false;
+    uint32_t max_usable_age(const Config& c) const {
+        // A nearly expired source sample must not gain a fresh local lifetime.
+        const uint32_t remaining=record.source_age_ms<=record.source_limit_ms?
+            record.source_limit_ms-record.source_age_ms:0;
+        return remaining<c.max_age_ms?remaining:c.max_age_ms;
+    }
     bool usable(uint32_t now,const Config& c) const {
-        return status==Status::Valid && has_sample && !quarantined && now-received_ms<=c.max_age_ms;
+        return status==Status::Valid && has_sample && !quarantined && now-received_ms<=max_usable_age(c);
     }
     void fail(Status reason) {++errors;status=quarantined?Status::EpochChanged:reason;}
     bool accept(const Config& c,uint16_t transaction,const uint8_t* p,size_t n,uint32_t now) {
@@ -73,7 +79,7 @@ struct State {
                 fail(Status::Replay);return false;
             }
             // Even recovery from a transport error needs a new sample, not this duplicate.
-            if(status==Status::Valid && now-received_ms>c.max_age_ms)status=Status::Stale;
+            if(status==Status::Valid && !usable(now,c))status=Status::Stale;
             return false;
         }
         record=r;received_ms=now;has_sample=true;status=Status::Valid;return true;

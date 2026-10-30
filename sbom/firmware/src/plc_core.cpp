@@ -6,10 +6,12 @@
 #include "modbus_tcp_server.h"
 #include "io_expansion.h"
 #include "plc_engine.h"
+#include "plc_project.h"
 #include "process_bindings.h"
 #include "mqtt_sensors.h"
 #include "tag_arbiter.h"
 #include "loop_timing.h"
+#include "config.h"
 #include <stdarg.h>
 #include <cstring>
 #include <esp_timer.h>
@@ -22,6 +24,13 @@ extern int         g_prog_n;
 // ---- state ----------------------------------------------------------------
 static PlcMode  s_mode = PLC_PROGRAM;
 static PlcScanSnapshot s_last_scan;
+static execution::Tracker s_execution;
+static execution::Watchdog s_watchdog;
+static PlcFirstFailure s_first_failure;
+#ifndef OPENPLC_GENERATED_CONTROLLER
+static_assert(execution::PeriodUs == uint64_t(OPENPLC_SCAN_CYCLE_MS) * 1000,
+              "Execution evidence must match the scheduler period");
+#endif
 struct CoreGuard {
     CoreGuard() { plc_image_lock(); }
     ~CoreGuard() { plc_image_unlock(); }
@@ -110,11 +119,12 @@ void plc_set_mode(PlcMode m, WriteSource src, const char* who) {
     }
     if(m!=s_mode)generated_controller::revoke();
 #else
-    if (m != PLC_PROGRAM && (plc_fault_active_count() || plc::validate_program(g_prog, g_prog_n))) {
-        plc_log(src, who, "mode rejected: fault or invalid program"); return;
+    plc_project_startup_cancel("explicit_mode_request");
+    if (m != PLC_PROGRAM && (!plc_project_ready() || plc_fault_active_count() || plc::validate_program(g_prog, g_prog_n))) {
+        plc_log(src, who, "mode rejected: no valid project, fault or invalid program"); return;
     }
-    if (m != PLC_PROGRAM && !plc_bindings_ready(g_prog,g_prog_n,m != s_mode)) {
-        plc_log(src,who,"mode rejected: process inputs not ready"); return;
+    if (m != PLC_PROGRAM && !plc_project_can_run(m != s_mode)) {
+        plc_log(src,who,"mode rejected: project module identity/freshness not ready");return;
     }
     #endif
     if (m == PLC_PROGRAM) { g_engine.reset(); s_first_scan = true; }
@@ -215,6 +225,18 @@ bool plc_coil_live(uint16_t a){ return plc_coil_is_forced(a) ? plc_coil_forced_v
 // ---- faults ---------------------------------------------------------------
 void plc_fault_raise(uint16_t code, const char* msg) {
     CoreGuard guard;
+    if (!s_first_failure.recorded) {
+        const auto& pending=s_execution.snapshot().pending;
+        s_first_failure.recorded=true;s_first_failure.code=code;
+        s_first_failure.at_us=esp_timer_get_time();
+        s_first_failure.project_generation=plc_project_generation();
+        s_first_failure.mode_before=s_mode;
+        s_first_failure.during_scan=pending.active;
+        s_first_failure.scan_sequence=pending.active ? pending.sequence : s_last_scan.sequence;
+        s_first_failure.phase=pending.active ? pending.phase : execution::Phase::OutsideScan;
+        snprintf(s_first_failure.message,sizeof(s_first_failure.message),"%s",msg ? msg : "");
+    }
+    plc_project_startup_cancel("fault");
 #ifdef OPENPLC_PUBLICATION_EXPERIMENT
     generated_controller::experimental_publication_record.revoke();
 #endif
@@ -232,6 +254,9 @@ void plc_fault_raise(uint16_t code, const char* msg) {
 }
 void plc_fault_clear_all(WriteSource src, const char* who) {
     CoreGuard guard;
+    if (s_first_failure.recorded && !s_first_failure.cleared) {
+        s_first_failure.cleared=true;s_first_failure.cleared_us=esp_timer_get_time();
+    }
     s_fault_n = 0;
     for (int i = 0; i < 4; i++) s_relay_mismatch[i] = false;
     plc_log(src, who, "faults cleared");
@@ -252,6 +277,29 @@ bool plc_relay_commanded(int i) { return (i >= 0 && i < 4) ? s_relay_cmd[i] : fa
 bool plc_relay_actual(int i)    { return (i >= 0 && i < 4) ? s_relay_act[i] : false; }
 
 void plc_scan_capture(PlcScanSnapshot& out) { CoreGuard guard; out=s_last_scan; }
+void plc_execution_capture(PlcExecutionSnapshot& out) {
+    CoreGuard guard;
+    out=PlcExecutionSnapshot{};
+#ifdef OPENPLC_GENERATED_CONTROLLER
+    out.supported=false; // This contract observes the VM coordinator, not its separate native task.
+#endif
+    out.captured_us=esp_timer_get_time();out.project_generation=plc_project_generation();
+    out.mode=s_mode;out.active_faults=plc_fault_active_count();
+    out.timing=s_execution.snapshot();out.watchdog=s_watchdog;out.first_failure=s_first_failure;
+    out.scan_available=s_last_scan.available;out.scan_sequence=s_last_scan.sequence;
+    out.scan_project_generation=s_last_scan.project_generation;
+    out.scan_mode_at_solve=s_last_scan.mode_at_solve;out.scan_mode_after=s_last_scan.mode_after;
+}
+void plc_execution_watchdog_setup(int init_result, bool reconfigured, int configuration_result,
+                                  int subscription_result, int status_result) {
+    const uint64_t completed_us=esp_timer_get_time(); // before any image-lock wait
+    CoreGuard guard;
+    s_watchdog.setup(init_result,reconfigured,configuration_result,subscription_result,status_result,completed_us);
+}
+void plc_execution_watchdog_feed(int result) {
+    const uint64_t completed_us=esp_timer_get_time(); // SDK call has already returned
+    CoreGuard guard;s_watchdog.feed(result,completed_us);
+}
 void plc_panel_inputs_capture(PlcPanelInputs& out) {
     CoreGuard guard;
     out=PlcPanelInputs{};
@@ -277,20 +325,19 @@ void plc_core_begin() {
     CoreGuard guard;
     s_mode = PLC_PROGRAM;
     s_last_scan = PlcScanSnapshot{};
+    s_execution=execution::Tracker{};s_watchdog=execution::Watchdog{};s_first_failure=PlcFirstFailure{};
     plc_bindings_begin();
     s_coil_force_en = s_coil_force_val = 0;
     s_di_force_en = s_di_force_val = 0;
     s_fault_n = 0;
     g_engine.reset();
-    for (const auto& p : pointmap::PARAMETERS) modbus_server.set_register(p.address, p.value);
-    // P3: the arbiter governs the command tags external protocols write and the ladder reads.
-    // (The base relays are ladder-driven and overwritten each scan, so they are not tracked.)
+    // P3: arbiter governs command tags external protocols write and the ladder reads.
     arb::reset();
-    arb::track(arb::coil_key(pointmap::ESTOP));            // the Sparkplug DCMD writes this coil
-    arb::track(arb::reg_key(pointmap::SETPOINT_TEMPX10));
-    arb::track(arb::reg_key(pointmap::ALARM_TEMPX10));
-    arb::track(arb::coil_key(pointmap::SOFT_ESTOP));
-    arb::track(arb::coil_key(pointmap::CMD_RUN));
+    arb::track(arb::coil_key(pointmap::EXPANSION_RELAY));   // the Sparkplug DCMD writes coil 0
+    arb::track(arb::reg_key(pointmap::USER_WORD0));
+    arb::track(arb::reg_key(pointmap::USER_WORD1));
+    arb::track(arb::coil_key(pointmap::AUX_COIL0));
+    arb::track(arb::coil_key(pointmap::AUX_COIL1));
     s_first_scan = true;
     s_scan_min = 0; s_scan_max = 0; s_scan_count = 0;
     plc_log(SRC_SYSTEM, "", "PLC core start, mode=PROGRAM (outputs inhibited)");
@@ -321,9 +368,8 @@ void plc_publication_inputs_end() {
 }
 #endif
 
-void plc_core_scan() {
-    // P3: resolve the previous window's contested writes and publish arbiter telemetry so the
-    // Studio (and any Modbus client) can see the concurrency state. One lock = atomic publish.
+static void core_scan(execution::Origin origin) {
+    // P3: resolve the previous window's contested writes + publish arbiter telemetry.
     {
         CoreGuard guard;
         arb::scan_boundary();
@@ -346,6 +392,7 @@ void plc_core_scan() {
     PlcScanTiming whole_scan; // destructor runs after the image guard releases
     uint32_t t0 = micros();
     const uint64_t scan_started_us=esp_timer_get_time();
+    { CoreGuard guard;s_execution.begin(scan_started_us,origin); }
     uint64_t phase_end_us[7]{};
 
     // 1. INPUT IMAGE: latch digital inputs (with force override) and analog.
@@ -363,7 +410,10 @@ void plc_core_scan() {
     static int s_tempx10 = 0;
     if ((s_analog_div++ % 5) == 0) {
         // Read the (slow, I2C) sensors into locals OUTSIDE the image lock...
-        s_tempx10 = (int)(io.temp_read() * 10.0f);
+        const float temperature=io.temp_read();
+        const bool temperature_valid=isfinite(temperature)&&temperature>=-3276.8f&&temperature<=3276.7f;
+        if(temperature_valid)s_tempx10=int(temperature*10.0f);
+        plc_project_observe_temperature(temperature_valid);
         uint16_t r_vin = (uint16_t)(io.voltage_read() * 1000.0f);
         uint16_t r_cur = (uint16_t)(io.current_read() * 1000.0f);
         int16_t v1 = 0, v2 = 0; int32_t i1 = 0, i2 = 0;
@@ -389,39 +439,21 @@ void plc_core_scan() {
         plc_image_unlock();
     }
     phase_end_us[0]=esp_timer_get_time();
+    { CoreGuard guard;s_execution.phase(execution::Phase::BindingRefresh); }
     plc_bindings_refresh();
+    plc_project_refresh_expansion();
     phase_end_us[1]=esp_timer_get_time();
     // Mode changes can reset VM memory; serialize its input publication too.
     CoreGuard output_guard;
-    for (int i = 0; i < 8; ++i) {
-        bool value = plc_di_is_forced(i) ? plc_di_forced_val(i) : digital[i];
-        modbus_server.set_coil(pointmap::DI_MIRROR_BASE + i, value);
-        g_engine.set_input(i, value);
+    s_execution.phase(execution::Phase::Inputs);
+    plc_project_startup_poll(); // one-shot boot request; mode guards precede every normal instruction
+    bool physical_inputs[plc::NDI]{};
+    for (int i = 0; i < plc::NDI; ++i) {
+        physical_inputs[i] = plc_di_is_forced(i) ? plc_di_forced_val(i) : digital[i];
+        modbus_server.set_coil(pointmap::DI_MIRROR_BASE + i, physical_inputs[i]);
     }
-    // Phone-as-input: a subscribed phone's momentary buttons OR into %IX6 / %IX7 so the
-    // ladder sees a phone press exactly like a hardwired digital input (aged out when quiet).
-    if (mqtt_sensors_btn(1)) { g_engine.set_input(6, true); modbus_server.set_coil(pointmap::DI_MIRROR_BASE + 6, true); }
-    if (mqtt_sensors_btn(2)) { g_engine.set_input(7, true); modbus_server.set_coil(pointmap::DI_MIRROR_BASE + 7, true); }
-    g_engine.set_analog(pointmap::IW_BASE_TEMPERATURE, s_tempx10);          // program temp interlock reads IW0
-    g_engine.set_analog(pointmap::IW_TEMPERATURE_SETPOINT, int16_t(modbus_server.get_register(pointmap::SETPOINT_TEMPX10)));
-    g_engine.set_analog(pointmap::IW_HIGH_TEMPERATURE_LIMIT, int16_t(modbus_server.get_register(pointmap::ALARM_TEMPX10)));
-    g_engine.set_analog(pointmap::IW_CYCLE_MS, modbus_server.get_register(pointmap::CYCLE_MS));
-    // Phone-sensor bridge (MQTT): map a subscribed phone's live sensors onto the free
-    // process-role input words so ladder logic can react to them, and mirror to holding
-    // registers 50..52 so the Studio/HMI can read them over Modbus. Aged-out when stale.
-    if (mqtt_sensors_fresh()) {
-        g_engine.set_analog(pointmap::IW_PROCESS_ROLE_1, mqtt_sensors_light_x1());        // %IW1 = light (lux)
-        g_engine.set_analog(pointmap::IW_PROCESS_ROLE_2, mqtt_sensors_accel_mag_x100());  // %IW2 = |accel|*100
-        g_engine.set_analog(pointmap::IW_PROCESS_ROLE_3, mqtt_sensors_tilt_beta());       // %IW3 = tilt beta
-        modbus_server.set_register(50, (uint16_t)mqtt_sensors_light_x1());
-        modbus_server.set_register(51, (uint16_t)mqtt_sensors_accel_mag_x100());
-        modbus_server.set_register(52, (uint16_t)mqtt_sensors_tilt_beta());
-    }
-    g_engine.set_mem(0, plc_coil_live(pointmap::SOFT_ESTOP));      // MX0 = soft_estop (coil 8)
-    g_engine.set_mem(1, s_first_scan);          // MX1 = first-scan bit
-    g_engine.set_mem(3, plc_coil_live(pointmap::CMD_RUN));      // MX3 = cmd_run (coil 9)
-
-    plc_bindings_scan(g_engine,g_prog,g_prog_n,s_mode != PLC_PROGRAM);
+    plc_project_inputs(physical_inputs, s_tempx10);
+    // Every selected process source comes from this project's embedded bindings.
 
     // Fixed-size local evidence; publish only after all final output handling.
     PlcScanSnapshot evidence;
@@ -430,15 +462,31 @@ void plc_core_scan() {
     evidence.saturated=s_last_scan.sequence==UINT64_MAX;
     evidence.started_us=scan_started_us;
     evidence.program_count=g_prog_n;
+    evidence.project_generation=plc_project_generation();
     memcpy(evidence.program,g_prog,sizeof(evidence.program));
     evidence.mode_at_solve=s_mode;
     evidence.di_force_mask=s_di_force_en;evidence.coil_force_mask=s_coil_force_en;
     for(int i=0;i<8;++i){if(digital[i])evidence.raw_di|=1<<i;if(g_engine.input(i))evidence.input_di|=1<<i;}
+    // Phone-sensor bridge (MQTT): a subscribed phone's live light/motion/tilt override
+    // the free process-role input words %IW1..3 (and mirror to regs 50..52 for the HMI),
+    // so ladder logic can react to a phone. Aged-out when the phone stops publishing.
+    if (mqtt_sensors_fresh()) {
+        g_engine.set_analog(1, mqtt_sensors_light_x1());        // %IW1 = light (lux)
+        g_engine.set_analog(2, mqtt_sensors_accel_mag_x100());  // %IW2 = |accel|*100
+        g_engine.set_analog(3, mqtt_sensors_tilt_beta());       // %IW3 = tilt beta
+        modbus_server.set_register(50, (uint16_t)mqtt_sensors_light_x1());
+        modbus_server.set_register(51, (uint16_t)mqtt_sensors_accel_mag_x100());
+        modbus_server.set_register(52, (uint16_t)mqtt_sensors_tilt_beta());
+    }
+    // Phone-as-input: a subscribed phone's momentary buttons OR into %IX6 / %IX7.
+    if (mqtt_sensors_btn(1)) { g_engine.set_input(6, true); modbus_server.set_coil(pointmap::DI_MIRROR_BASE + 6, true); }
+    if (mqtt_sensors_btn(2)) { g_engine.set_input(7, true); modbus_server.set_coil(pointmap::DI_MIRROR_BASE + 7, true); }
     for(int i=0;i<plc::NIW;++i)evidence.analog[i]=g_engine.analog(i);
     { PlcBindingsSnapshot binding;plc_bindings_capture(binding);
       evidence.binding_generation=binding.generation;
       for(int i=0;i<3;++i){evidence.sample_sequence[i]=binding.samples[i].sequence;evidence.sample_ms[i]=binding.samples[i].sampled;} }
     phase_end_us[2]=esp_timer_get_time();
+    s_execution.phase(execution::Phase::Solve);
     // 2. SOLVE. Faults enter PROGRAM; bad IR executes no instructions.
     evidence.solve_attempted=s_mode!=PLC_PROGRAM;
     if(evidence.solve_attempted) {
@@ -447,25 +495,31 @@ void plc_core_scan() {
     }
     for(int i=0;i<4;++i)if(g_engine.relay(i))evidence.logic_outputs|=1<<i;
     phase_end_us[3]=esp_timer_get_time();
-    const bool outputs_enabled = s_mode != PLC_PROGRAM && !plc_fault_active_count();
+    s_execution.phase(execution::Phase::Outputs);
+    const bool outputs_enabled = plc_project_ready() && s_mode != PLC_PROGRAM && !plc_fault_active_count();
+    bool physical_outputs[project::HardwareOutputs]{};
+    plc_project_outputs(outputs_enabled, physical_outputs);
 
     // 3. OUTPUT IMAGE -> physical. Base relays 0-3 map to coils 1-4.
     for (int k = 0; k < 4; k++) {
         uint16_t coil = pointmap::RELAY0 + k;
-        bool commanded = outputs_enabled ? g_engine.relay(k) : false;
+        bool commanded = physical_outputs[k];
         modbus_server.set_coil(coil, commanded);
         bool phys = outputs_enabled && (plc_coil_is_forced(coil) ? plc_coil_forced_val(coil) : commanded);
         io.relay_set(k, phys);
         s_relay_cmd[k] = phys;
     }
-    // Expansion requests remain inspectable, but share the same inhibition.
-    bool estop = outputs_enabled && plc_coil_live(pointmap::ESTOP);
+    // Mapped expansion outputs follow logical QX. Unmapped expansion protocol
+    // requests retain the existing lab path (build-profile write guards apply).
+    for (uint8_t physical=4;physical<project::HardwareOutputs;++physical)
+        if(plc_project_output_mapped(physical))modbus_server.set_coil(project::output_coil(physical),physical_outputs[physical]);
+    bool expansion_relay = outputs_enabled && plc_coil_live(pointmap::EXPANSION_RELAY);
     if (ioexp_present()) {
-        ioexp_set_mech_relay(estop);
+        ioexp_set_mech_relay(expansion_relay);
         ioexp_set_ssr(0, outputs_enabled && plc_coil_live(pointmap::SSR1));
         ioexp_set_ssr(1, outputs_enabled && plc_coil_live(pointmap::SSR2));
         uint8_t actual = 0;
-        const uint8_t expected = (estop ? 0x10 : 0) |
+        const uint8_t expected = (expansion_relay ? 0x10 : 0) |
             (outputs_enabled && plc_coil_live(pointmap::SSR1) ? 1 : 0) |
             (outputs_enabled && plc_coil_live(pointmap::SSR2) ? 2 : 0);
         if (!ioexp_output_readback(&actual)) plc_fault_raise(40, "expansion output read failed");
@@ -473,6 +527,7 @@ void plc_core_scan() {
     }
 
     phase_end_us[4]=esp_timer_get_time();
+    s_execution.phase(execution::Phase::Readback);
     // commanded vs actual (expander readback) for base relays
     for (int k = 0; k < 4; k++) {
         s_relay_act[k] = io.relay_get(k);
@@ -482,6 +537,7 @@ void plc_core_scan() {
     }
 
     phase_end_us[5]=esp_timer_get_time();
+    s_execution.phase(execution::Phase::FaultHandling);
     uint32_t dt = micros() - t0;
     // Only fault on a SUSTAINED overrun. A single scan over 100ms is usually host/
     // emulation jitter (QEMU under load, a slow USB drain) and latching on it strands
@@ -489,7 +545,7 @@ void plc_core_scan() {
     // overload still faults (the lesson) while transient jitter does not. A good scan
     // resets the streak. The reported policy (100ms threshold, action) is unchanged.
     static uint8_t s_scan_overrun_streak = 0;
-    if (dt > 100000) {
+    if (dt > execution::ScanFaultUs) {
         if (++s_scan_overrun_streak >= 3) plc_fault_raise(10, "scan overrun >100ms (sustained)");
     } else s_scan_overrun_streak = 0;
     // A fault discovered during this scan must inhibit outputs in this scan.
@@ -531,6 +587,10 @@ void plc_core_scan() {
     evidence.completed_us=esp_timer_get_time();
     phase_end_us[6]=evidence.completed_us;
     memcpy(evidence.phase_end_us,phase_end_us,sizeof(phase_end_us));
+    s_execution.finish(evidence.completed_us,dt);
     s_last_scan=evidence; // still inside output_guard; never a partly published scan
 
 }
+
+void plc_core_scan() { core_scan(execution::Origin::Maintenance); }
+void plc_core_scan_scheduled() { core_scan(execution::Origin::Scheduled); }

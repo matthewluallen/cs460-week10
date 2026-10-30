@@ -1,3 +1,4 @@
+#include "network_access.h"
 #include "diagnostic_log.h"
 #include "bacnet_responder.h"
 #include "plc_core.h"          // plc_log / SRC_BACNET
@@ -54,6 +55,7 @@ void BacnetResponder::handle() {
     if (sz <= 0) return;
     uint8_t buf[128];
     int n = udp.read(buf, sizeof(buf));
+    if (!plc_project_host_allowed(plc_network_ipv4(udp.remoteIP()))) return;
     if (n < 6 || buf[0] != 0x81) return;           // BVLC type 0x81 = BACnet/IP
     // NPDU starts at offset 4: version, control
     int i = 4;

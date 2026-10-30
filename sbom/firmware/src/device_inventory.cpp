@@ -164,6 +164,53 @@ bool device_inventory_begin() {
     }
     return false;
 }
+static const char* profile_name(uint8_t p){
+    if(p==1)return "observe"; if(p==0)return "direct-env";
+    if(p>=0x70&&p<=0x77){static char b[10];snprintf(b,sizeof(b),"pahub7%u",p-0x70);return b;}
+    return "?";
+}
+// The `sensors` command: a friendly table over the same acquisition data that
+// `devices samples` emits as JSON. Sensors live on PORT.A/Wire1, a different bus
+// from the relays/DI that `io` shows, so this is where a plugged-in Grove module
+// (e.g. an ENV/BME688 @0x77) actually appears.
+void device_inventory_sensors_text() {
+    auto& e=device_acquisition_state(); uint32_t now=millis();
+    Serial.printf("SENSORS (Grove / expansion)  profile=%s  sampling=%s  devices=%u\n",
+                  profile_name(active), e.enabled?"on":"off", unsigned(e.count));
+    if(e.count==0){
+        Serial.println("  none sampling. Plug a Grove module into PORT.A (red port, Wire1), then:  devices scan");
+        Serial.println("  then:  devices profile direct-env   (or pahub7N if behind the PaHub) ;  reboot ;  devices sampling on");
+        Serial.println("  note: PORT.A is the SENSOR bus; relays/inputs are the separate control bus shown by 'io'.");
+        return;
+    }
+    if(!e.enabled) Serial.println("  sampling is OFF — enable it:  devices sampling on");
+    Serial.println("  PORT   ADDR  DEVICE        READING");
+    for(size_t i=0;i<e.count;++i){
+        const auto& s=e.slots[i]; const auto& d=s.device; const auto& v=s.value;
+        auto q=s.current(now,e.enabled);
+        char name[24]; snprintf(name,sizeof(name),"%s",d.driver);
+        char* dash=strstr(name,"-candidate"); if(dash)*dash=0;
+        char rd[96];
+        if(!s.has_sample) snprintf(rd,sizeof(rd),"(awaiting)");
+        else switch(s.kind){
+            case acquisition::Kind::Env:
+                if(v.gas_valid&&q==acquisition::Quality::Valid)
+                    snprintf(rd,sizeof(rd),"%.1f C  %.0f %%RH  %.0f hPa  gas %.1fk",
+                             double(v.temp_c),double(v.rh_pct),double(v.pressure_pa)/100.0,double(v.gas_ohm)/1000.0);
+                else snprintf(rd,sizeof(rd),"%.1f C  %.0f %%RH  %.0f hPa",
+                             double(v.temp_c),double(v.rh_pct),double(v.pressure_pa)/100.0);
+                break;
+            case acquisition::Kind::Tof:  snprintf(rd,sizeof(rd),"%ld mm",(long)v.distance_mm); break;
+            case acquisition::Kind::Ncir: snprintf(rd,sizeof(rd),"obj %.2f C  amb %.2f C",
+                             double(v.object_centi_c)/100.0,double(v.ambient_centi_c)/100.0); break;
+            case acquisition::Kind::Sgp:  snprintf(rd,sizeof(rd),"eCO2 %u ppm  TVOC %u ppb",v.eco2_ppm,v.tvoc_ppb); break;
+            case acquisition::Kind::Heart:snprintf(rd,sizeof(rd),"IR %u  RED %u  fifo %u",v.ir,v.red,v.fifo_samples); break;
+            default:                      snprintf(rd,sizeof(rd),"ch1 %dmV  ch2 %dmV",v.mv1,v.mv2); break;
+        }
+        Serial.printf("  %-6s 0x%02x  %-12s  %s  [%s]\n",
+                      d.bus?"intern":"porta", d.address, name, rd, acquisition::name(q));
+    }
+}
 void device_inventory_console(const char* op,const char* arg,bool extra) {
     if(extra){error("extra arguments");return;}
     if(!op || !strcmp(op,"status")){if(arg){error("unexpected argument");return;}snapshot();return;}

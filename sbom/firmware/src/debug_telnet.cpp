@@ -1,3 +1,4 @@
+#include "network_access.h"
 #include "diagnostic_log.h"
 #include <Arduino.h>
 #include <cstring>
@@ -26,6 +27,13 @@ void DebugTelnet::handle() {
 #ifndef ENABLE_CWE_DEMOS
     return;                               // secure build: telnet was never started (CWE-489 fixed)
 #endif
+    // This diagnostic shell has unscoped management operations. An enabled
+    // point policy closes it in both profiles; use the trusted USB console.
+    if (plc_project_host_acl_enabled()) {
+        if (client) client.stop();
+        auto pending = server.available(); if (pending) pending.stop();
+        return;
+    }
     // Accept incoming telnet connections
     if (!client) {
         client = server.available();
@@ -61,6 +69,8 @@ void DebugTelnet::stop() {
 }
 
 void DebugTelnet::process_command(const String& cmd) {
+    PlcNetworkImageGuard guard;
+    if (plc_project_host_acl_enabled()) { client.stop(); return; }
     if (cmd == "help") {
         client.println("\n--- Available Commands ---");
         client.println("status            - Show device status");

@@ -3,7 +3,6 @@
 // OpenPLC/GPL source — behavior modeled on the public IEC 61131-3 standard.
 // See firmware/LOGIC_ENGINE_DESIGN.md.
 #pragma once
-#include <Arduino.h>
 #include <stdint.h>
 #include "plc_point_map.h"
 
@@ -61,10 +60,6 @@ class Engine {
   bool mem(int i) const           { return (i>=0 && i<NMX)? mx_[i] : false; }
   // Run one scan of the loaded program.
   bool scan(const Instr* prog, int n, uint32_t now_ms);
-  // Load the built-in self-test blinker (proves the VM with no inputs).
-  static int demo_blinker(Instr* out, int cap);
-  // Meaningful default: start/stop motor latch with estop + high-temp interlock.
-  static int demo_process(Instr* out, int cap);
  private:
   bool ix_[NDI]={false};
   bool qx_[NQ]={false};

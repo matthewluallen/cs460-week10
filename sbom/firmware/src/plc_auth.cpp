@@ -151,6 +151,22 @@ bool plc_auth_set_user_password(const char* pw, String& msg) {
     return true;
 }
 
+// First-run enrollment + maintainer recovery support.
+bool plc_auth_is_provisioned() {
+#ifdef ENABLE_CWE_DEMOS
+    return true;                                  // teaching build ships a default operator credential
+#else
+    return s_pwhash[0] != 0;                      // secure: provisioned only once a hash is stored
+#endif
+}
+
+void plc_auth_clear_user_password() {
+#ifndef ENABLE_CWE_DEMOS
+    s_pwhash[0] = 0;                              // back to "login disabled until enrolled"
+    Preferences p; p.begin("cfg", false); p.remove("userpwh"); p.end();
+#endif
+}
+
 // ---- session ----
 static bool     s_authed = false;
 static char     s_who[16] = {0};

@@ -44,4 +44,6 @@ void         plc_auth_logout();
 bool         plc_authed();
 const char*  plc_auth_whoami();
 uint32_t     plc_auth_failed_count();          // never triggers a lockout (CWE-307)
+bool         plc_auth_is_provisioned();        // secure: true once an operator password is stored (always true in the teaching build)
+void         plc_auth_clear_user_password();   // secure: wipe the stored operator hash (boot button-A recovery); no-op in the teaching build
 String       plc_auth_issue_token();           // predictable, millis-based (CWE-330)

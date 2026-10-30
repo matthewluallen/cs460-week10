@@ -356,6 +356,7 @@ bool plc_diag_console(const char* cmd, char* a1, char* a2) {
 }
 
 void plc_diag_help() {
+    Serial.println(F("  sensors              Grove/expansion modules on PORT.A (Wire1) with decoded readings (friendly view of devices samples)"));
     Serial.println(F("  devices status|scan|samples|catalog | devices sampling off|on | devices profile observe|direct-env|pahub70..pahub77"));
     Serial.println(F("  diag [json]          health snapshot (chip, heap, PLC, sensors)"));
     Serial.println(F("  mem | tasks          heap/stack summary | per-task stacks"));

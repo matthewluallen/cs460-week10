@@ -1,3 +1,4 @@
+#include "network_access.h"
 #include "mqtt_transport.h"
 #ifdef ENABLE_ETHERNET
 #include "net_types.h"
@@ -61,10 +62,14 @@ esp_transport_handle_t mqtt_w5500_transport(){
 }
 void mqtt_w5500_service(){
     if(!initialized.load())return;
+    // Close the W5500 connection even with no pending request. Already delivered
+    // broker/retained data cannot be revoked by a later controller policy.
+    if(plc_project_host_acl_enabled())net.stop();
     static Request q;static bool pending=false;
     if(!pending){if(xQueueReceive(requests,&q,0)!=pdTRUE)return;pending=true;}
     Response r{};r.id=q.id;r.result=-1;
     if(q.op==Close){net.stop();r.result=0;}
+    else if(plc_project_host_acl_enabled()){net.stop();r.result=-1;}
     else if(clock_ms()>=q.deadline){r.result=(q.op==Read||q.op==PollRead||q.op==PollWrite)?0:-1;}
     else if(q.op==Connect){
         // Numeric IPv4 is the admitted W5500 endpoint form. A DNS/TLS profile
