@@ -66,6 +66,9 @@ button:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--accent);ou
 .pbtn svg{display:block}
 .pbtn .k{font-family:var(--mono);font-size:11px}
 #palette .sep{width:1px;height:20px;background:var(--line2);margin:0 3px}
+#palette .pgrp{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);align-self:center;margin:0 1px 0 7px;white-space:nowrap;opacity:.85}
+#palette .pgrp:first-of-type{margin-left:2px}
+#palette [data-grp][hidden]{display:none!important}
 main{display:flex;flex:1;min-height:0}
 .col{display:flex;flex-direction:column;min-width:0;min-height:0}
 .col.ladder{flex:1.4;border-right:1px solid var(--line)}
@@ -437,6 +440,17 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
 .wfguide{background:linear-gradient(180deg,var(--panel2),var(--panel))}
 .wfguide .wstep.cur .wnum{box-shadow:0 0 10px -2px var(--accent)}
 .wfguide .wstep.done .wnum{box-shadow:0 0 10px -3px var(--live)}
+/* Controller-mode identity: which mode the device is actually in, and that RUN
+   energises relays / REMOTE opens network writes (the security-relevant state). */
+#modeChips button[data-m].is-active{font-weight:700;border-width:2px;padding-top:2px;padding-bottom:2px}
+#modeChips button[data-m="program"].is-active{border-color:var(--muted);color:var(--ink)}
+#modeChips button[data-m="run"].is-active{border-color:var(--live);color:var(--live);box-shadow:0 0 10px -3px var(--live)}
+#modeChips button[data-m="remote"].is-active{border-color:var(--warn,#d08b00);color:var(--warn,#d08b00);box-shadow:0 0 10px -3px var(--warn,#d08b00)}
+#modeChips .modedot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle;background:var(--line2)}
+#modeChips .modedot.program{background:var(--muted)}
+#modeChips .modedot.run{background:var(--live);box-shadow:0 0 6px -1px var(--live)}
+#modeChips .modedot.remote{background:var(--warn,#d08b00);box-shadow:0 0 6px -1px var(--warn,#d08b00)}
+#modeChips .modedot.unknown{background:var(--line2)}
 @media(prefers-reduced-motion:reduce){.pill.on .dot{animation:none}}
 
 /* ===== "follow the signal": live power-flow through the ladder (Marco/Pixar) ===== */
@@ -622,33 +636,49 @@ body.hero-collapsed #heroStrip{display:flex}
 
   <div id="palette">
     <span class="lbl">Insert</span>
-    <button class="pbtn" data-ins="no" title="Normally-open contact">⊣ ⊢ <span>NO</span></button>
-    <button class="pbtn" data-ins="nc" title="Normally-closed contact">⊣/⊢ <span>NC</span></button>
-    <button class="pbtn" data-ins="cmp" title="Analog compare">[&gt;] <span>CMP</span></button>
-    <button class="pbtn" data-ins="ton" title="On-delay timer">⏱ <span>TON</span></button>
-    <button class="pbtn" data-ins="tof" title="Off-delay timer — the output stays ON for the preset time after the input turns off">⏱↓ <span>TOF</span></button>
-    <button class="pbtn" data-ins="rtrig" title="Rising-edge — Q pulses for one scan when the input goes OFF→ON">↑ <span>R_TRIG</span></button>
-    <button class="pbtn" data-ins="ftrig" title="Falling-edge — Q pulses for one scan when the input goes ON→OFF">↓ <span>F_TRIG</span></button>
-    <button class="pbtn" data-ins="ctud" title="Up/down counter (CTUD) — counts CU up and CD down; QU is true when the count reaches PV, QD when it returns to zero. R resets the count, LD loads PV.">⊞ <span>CTUD</span></button>
-    <span class="pdiv" style="width:1px;align-self:stretch;background:var(--line);margin:0 4px"></span>
-    <button class="pbtn" data-ins="add" title="Word math — add two scaled-integer words and store the result (ADD). Writes to a memory word %MW or analog output %QW.">＋ <span>ADD</span></button>
-    <button class="pbtn" data-ins="sub" title="Word math — subtract (SUB).">－ <span>SUB</span></button>
-    <button class="pbtn" data-ins="mul" title="Word math — multiply (MUL). Overflow saturates to the int32 range.">× <span>MUL</span></button>
-    <button class="pbtn" data-ins="div" title="Word math — integer divide (DIV). Truncates toward zero; divide-by-zero yields 0.">÷ <span>DIV</span></button>
-    <button class="pbtn" data-ins="move" title="MOVE — copy a word (or a constant) into a memory word %MW or analog output %QW.">→ <span>MOVE</span></button>
-    <button class="pbtn" data-ins="limit" title="LIMIT(MN, IN, MX) — clamp IN to the range [MN, MX].">⊓ <span>LIMIT</span></button>
-    <button class="pbtn" data-ins="sel" title="SEL(G, IN0, IN1) — pick IN1 when G is nonzero, otherwise IN0.">⋔ <span>SEL</span></button>
-    <button class="pbtn" data-ins="pid" title="PID controller — closed-loop control. Error = SP − PV; output CV = KP·e + KI·∑e + KD·Δe, clamped to [OUTMIN, OUTMAX] with anti-windup. Gains are fixed-point hundredths. CV drives an analog output %QW.">∿ <span>PID</span></button>
+    <span class="lvseg" id="palTier" title="How many instruction groups are shown. Basic is enough to build a rung; Standard adds timers, counters and edges; Full adds analog math and PID. Your choice is remembered.">
+      <button type="button" data-tier="0">Basic</button>
+      <button type="button" data-tier="1" class="on">Standard</button>
+      <button type="button" data-tier="2">Full</button>
+    </span>
     <span class="sep"></span>
-    <button class="pbtn" data-ins="orbranch" title="Parallel OR branch on selected network">⑃ <span>OR branch</span></button>
-    <button class="pbtn" data-ins="coil" title="Set the network's coil">( ) <span>Coil</span></button>
-    <button class="pbtn" data-ins="srlatch" title="Set/Reset latch — the output stays ON after a Set pulse until Reset. Builds the standard seal-in rung: QX := Set OR (QX AND NOT Reset).">⊣S/R⊢ <span>S/R latch</span></button>
-    <button class="pbtn" data-ins="xor" title="Exclusive-OR — output is ON when exactly one input is ON. Builds the standard ladder XOR: (A AND NOT B) OR (NOT A AND B).">⊕ <span>XOR</span></button>
-    <span class="sep"></span>
-    <button class="pbtn" data-ins="net" title="Add a network">＋ <span>Network</span></button>
-    <button class="pbtn" data-ins="startup" id="bStartup" title="Add an explicit boot-admission declaration outside scan logic">↻ <span>Reboot RUN</span></button>
-    <span class="lbl" style="margin-left:8px" id="palHint">keys: n·NO  /·NC  m·CMP  t·TON  r·R_TRIG  f·F_TRIG  o·OR  c·coil  e·network</span>
-    <span class="hint" style="font-size:11px;color:var(--ink2)">Boolean logic, comparisons, timers, counters, scaled-integer word math and a fixed-point PID loop — all run on the device IR.</span>
+
+    <span class="pgrp" data-grp="0">Basics</span>
+    <button class="pbtn" data-ins="no" data-grp="0" title="Normally-open contact — passes power when its input is ON">⊣ ⊢ <span>NO</span></button>
+    <button class="pbtn" data-ins="nc" data-grp="0" title="Normally-closed contact — passes power when its input is OFF">⊣/⊢ <span>NC</span></button>
+    <button class="pbtn" data-ins="coil" data-grp="0" title="Set the network's output coil">( ) <span>Coil</span></button>
+    <button class="pbtn" data-ins="orbranch" data-grp="0" title="Parallel OR branch on the selected network">⑃ <span>OR branch</span></button>
+    <button class="pbtn" data-ins="net" data-grp="0" title="Add a network (a new rung)">＋ <span>Network</span></button>
+
+    <span class="pgrp" data-grp="1">Timing &amp; counting</span>
+    <button class="pbtn" data-ins="ton" data-grp="1" title="On-delay timer (TON) — Q turns ON after the input stays ON for the preset time">⏱ <span>TON</span></button>
+    <button class="pbtn" data-ins="tof" data-grp="1" title="Off-delay timer (TOF) — the output stays ON for the preset time after the input turns off">⏱↓ <span>TOF</span></button>
+    <button class="pbtn" data-ins="ctud" data-grp="1" title="Up/down counter (CTUD) — counts CU up and CD down; QU is true when the count reaches PV, QD when it returns to zero. R resets the count, LD loads PV.">⊞ <span>CTUD</span></button>
+
+    <span class="pgrp" data-grp="1">Edges &amp; latches</span>
+    <button class="pbtn" data-ins="rtrig" data-grp="1" title="Rising-edge (R_TRIG) — Q pulses for one scan when the input goes OFF→ON">↑ <span>R_TRIG</span></button>
+    <button class="pbtn" data-ins="ftrig" data-grp="1" title="Falling-edge (F_TRIG) — Q pulses for one scan when the input goes ON→OFF">↓ <span>F_TRIG</span></button>
+    <button class="pbtn" data-ins="srlatch" data-grp="1" title="Set/Reset latch — the output stays ON after a Set pulse until Reset. Builds the standard seal-in rung: QX := Set OR (QX AND NOT Reset).">⊣S/R⊢ <span>S/R latch</span></button>
+
+    <span class="pgrp" data-grp="1">Compare &amp; logic</span>
+    <button class="pbtn" data-ins="cmp" data-grp="1" title="Analog compare — compare a word input against a constant">[&gt;] <span>CMP</span></button>
+    <button class="pbtn" data-ins="xor" data-grp="1" title="Exclusive-OR — output is ON when exactly one input is ON. Builds the standard ladder XOR: (A AND NOT B) OR (NOT A AND B).">⊕ <span>XOR</span></button>
+
+    <span class="pgrp" data-grp="2">Analog &amp; control</span>
+    <button class="pbtn" data-ins="add" data-grp="2" title="Word math — add two scaled-integer words and store the result (ADD). Writes to a memory word %MW or analog output %QW.">＋ <span>ADD</span></button>
+    <button class="pbtn" data-ins="sub" data-grp="2" title="Word math — subtract (SUB).">－ <span>SUB</span></button>
+    <button class="pbtn" data-ins="mul" data-grp="2" title="Word math — multiply (MUL). Overflow saturates to the int32 range.">× <span>MUL</span></button>
+    <button class="pbtn" data-ins="div" data-grp="2" title="Word math — integer divide (DIV). Truncates toward zero; divide-by-zero yields 0.">÷ <span>DIV</span></button>
+    <button class="pbtn" data-ins="move" data-grp="2" title="MOVE — copy a word (or a constant) into a memory word %MW or analog output %QW.">→ <span>MOVE</span></button>
+    <button class="pbtn" data-ins="limit" data-grp="2" title="LIMIT(MN, IN, MX) — clamp IN to the range [MN, MX].">⊓ <span>LIMIT</span></button>
+    <button class="pbtn" data-ins="sel" data-grp="2" title="SEL(G, IN0, IN1) — pick IN1 when G is nonzero, otherwise IN0.">⋔ <span>SEL</span></button>
+    <button class="pbtn" data-ins="pid" data-grp="2" title="PID controller — closed-loop control. Error = SP − PV; output CV = KP·e + KI·∑e + KD·Δe, clamped to [OUTMIN, OUTMAX] with anti-windup. Gains are fixed-point hundredths. CV drives an analog output %QW.">∿ <span>PID</span></button>
+
+    <span class="pgrp" data-grp="2">Boot</span>
+    <button class="pbtn" data-ins="startup" data-grp="2" id="bStartup" title="Add an explicit boot-admission declaration outside scan logic">↻ <span>Reboot RUN</span></button>
+
+    <span class="lbl" style="margin-left:8px" id="palHint">keys: n·NO  /·NC  c·coil  o·OR  e·network</span>
+    <span class="hint" style="font-size:11px;color:var(--ink2)" id="palTierHint"></span>
     <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">
       <span class="lbl">View</span>
       <span class="lvseg" id="logicViewSeg" title="How much room the ladder vs the program text gets"><button type="button" data-lv="split" class="on">Split</button><button type="button" data-lv="ladder">Ladder</button><button type="button" data-lv="text">Text</button></span>
@@ -4472,7 +4502,10 @@ function renderControllerStatus(){
   document.getElementById('bReadProject').disabled=!conn||busBusy;document.getElementById('bExportProjectReadback').disabled=!lastProjectEvidence;
   document.getElementById('bDownload').disabled=!PROJECT||projectNeedsReview||busBusy||!!stDraftState?.dirty||MODE!=='edit'||!modeKnown||controllerStatus?.mode!=='PROGRAM';
   document.getElementById('bDownload').title='Requires Author, validated project settings, and fresh PROGRAM readback. Loading never starts RUN.';
-  document.querySelectorAll('#modeChips button[data-m]').forEach(button=>{const executes=button.dataset.m!=='program';button.disabled=MODE!=='edit'||busBusy||!modeKnown||(executes&&(!matched||!projectFresh||projectReadback?.run_ready!==true));button.title=button.dataset.m==='remote'?'Explicit USB REMOTE request: executes logic and relaxes remote-download acceptance and the secure Modbus write gate; it does not authenticate clients. Requires matching project and readiness.':executes?'Requires matching application readback and controller readiness; RUN is sent separately.':'Explicit PROGRAM request; cancels the current pending startup request. Future reboot behavior follows the installed declaration.';});
+  {const live=modeKnown?controllerStatus.mode:null,dot=document.getElementById('modeNowDot');
+   if(dot)dot.className='modedot '+(live?live.toLowerCase():'unknown');
+   if(dot)dot.title=live?('Controller is in '+live+(live==='RUN'?' — scanning, relays live':live==='REMOTE'?' — scanning, network writes open':' — idle, safe to load')):'Live controller mode unknown';}
+  document.querySelectorAll('#modeChips button[data-m]').forEach(button=>{const executes=button.dataset.m!=='program';button.classList.toggle('is-active',modeKnown&&controllerStatus.mode===button.dataset.m.toUpperCase());button.disabled=MODE!=='edit'||busBusy||!modeKnown||(executes&&(!matched||!projectFresh||projectReadback?.run_ready!==true));button.title=button.dataset.m==='remote'?'Explicit USB REMOTE request: executes logic and relaxes remote-download acceptance and the secure Modbus write gate; it does not authenticate clients. Requires matching project and readiness.':executes?'Requires matching application readback and controller readiness; RUN is sent separately.':'Explicit PROGRAM request; cancels the current pending startup request. Future reboot behavior follows the installed declaration.';});
   {const cf=document.getElementById('bClearFault'); if(cf){const clearable=conn&&MODE==='edit'&&!busBusy&&modeKnown&&matched&&projectFresh&&projectReadback&&projectReadback.run_ready!==true&&/fault/i.test(projectReadback.readiness_reason||''); cf.style.display=clearable?'':'none'; cf.disabled=!clearable;}}
   const mh=document.getElementById('modeHint'); if(mh){ let r=''; if(MODE!=='edit') r='Switch to Author to change controller mode.'; else if(!conn) r='Connect USB to change mode.'; else if(busBusy) r='Working - wait for the current read.'; else if(!modeKnown) r='Reading controller status...'; else if(!matched||!projectFresh) r='PROGRAM ready. Load + read back the application to enable RUN/REMOTE.'; else if(projectReadback?.run_ready!==true){ const rr=projectReadback?.readiness_reason||'controller not ready'; r='RUN/REMOTE blocked: '+rr+'.'+(/fault/i.test(rr)?' Clear fault to retry.':''); } else r='Ready: PROGRAM, RUN and REMOTE available.'; mh.textContent=r; }
   renderWorkflow();try{renderHero();}catch(e){}
@@ -4706,7 +4739,7 @@ function autosave(){if(!PROJECT||projectNeedsReview)return;try{localStorage.setI
 function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('s3theme',t);}catch(e){}}
 function initTheme(){let t;try{t=localStorage.getItem('s3theme');}catch(e){}setTheme(t||'dark');}
 function modeChips(){
-  const el=document.getElementById('modeChips');el.innerHTML='<span style="font-size:10px;color:var(--ink2)">Controller commands</span> '+['PROGRAM','RUN','REMOTE'].map(mode=>`<button class="btn" style="padding:3px 9px;font-size:11px" data-m="${mode.toLowerCase()}" disabled>${mode}</button>`).join('')+'<button class="btn" id="bClearFault" style="padding:3px 9px;font-size:11px;display:none" title="Clear a latched controller fault (e.g. a transient scan overrun under load), then re-read readiness so RUN can proceed">Clear fault</button>'+'<span id="modeHint" style="font-size:10px;color:var(--muted);margin-left:8px"></span>';
+  const el=document.getElementById('modeChips');el.innerHTML='<span style="font-size:10px;color:var(--ink2)"><span id="modeNowDot" class="modedot unknown" title="Live controller mode"></span>Controller commands</span> '+['PROGRAM','RUN','REMOTE'].map(mode=>`<button class="btn" style="padding:3px 9px;font-size:11px" data-m="${mode.toLowerCase()}" disabled>${mode}</button>`).join('')+'<button class="btn" id="bClearFault" style="padding:3px 9px;font-size:11px;display:none" title="Clear a latched controller fault (e.g. a transient scan overrun under load), then re-read readiness so RUN can proceed">Clear fault</button>'+'<span id="modeHint" style="font-size:10px;color:var(--muted);margin-left:8px"></span>';
   el.querySelectorAll('button[data-m]').forEach(button=>button.onclick=async()=>{
     if(MODE!=='edit'||busBusy||!modeFresh())return;
     try{if(button.dataset.m!=='program'){await readProjectIdentity();if(!projectMatchesWorkspace()||!projectReplyFresh())throw Error('Readback does not match the current application. Load and verify it before RUN or REMOTE.');if(projectReadback.run_ready!==true)throw Error('Controller not ready: '+(projectReadback.readiness_reason||'readiness unavailable'));}
@@ -4734,7 +4767,12 @@ document.addEventListener('keydown',e=>{const t=e.target.tagName;if(t==='INPUT'|
   if(e.metaKey||e.ctrlKey||e.altKey)return;
   // keyboard rung entry (LS-16): place an element into the selected network
   const km={'n':'no','/':'nc','c':'coil','t':'ton','r':'rtrig','f':'ftrig','u':'ctud','m':'cmp','o':'orbranch','e':'net'};
-  if(km[e.key]&&MODE==='edit'){e.preventDefault();insertElement(km[e.key]);}});
+  if(km[e.key]&&MODE==='edit'){
+    // Don't let a shortcut insert an instruction the current palette tier hides.
+    const btn=document.querySelector('#palette .pbtn[data-ins="'+km[e.key]+'"]');
+    if(btn&&btn.hidden)return;
+    e.preventDefault();insertElement(km[e.key]);
+  }});
 document.getElementById('bExample').onclick=openExampleProjects;
 document.getElementById('bCompile').onclick=openApplicationArtifact;
 document.getElementById('bProject').onclick=openProject;
@@ -4856,6 +4894,27 @@ document.querySelectorAll('.contabs button').forEach(b=>b.onclick=()=>showConTab
 document.getElementById('bTheme').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');setTheme(c==='dark'?'light':'dark');};
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
 document.querySelectorAll('#palette .pbtn').forEach(b=>b.onclick=()=>insertElement(b.dataset.ins));
+/* Insert-palette skill tiers: group the instruction set and show only as much as
+   the learner wants. Basic = enough to build a rung; Standard adds timing/counting/
+   edges/compare; Full adds analog math + PID. Nothing is removed; the choice sticks. */
+(function(){
+  const seg=document.getElementById('palTier'); if(!seg)return;
+  const hint=document.getElementById('palTierHint');
+  let tier=1; try{const s=localStorage.getItem('cs460_pal_tier'); if(s!==null&&/^[0-2]$/.test(s))tier=+s;}catch(e){}
+  const HINTS=[
+    'Basic — the five pieces to build a working rung. Switch to Standard or Full when you need more.',
+    'Standard — timers, counters, edges and compare, grouped by what they do. Analog math and PID are under Full.',
+    'Full — every instruction, including scaled-integer word math and the fixed-point PID loop. All run on the device IR.'
+  ];
+  function apply(){
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.tier===tier));
+    document.querySelectorAll('#palette [data-grp]').forEach(el=>{ el.hidden = (+el.dataset.grp) > tier; });
+    if(hint)hint.textContent=HINTS[tier];
+    try{localStorage.setItem('cs460_pal_tier',String(tier));}catch(e){}
+  }
+  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{tier=+b.dataset.tier;apply();}));
+  apply();
+})();
 const ta=document.getElementById('stl');ta.addEventListener('blur',rebuildFromSTL);ta.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();rebuildFromSTL();}});
 
 initTheme();modeChips();setMode('edit');rebuildFromModel();openProject();
