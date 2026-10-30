@@ -54,6 +54,13 @@ run "${ESPTOOL[@]}" --chip esp32s3 merge_bin -o "$OUT" \
     --flash_mode dio --flash_freq 80m --flash_size 8MB \
     0x0 "$BUILD/bootloader.bin" 0x8000 "$BUILD/partitions.bin" \
     0xe000 "$BOOTAPP0" 0x10000 "$BUILD/firmware.bin"
+# esptool 5.x merge_bin no longer pads the output to --flash_size, so it emits a
+# ~1.8 MB file. The QEMU twin's SPI-flash (if=mtd) only accepts a 2/4/8/16 MB image
+# ("Drive size error"), so pad to a full 8 MB with 0xFF (the erased-flash value).
+WANT=$((8*1024*1024)); HAVE=$(wc -c < "$OUT")
+if [ "$HAVE" -lt "$WANT" ]; then
+  python3 -c "import sys; f=open('$OUT','ab'); f.write(b'\xff'*($WANT-$HAVE)); f.close()"
+fi
 observe "wrote $(basename "$OUT")  ($(wc -c < "$OUT") bytes)"
 say  "Boot it:   ./qemu/run.sh $PROFILE      Control it:   ./qemu/console.sh"
 note "The secure build ships NO default password — enroll one with 'passwd <12+ chars>' at the"
