@@ -36,8 +36,12 @@ step "Packaging bootloader + partitions + app into one 8 MB image"
 say  "The twin boots a single flash image. We merge the just-built pieces at the"
 say  "documented offsets (bootloader@0x0, partitions@0x8000, boot_app0@0xe000, app@0x10000)"
 say  "and pad to 8 MB — exactly the layout a real StampLC is flashed with."
-BOOTAPP0="$(ls "$FW"/.pio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin 2>/dev/null | head -1)"
-[ -n "$BOOTAPP0" ] || BOOTAPP0="$(find "$HOME/.platformio" -name boot_app0.bin 2>/dev/null | head -1)"
+# boot_app0.bin location varies: older pioarduino put it under the project's
+# .pio/packages, current builds keep it only in the global ~/.platformio. The
+# trailing `|| true` matters: under `set -euo pipefail` a failing ls/find in a
+# command substitution aborts the whole script (RC 2) BEFORE the fallback runs.
+BOOTAPP0="$(ls "$FW"/.pio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin 2>/dev/null | head -1 || true)"
+[ -n "$BOOTAPP0" ] || BOOTAPP0="$(find "$FW/.pio" "$HOME/.platformio" -name boot_app0.bin 2>/dev/null | head -1 || true)"
 for f in "$BUILD/bootloader.bin" "$BUILD/partitions.bin" "$BUILD/firmware.bin" "$BOOTAPP0"; do
   [ -f "$f" ] || { echo "missing build artifact: $f"; exit 1; }
 done
