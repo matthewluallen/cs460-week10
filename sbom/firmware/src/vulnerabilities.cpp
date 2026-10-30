@@ -73,8 +73,8 @@ uint32_t predictable_session_token() {
 // The Modbus server accepts the hardcoded password defined in config.h
 // Student can use: username="admin", password="openplc"
 void check_default_credentials_example() {
-    // This is just documentation of the vulnerability
-    // The actual vulnerable code is in modbus_tcp_server.cpp authenticate()
+    // This is just documentation of the vulnerability. The Modbus server
+    // performs NO authentication at all - every request is served (CWE-306).
 
     diagnostic_log_printf(diagnostics::Origin::Application,"[CWE-798/1393] Hardcoded credentials:");
     diagnostic_log_printf(diagnostics::Origin::Application,"  User: %s\n", MODBUS_HARDCODED_USER);

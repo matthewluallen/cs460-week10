@@ -32,9 +32,6 @@ private:
     void handle_hlog();     // the source-attributed audit log as JSON
     void handle_config();   // GET/POST network+NTP config, "protected" by a DEFAULT cred (CWE-798/1392)
 
-    // CWE-330: Predictable session ID (seeded from millis)
-    uint32_t generate_session_token();
-    bool validate_session(const String& token);
 
     // Simple HTML page
     String get_html_page();

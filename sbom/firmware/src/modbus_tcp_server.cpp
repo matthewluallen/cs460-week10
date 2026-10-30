@@ -445,16 +445,3 @@ uint16_t ModbusTCPServer::get_register(uint16_t addr) {
     return v;
 }
 
-bool ModbusTCPServer::authenticate(const char* user, const char* pass) {
-    // CWE-798: Hardcoded credentials (no real auth)
-    // Just check if password matches hardcoded value
-    return strcmp(pass, MODBUS_HARDCODED_PASS) == 0;
-}
-
-// CWE-330: Predictable PRNG for session token
-uint32_t ModbusTCPServer::generate_session_id(uint8_t client_idx) {
-    // Seeded only from millis() - highly predictable!
-    // Student can observe millis() value and predict next token
-    uint32_t seed = esp_timer_get_time() % 1000;
-    return (seed << 16) | client_idx;
-}

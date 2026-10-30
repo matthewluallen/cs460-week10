@@ -74,6 +74,5 @@ int scan_boundary() {
 uint32_t conflict_count()        { return g_conflicts; }
 uint16_t last_conflict_key()     { return g_last_conflict_key; }
 uint8_t  last_conflict_sources() { return g_last_conflict_sources; }
-uint8_t  last_writer(uint16_t key) { Tag* t = find(key); return t ? t->last_winner : SRC_NONE; }
 
 } // namespace arb

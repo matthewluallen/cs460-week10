@@ -65,11 +65,6 @@ private:
     bool fc_write_multiple_coils(const uint8_t* req, uint8_t* resp, uint16_t& resp_len, const char* source);
     bool fc_write_multiple_registers(const uint8_t* req, uint8_t* resp, uint16_t& resp_len, const char* source);
 
-    // Authentication (CWE-798: hardcoded, no real check)
-    bool authenticate(const char* user, const char* pass);
-
-    // CWE-330: Predictable session token
-    uint32_t generate_session_id(uint8_t client_idx);
 };
 
 extern ModbusTCPServer modbus_server;

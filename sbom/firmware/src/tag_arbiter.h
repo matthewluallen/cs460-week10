@@ -72,7 +72,6 @@ int scan_boundary();
 uint32_t conflict_count();        // cumulative conflicts since reset
 uint16_t last_conflict_key();     // key of the most recent contested tag (0 if none)
 uint8_t  last_conflict_sources(); // Source bitmask of the most recent conflict
-uint8_t  last_writer(uint16_t key); // the winning Source for a tag's last resolved window
 
 // Resolve a contested source bitmask to the single winning Source by PRIORITY.
 uint8_t  winner(uint8_t source_mask);

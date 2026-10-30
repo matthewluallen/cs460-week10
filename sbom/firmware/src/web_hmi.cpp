@@ -248,28 +248,14 @@ void WebHMI::handle_hlog() {
     send_json(server, web_api_log_json(plc_network_ipv4(server.client().remoteIP())));
 }
 
-// CWE-330: Predictable PRNG for session tokens
-// Seeded only from millis() - trivial to predict
-uint32_t WebHMI::generate_session_token() {
-    // CWE-330: Weak random seed
-    uint32_t seed = millis() % 10000;  // Only 10,000 possible values!
-    return seed ^ 0xDEADBEEF;
-}
-
-bool WebHMI::validate_session(const String& token) {
-    // CWE-287: No real session validation
-    // Just return true for any token
-    return true;
-}
-
 String WebHMI::get_html_page() { return web_api_html(); }
 
 String web_api_html() {
     // Named-point HMI: view and set the register bits that map to the device's
     // points, like a real PLC/HMI. Data comes from /api/points and /api/log; the
     // "friendly" buttons here and a raw Modbus FC05 write are the SAME action
-    // underneath (the CWE-306 lesson). The vulnerable log viewer (CWE-22) and the
-    // predictable session token (CWE-330) are kept below on purpose.
+    // underneath (the CWE-306 lesson). The vulnerable log viewer (CWE-22) is
+    // kept below on purpose.
     return R"CWEHTML(<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StamPLC HMI</title><style>
