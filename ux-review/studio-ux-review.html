@@ -1,0 +1,582 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Studio Learnability Review</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Spline+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column; interactive "lab" panels break out full-width inside it.
+   Palette: signal-azure accent + a distinct teal "live" hue, on cool azure-biased neutrals,
+   echoing the platform's own "follow the signal" language. */
+:root{
+  --bg:#f3f6fb; --surface:#ffffff; --surface2:#eaf0f8; --line:#d9e1ee;
+  --fg:#101826; --muted:#55627a; --faint:#8a94a8;
+  --accent:#1f63e6; --accent-soft:#e4edff;
+  --live:#0a8a55; --live-soft:#d8f3e6;
+  --warn:#b45a09; --warn-soft:#fbead2;
+  --crit:#c0362c; --crit-soft:#fbe0dd;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --sans:"Spline Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --disp:"Archivo","Spline Sans",system-ui,sans-serif;
+  --shadow:0 1px 2px rgba(16,24,38,.05),0 6px 20px rgba(16,24,38,.06);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a0e16; --surface:#111826; --surface2:#19223300; --surface2:#1a2435; --line:#263247;
+  --fg:#e9eff8; --muted:#9aa7bd; --faint:#6b7589;
+  --accent:#4f8dff; --accent-soft:#15233f;
+  --live:#2fd27e; --live-soft:#10281d;
+  --warn:#f0a93a; --warn-soft:#2c2112;
+  --crit:#ff6f62; --crit-soft:#2e1513;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0a0e16; --surface:#111826; --surface2:#1a2435; --line:#263247;
+  --fg:#e9eff8; --muted:#9aa7bd; --faint:#6b7589;
+  --accent:#4f8dff; --accent-soft:#15233f;
+  --live:#2fd27e; --live-soft:#10281d;
+  --warn:#f0a93a; --warn-soft:#2c2112;
+  --crit:#ff6f62; --crit-soft:#2e1513;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55;
+  -webkit-font-smoothing:antialiased;font-size:16px}
+.wrap{max-width:1040px;margin:0 auto;
+  padding-left:max(20px,env(safe-area-inset-left,0px));
+  padding-right:max(20px,env(safe-area-inset-right,0px));
+  padding-block:0}
+h1,h2,h3{font-family:var(--disp);text-wrap:balance;line-height:1.12;margin:0}
+h1{font-size:clamp(2.1rem,6vw,3.4rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:clamp(1.4rem,3.4vw,1.9rem);font-weight:600;letter-spacing:-.01em}
+h3{font-size:1.12rem;font-weight:600}
+p{margin:.6em 0}
+a{color:var(--accent)}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);font-weight:500}
+.mono{font-family:var(--mono)}
+code{font-family:var(--mono);font-size:.86em;background:var(--surface2);padding:.08em .35em;border-radius:4px}
+.muted{color:var(--muted)}
+hr{border:0;border-top:1px solid var(--line);margin:0}
+
+/* hero */
+header.hero{padding-block:clamp(48px,9vw,96px) 32px}
+.kicker{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px}
+.tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;padding:4px 9px;border-radius:999px;
+  border:1px solid var(--line);color:var(--muted);background:var(--surface)}
+.lede{font-size:clamp(1.05rem,2.2vw,1.28rem);color:var(--muted);max-width:60ch;margin-top:18px}
+.theme-btn{position:fixed;top:max(12px,env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));
+  z-index:30;font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;background:var(--surface);
+  color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:7px 12px;cursor:pointer;box-shadow:var(--shadow)}
+.theme-btn:hover{color:var(--fg)}
+
+section{padding-block:clamp(34px,6vw,58px)}
+.section-head{display:flex;flex-direction:column;gap:6px;margin-bottom:26px}
+.section-head h2{margin-top:4px}
+
+/* verdict matrix */
+.verdicts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.vcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;box-shadow:var(--shadow);
+  min-width:0;display:flex;flex-direction:column;gap:8px}
+.vcard .vtop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.vcard h3{font-size:1.02rem}
+.pill{font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  padding:4px 9px;border-radius:999px;white-space:nowrap}
+.pill.fine{background:var(--live-soft);color:var(--live)}
+.pill.slight{background:var(--accent-soft);color:var(--accent)}
+.pill.redesign{background:var(--warn-soft);color:var(--warn)}
+.vcard p{margin:0;font-size:.9rem;color:var(--muted)}
+
+/* persona cards */
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:720px){.cols2{grid-template-columns:1fr}}
+.persona{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow);min-width:0}
+.persona .role{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.persona h3{margin:6px 0 10px}
+.persona ul{margin:10px 0 0;padding-left:18px}
+.persona li{margin:5px 0;font-size:.93rem}
+.persona li b{font-weight:600}
+
+/* generic analysis block */
+.finding{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:12px;padding:16px 18px;margin:12px 0;box-shadow:var(--shadow);min-width:0}
+.finding.warn{border-left-color:var(--warn)}
+.finding.good{border-left-color:var(--live)}
+.finding .lbl{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.finding h3{margin:3px 0 6px;font-size:1.02rem}
+.finding p{margin:.3em 0;font-size:.94rem}
+.comp{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
+.comp .ct{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* LAB panel (interactive prototypes) */
+.lab{background:linear-gradient(180deg,var(--surface),var(--bg));border:1px solid var(--line);
+  border-radius:18px;padding:0;margin:20px 0;box-shadow:var(--shadow);overflow:hidden}
+.lab-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);
+  background:var(--surface)}
+.lab-head .dot{width:9px;height:9px;border-radius:50%;background:var(--live);box-shadow:0 0 0 4px var(--live-soft)}
+.lab-head .lt{font-family:var(--mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lab-head .lt b{color:var(--fg);font-weight:600}
+.lab-body{padding:18px}
+
+/* segmented control */
+.seg{display:inline-flex;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.seg button{font-family:var(--sans);font-size:.84rem;font-weight:500;border:0;background:transparent;color:var(--muted);
+  padding:7px 14px;border-radius:7px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff;box-shadow:var(--shadow)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* palette prototype */
+.pal-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:14px 0 6px}
+.pal-count{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.pal-count b{color:var(--fg)}
+.group{border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden;background:var(--surface)}
+.group summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:11px 14px;
+  font-weight:600;font-size:.95rem;user-select:none}
+.group summary::-webkit-details-marker{display:none}
+.group summary .chev{margin-left:auto;transition:transform .18s;color:var(--muted);font-family:var(--mono)}
+.group[open] summary .chev{transform:rotate(90deg)}
+.group summary .gtag{font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 7px;border-radius:999px;background:var(--surface2);color:var(--muted)}
+.group summary .gtag.ess{background:var(--live-soft);color:var(--live)}
+.group summary .gtag.std{background:var(--accent-soft);color:var(--accent)}
+.group summary .gtag.exp{background:var(--warn-soft);color:var(--warn)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:4px 14px 14px}
+.chip{font-family:var(--sans);font-size:.84rem;display:inline-flex;align-items:center;gap:7px;
+  border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:7px 11px;color:var(--fg);min-width:0}
+.chip .gl{font-family:var(--mono);color:var(--accent);font-weight:600}
+.chip .nm{font-family:var(--mono);font-size:.82rem}
+.chip.adv{border-style:dashed}
+.hint{font-size:.86rem;color:var(--muted);margin:10px 2px 0}
+.hint b{color:var(--fg)}
+
+/* workflow rail prototype */
+.rail{display:flex;gap:4px;flex-wrap:wrap;align-items:stretch;margin:4px 0 14px}
+.step{flex:1 1 120px;min-width:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);
+  padding:11px 12px;display:flex;flex-direction:column;gap:3px;position:relative}
+.step .sn{font-family:var(--mono);font-size:.66rem;color:var(--faint);letter-spacing:.06em}
+.step .sl{font-weight:600;font-size:.92rem}
+.step .ss{font-size:.76rem;color:var(--muted)}
+.step.done{border-color:var(--live)}
+.step.done .sn{color:var(--live)}
+.step.active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.step.active .sn{color:var(--accent)}
+.step.locked{opacity:.65}
+.step .chk{position:absolute;top:9px;right:10px;font-family:var(--mono);font-size:.8rem}
+.step.done .chk{color:var(--live)}
+.step.active .chk{color:var(--accent)}
+.modebar{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 8px;align-items:center}
+.modechip{font-family:var(--mono);font-size:.76rem;letter-spacing:.04em;border:1px solid var(--line);border-radius:999px;
+  padding:6px 13px;background:var(--surface);color:var(--muted);cursor:pointer}
+.modechip[aria-pressed="true"]{color:#fff;border-color:transparent}
+.modechip.author[aria-pressed="true"]{background:var(--accent)}
+.modechip.monitor[aria-pressed="true"]{background:var(--live);color:#04150d}
+.modechip.run[aria-pressed="true"]{background:var(--crit)}
+.modepanel{border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:6px;background:var(--surface)}
+.modepanel .mh{font-family:var(--disp);font-weight:600;font-size:1.05rem;margin-bottom:4px}
+.primary{display:inline-flex;align-items:center;gap:8px;font-family:var(--sans);font-weight:600;font-size:.92rem;
+  border:0;border-radius:10px;padding:10px 18px;cursor:pointer;color:#fff;background:var(--accent);box-shadow:var(--shadow)}
+.primary.run{background:var(--crit)}
+.primary:disabled{background:var(--surface2);color:var(--faint);cursor:not-allowed;box-shadow:none}
+.why{font-size:.84rem;color:var(--warn);margin-top:9px}
+.why.ok{color:var(--live)}
+
+/* recommendations */
+.rec{display:flex;gap:14px;padding:16px 0;border-top:1px solid var(--line);min-width:0}
+.rec .rn{font-family:var(--disp);font-weight:700;font-size:1.5rem;color:var(--accent);line-height:1;flex:0 0 auto;width:34px}
+.rec .rb{min-width:0}
+.rec h3{font-size:1.02rem;margin-bottom:3px}
+.rec p{margin:0;font-size:.93rem;color:var(--muted)}
+.rec .eff{font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-top:5px}
+
+footer{padding-block:40px 60px;color:var(--muted);font-size:.86rem}
+.callout{background:var(--accent-soft);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:18px 0;min-width:0}
+.callout .eyebrow{color:var(--accent)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<button class="theme-btn" id="themeBtn" aria-label="Toggle colour theme">◑ theme</button>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">
+    <span class="tag">CS460 · Weeks 10–11</span>
+    <span class="tag">Logic Studio · Circuit Studio · Analyzer</span>
+    <span class="tag">UX &amp; learnability</span>
+  </div>
+  <div class="eyebrow">Design review + working prototypes</div>
+  <h1>Can a novice and a controls engineer share one tool?</h1>
+  <p class="lede">The platform is powerful and, in places, genuinely beautiful. The risk isn't capability — it's that a first-time student and a seasoned engineer need opposite things from the same screen. This review grades each surface, then proposes two concrete fixes you can try right here on the page.</p>
+</header>
+
+<hr>
+
+<section>
+  <div class="section-head">
+    <div class="eyebrow">The verdict, up front</div>
+    <h2>Where each surface stands</h2>
+    <p class="muted" style="max-width:62ch">Three ratings: <b>Solid</b> (keep it, polish only), <b>Refine</b> (clear, targeted improvements), <b>Rework</b> (structure is fighting the learner). Nothing here needs a ground-up redesign — the bones are good. The gaps are concentrated in onboarding, density, and consistency.</p>
+  </div>
+  <div class="verdicts" id="verdicts"></div>
+</section>
+
+<section>
+  <div class="section-head">
+    <div class="eyebrow">Who's actually at the keyboard</div>
+    <h2>Two students, opposite needs</h2>
+    <p class="muted" style="max-width:64ch">Every design call below is judged against these two. When a change helps one and hurts the other, that's the real design problem — and the reason "add a mode," not "pick a side," is usually the answer.</p>
+  </div>
+  <div class="cols2">
+    <div class="persona">
+      <div class="role">Novice · first PLC ever</div>
+      <h3>Priya — CS / informatics student</h3>
+      <p class="muted" style="font-size:.93rem;margin:0">Strong on code, new to ladder logic, relays, and buses. Here to understand how software reaches into the physical world — and to not feel stupid doing it.</p>
+      <ul>
+        <li><b>Needs:</b> one obvious next step, plain words before jargon, a small number of choices on screen at once.</li>
+        <li><b>Breaks on:</b> a palette of 21 instructions, <code>%IX0</code> / <code>ABI v4</code> with no gloss, three stacked control bands, a greyed-out button with no reason.</li>
+        <li><b>Win condition:</b> builds a working rung in the first ten minutes without reading a manual.</li>
+      </ul>
+    </div>
+    <div class="persona">
+      <div class="role">Expert · works with real PLCs</div>
+      <h3>Dale — controls / automation engineer</h3>
+      <p class="muted" style="font-size:.93rem;margin:0">Has wired hundreds of panels. Wants density, speed, and honest feedback. Hand-holding is friction. (A real instructor in this seat once said <span class="mono">"I cannot find a way to make it run."</span>)</p>
+      <ul>
+        <li><b>Needs:</b> everything reachable fast, keyboard shortcuts, ladder↔ST fidelity, the register table docked, not buried.</li>
+        <li><b>Breaks on:</b> hidden RUN-readiness, a modal that hides live values, progressive disclosure that slows him down.</li>
+        <li><b>Win condition:</b> loads, runs, and debugs without the UI ever getting in the way.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">
+    <div class="eyebrow">The principle that resolves it</div>
+    <p style="margin:.4em 0 0"><b>Depth on demand, not depth by default.</b> Show Priya a calm, minimal surface with an obvious path; let Dale summon full density with one click and have it stick. Same tool, two throttle settings — plus one consistent visual language so moving between Logic, Circuit, Protocol, and the Analyzer never feels like switching apps.</p>
+  </div>
+</section>
+
+<hr>
+
+<section>
+  <div class="section-head">
+    <div class="eyebrow">Surface by surface</div>
+    <h2>What's working, what isn't</h2>
+  </div>
+
+  <div class="comp">
+    <div class="ct"><h3 style="font-size:1.15rem">Logic Studio — the ladder / ST editor</h3><span class="pill slight">Refine</span></div>
+    <p class="muted" style="font-size:.92rem;margin:0">The core is strong: editor-first layout, true ladder↔ST↔IL correspondence with live cross-highlighting, an honest register table, and now a full instruction set that runs on the real device IR. The problems are at the edges.</p>
+  </div>
+  <div class="finding warn">
+    <div class="lbl">Finding · density</div>
+    <h3>The instruction palette just doubled — straight into overwhelm</h3>
+    <p>Adding timers, counters, edges, analog math and PID grew the insert row from ~7 buttons to <b>21</b>. For Dale that's power; for Priya it's a wall she has to decode before she can place a single contact. This is the single most actionable regression from the new work, and it's fixable without removing anything. <b>See the first prototype below.</b></p>
+  </div>
+  <div class="finding warn">
+    <div class="lbl">Finding · wayfinding</div>
+    <h3>"What do I do next?" is invisible — it stumped an expert</h3>
+    <p>The Open → Validate → Connect → Load → Read → RUN sequence exists only as faint status text. RUN refuses with a reason in an easy-to-miss log line. A persistent, stateful workflow rail — with each disabled action explaining itself — serves both personas at once. <b>See the second prototype.</b></p>
+  </div>
+  <div class="finding">
+    <div class="lbl">Finding · scaffolding</div>
+    <h3>Jargon arrives before meaning</h3>
+    <p><code>%IX0</code>, <code>%QW0</code>, <code>ABI v4</code>, "mirror coil" appear with no first-encounter gloss. A one-line plain-language tooltip on first hover (and a dismissible "beginner captions" toggle) would let Priya read the screen without diluting it for Dale.</p>
+  </div>
+  <div class="finding good">
+    <div class="lbl">Keep</div>
+    <h3>The dual-language cross-highlight is the platform's best teaching asset</h3>
+    <p>Hovering a rung element and watching the matching ST / IL light up is exactly how a novice builds the ladder↔text mental model. Protect it; make it more prominent, not less.</p>
+  </div>
+
+  <div class="comp" style="margin-top:28px">
+    <div class="ct"><h3 style="font-size:1.15rem">Circuit Studio</h3><span class="pill fine">Solid</span></div>
+  </div>
+  <div class="finding good">
+    <p style="margin:0"><b>"Three paths → one point map → outputs"</b> is a genuinely good piece of information design: hardwired DI, analog expansion, and Grove sensor on the left; the StamPLC point map as the single meeting point; relays on the right. It teaches the model, not just the pins. Minor: the empty live values (0.00 V) could read as an inviting "connect the twin to see these move" state rather than flat zeros.</p>
+  </div>
+
+  <div class="comp" style="margin-top:22px">
+    <div class="ct"><h3 style="font-size:1.15rem">Flow view</h3><span class="pill fine">Solid</span></div>
+  </div>
+  <div class="finding good">
+    <p style="margin:0">Field → bus → logic → bus → output, with the network plane (HMI/SCADA over Modbus) drawn above the bus plane acting on the <i>same points</i>. This is the "follow the signal" idea made literal, and it's the clearest explanation of the network-vs-bus distinction anywhere in the system. Leave it alone.</p>
+  </div>
+
+  <div class="comp" style="margin-top:22px">
+    <div class="ct"><h3 style="font-size:1.15rem">Protocol Studio (standalone)</h3><span class="pill fine">Solid — the north star</span></div>
+  </div>
+  <div class="finding good">
+    <p style="margin:0">Spacious, staged, modern: the "Follow the signal" hero, the single-line substation diagram, evidence-provenance tiles, a play-sequence. This is what a launched product looks like. <b>It's also the yardstick:</b> the rest of the system should borrow its spacing, hierarchy, and calm — that's the consistency fix below.</p>
+  </div>
+
+  <div class="comp" style="margin-top:22px">
+    <div class="ct"><h3 style="font-size:1.15rem">Logic / bus Analyzer</h3><span class="pill slight">Refine — concrete bugs first</span></div>
+  </div>
+  <div class="finding warn">
+    <p style="margin:.2em 0"><b>Fix the objective bugs before any styling:</b></p>
+    <p style="margin:.2em 0">• the "DEMO · synthetic data" badge overprints the time-axis labels (unreadable);<br>
+    • the decode table's <b>Val</b> column — the most important one — is clipped off the right edge;<br>
+    • Inject / Monitor flyouts cover the decode table, so you attack the bus blind;<br>
+    • colour is load-bearing and colour-only (Start/Addr/Data/Stop, SDA/SCL) — fails WCAG 1.4.1;<br>
+    • the auto-start tour traps pointer events on first load.</p>
+    <p style="margin:.4em 0 0">None of these are redesigns — they're a focused fix list. The analyzer's MITRE ATT&CK-ICS mapping (T0855 / T0830 / D3-PMAD) is rare and excellent; protect it.</p>
+  </div>
+
+  <div class="comp" style="margin-top:22px">
+    <div class="ct"><h3 style="font-size:1.15rem">The system as a whole — wayfinding &amp; consistency</h3><span class="pill slight">Refine</span></div>
+  </div>
+  <div class="finding">
+    <p style="margin:.2em 0">The design <i>maturity</i> is uneven: Protocol Studio is a finished product; Logic Studio is a dense instrument; the Analyzer is a capable prototype with rough edges. Moving between them, a student re-learns the layout each time. Two cheap wins: (1) one shared shell — same header, accent discipline, spacing scale, and a single "you are here" switcher across all tools; (2) a one-screen <b>map of how the tools connect</b> (logic makes the signal → the bus carries it → the analyzer reads it → the threat map explains the attack) as the novice's entry point.</p>
+  </div>
+</section>
+
+<hr>
+
+<section>
+  <div class="section-head">
+    <div class="eyebrow">Prototype 01 · try it</div>
+    <h2>A palette that grows with the student</h2>
+    <p class="muted" style="max-width:64ch">Same 21 instructions, nothing removed — reorganised into meaning-based groups and gated by a skill level that sticks. Switch the level and watch what Priya vs. Dale each sees. This is a working interaction, not a mockup.</p>
+  </div>
+
+  <div class="lab">
+    <div class="lab-head"><span class="dot"></span><span class="lt"><b>INSERT</b> palette · live prototype</span></div>
+    <div class="lab-body">
+      <div class="pal-meta">
+        <div class="seg" role="group" aria-label="Skill level">
+          <button data-lvl="beginner" aria-pressed="true">Beginner</button>
+          <button data-lvl="standard" aria-pressed="false">Standard</button>
+          <button data-lvl="expert" aria-pressed="false">Expert</button>
+        </div>
+        <div class="pal-count"><b id="palShown">5</b> of 21 instructions shown</div>
+      </div>
+      <div id="palGroups"></div>
+      <p class="hint" id="palHint"></p>
+    </div>
+  </div>
+  <p class="muted" style="font-size:.9rem">Beginner shows only the five pieces needed to build a working rung; one <b>Show everything</b> nudge reveals the rest without changing the mode. Standard adds timing, counting, edges and compare. Expert opens analog math and PID. The level is remembered, so Dale sets "Expert" once and never sees the training wheels again — Priya is never faced with PID on day one.</p>
+</section>
+
+<section>
+  <div class="section-head">
+    <div class="eyebrow">Prototype 02 · try it</div>
+    <h2>A workflow rail that answers "what next?" — and "why not?"</h2>
+    <p class="muted" style="max-width:64ch">The same six-step path, made persistent and stateful. The current step is lit, finished steps are checked, and the one primary action per state explains itself when it can't run. Toggle the mode and the controller state to see it react.</p>
+  </div>
+
+  <div class="lab">
+    <div class="lab-head"><span class="dot"></span><span class="lt"><b>WORKFLOW</b> + mode identity · live prototype</span></div>
+    <div class="lab-body">
+      <div class="rail" id="rail"></div>
+
+      <div class="modebar">
+        <span class="muted mono" style="font-size:.72rem;letter-spacing:.06em">MODE</span>
+        <button class="modechip author" data-mode="author" aria-pressed="true">✎ Author</button>
+        <button class="modechip monitor" data-mode="monitor" aria-pressed="false">◉ Monitor</button>
+        <button class="modechip run" data-mode="run" aria-pressed="false">▶ Run</button>
+        <span style="flex:1"></span>
+        <label class="muted" style="font-size:.82rem;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
+          <input type="checkbox" id="connChk"> controller connected
+        </label>
+        <label class="muted" style="font-size:.82rem;display:inline-flex;align-items:center;gap:7px;cursor:pointer">
+          <input type="checkbox" id="loadChk"> application loaded
+        </label>
+      </div>
+
+      <div class="modepanel" id="modePanel"></div>
+    </div>
+  </div>
+  <p class="muted" style="font-size:.9rem">One primary action per state (the colour <i>is</i> the mode — calm blue to author, green to monitor, a deliberate red to run real relays). A disabled action never just greys out; it says the one thing standing in the way. Dale gets his missing RUN button back; Priya always knows the single next move.</p>
+</section>
+
+<hr>
+
+<section>
+  <div class="section-head">
+    <div class="eyebrow">If you do five things</div>
+    <h2>Prioritised</h2>
+  </div>
+  <div id="recs"></div>
+</section>
+
+<footer>
+  <hr style="margin-bottom:22px">
+  <p>Grounded in the live current build (Logic / Circuit / Flow / Protocol views and the standalone Protocol Studio + bus Analyzer), the existing Apple/Pixar design personas and prior O*NET persona walkthroughs, and the instruction-set expansion completed this cycle. The two prototypes are functional and reflect instructions that already run on the device IR.</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ---- theme toggle (per-viewer convenience only) ----
+  var root=document.documentElement, tb=document.getElementById('themeBtn');
+  function sysDark(){return window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches;}
+  try{var saved=localStorage.getItem('ux_theme'); if(saved)root.setAttribute('data-theme',saved);}catch(e){}
+  tb.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme')|| (sysDark()?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    try{localStorage.setItem('ux_theme',next);}catch(e){}
+  });
+
+  // ---- verdict matrix ----
+  var V=[
+    ['Logic Studio','slight','Refine','Strong core; density, wayfinding & jargon scaffolding need work.'],
+    ['Circuit Studio','fine','Solid','"Three paths → point map → outputs" teaches the model well.'],
+    ['Flow view','fine','Solid','"Follow the signal" made literal; network vs bus is clear.'],
+    ['Protocol Studio','fine','Solid','The design north star — spacious, staged, finished.'],
+    ['Logic Analyzer','slight','Refine','Great ATT&CK mapping; fix concrete bugs (overprint, clipping, flyouts).'],
+    ['System / wayfinding','slight','Refine','Uneven maturity across tools; needs one shell + a connection map.']
+  ];
+  var vc=document.getElementById('verdicts');
+  V.forEach(function(r){
+    var d=document.createElement('div');d.className='vcard';
+    d.innerHTML='<div class="vtop"><h3>'+r[0]+'</h3><span class="pill '+r[1]+'">'+r[2]+'</span></div><p>'+r[3]+'</p>';
+    vc.appendChild(d);
+  });
+
+  // ---- Prototype 1: grouped palette ----
+  var GROUPS=[
+    {id:'ess',tag:'ess',name:'Essentials',note:'make a rung',levels:['beginner','standard','expert'],
+     items:[['⊣⊢','NO contact'],['⊣/⊢','NC contact'],['( )','Coil'],['∧','OR branch'],['+','Network']]},
+    {id:'time',tag:'std',name:'Timing & counting',note:'',levels:['standard','expert'],
+     items:[['⏱','TON'],['⏱↓','TOF'],['⊞','CTUD']]},
+    {id:'edge',tag:'std',name:'Edges & latches',note:'',levels:['standard','expert'],
+     items:[['↑','R_TRIG'],['↓','F_TRIG'],['⊣S/R⊢','S/R latch']]},
+    {id:'logic',tag:'std',name:'Logic & compare',note:'',levels:['standard','expert'],
+     items:[['⊕','XOR'],['[>]','CMP']]},
+    {id:'math',tag:'exp',name:'Analog & control',note:'advanced',levels:['expert'],
+     items:[['＋','ADD'],['－','SUB'],['×','MUL'],['÷','DIV'],['→','MOVE'],['⊓','LIMIT'],['⋔','SEL'],['∿','PID']]}
+  ];
+  var TOTAL=GROUPS.reduce(function(n,g){return n+g.items.length;},0);
+  var level='beginner', showAll=false;
+  try{var sl=localStorage.getItem('ux_level'); if(sl){level=sl;}}catch(e){}
+  var palG=document.getElementById('palGroups'),palShown=document.getElementById('palShown'),palHint=document.getElementById('palHint');
+  var segBtns=[].slice.call(document.querySelectorAll('.seg [data-lvl]'));
+
+  function visibleGroups(){
+    if(level==='beginner'&&!showAll) return GROUPS.filter(function(g){return g.id==='ess';});
+    if(showAll) return GROUPS; // beginner + show everything
+    return GROUPS.filter(function(g){return g.levels.indexOf(level)>=0;});
+  }
+  function renderPalette(){
+    segBtns.forEach(function(b){b.setAttribute('aria-pressed', b.dataset.lvl===level?'true':'false');});
+    var groups=visibleGroups(), shown=0;
+    palG.innerHTML='';
+    groups.forEach(function(g){
+      shown+=g.items.length;
+      var open = (g.id==='ess') || (level==='expert') || (level==='standard'&&g.tag==='std');
+      var det=document.createElement('details');det.className='group'; if(open)det.open=true;
+      var adv = g.levels.indexOf('standard')<0; // expert-only group
+      var chips=g.items.map(function(it){
+        return '<span class="chip'+(adv?' adv':'')+'"><span class="gl">'+it[0]+'</span><span class="nm">'+it[1]+'</span></span>';
+      }).join('');
+      det.innerHTML='<summary><span class="gtag '+g.tag+'">'+(g.tag==='ess'?'core':g.tag==='std'?'standard':'advanced')+'</span>'+
+        g.name+(g.note?' <span class="muted" style="font-weight:400;font-size:.82rem">· '+g.note+'</span>':'')+
+        '<span class="chev">›</span></summary><div class="chips">'+chips+'</div>';
+      palG.appendChild(det);
+    });
+    palShown.textContent=shown;
+    // beginner "show everything" nudge
+    if(level==='beginner'){
+      var btn=document.createElement('button');
+      btn.className='modechip'; btn.style.marginTop='6px';
+      btn.textContent = showAll ? '− Show just the essentials' : '+ Show everything (21)';
+      btn.addEventListener('click',function(){showAll=!showAll;renderPalette();});
+      palG.appendChild(btn);
+    }
+    palHint.innerHTML = level==='beginner'
+      ? '<b>Priya’s view.</b> Five pieces, one open group, zero jargon she can’t act on. Everything else is one nudge away — not gone.'
+      : level==='standard'
+      ? '<b>Mid-course.</b> Timing, counting, edges and compare are now in reach, grouped by what they do. Analog &amp; PID stay folded until Expert.'
+      : '<b>Dale’s view.</b> Every group expanded, all 21 instructions at once, no clicks wasted. Set once and it sticks.';
+  }
+  segBtns.forEach(function(b){b.addEventListener('click',function(){
+    level=b.dataset.lvl; showAll=false;
+    try{localStorage.setItem('ux_level',level);}catch(e){}
+    renderPalette();
+  });});
+  renderPalette();
+
+  // ---- Prototype 2: workflow rail + mode ----
+  var STEPS=[
+    ['01','Open project','example or new'],
+    ['02','Validate','logic compiles'],
+    ['03','Connect','USB or twin'],
+    ['04','Load','write to controller'],
+    ['05','Read back','verify what’s installed'],
+    ['06','Run','energise the relays']
+  ];
+  var rail=document.getElementById('rail'),panel=document.getElementById('modePanel');
+  var connChk=document.getElementById('connChk'),loadChk=document.getElementById('loadChk');
+  var mode='author';
+  function currentStep(){
+    // derive progress from the two toggles (project+validate assumed done in this demo)
+    if(!connChk.checked) return 2;      // need to connect (index)
+    if(!loadChk.checked) return 3;      // need to load
+    return 5;                            // ready to run
+  }
+  function renderRail(){
+    var cur=currentStep();
+    rail.innerHTML='';
+    STEPS.forEach(function(s,i){
+      var cls='step';
+      if(i<cur)cls+=' done'; else if(i===cur)cls+=' active'; else cls+=' locked';
+      var mark = i<cur?'✓' : i===cur?'●' : '';
+      var d=document.createElement('div');d.className=cls;
+      d.innerHTML='<span class="sn">'+s[0]+'</span><span class="sl">'+s[1]+'</span><span class="ss">'+s[2]+'</span>'+
+        (mark?'<span class="chk">'+mark+'</span>':'');
+      rail.appendChild(d);
+    });
+  }
+  function renderPanel(){
+    document.querySelectorAll('.modechip[data-mode]').forEach(function(b){
+      b.setAttribute('aria-pressed', b.dataset.mode===mode?'true':'false');
+    });
+    var h,body,action,why,whyOk=false,disabled=false,runBtn=false;
+    if(mode==='author'){
+      h='Author — build the logic';
+      body='A calm blue workspace for editing rungs. The one primary action is to validate and move toward the controller.';
+      action='Validate &amp; continue';
+    } else if(mode==='monitor'){
+      h='Monitor — watch, don’t touch';
+      body='Live values stream in; the editor is read-only so nothing you click changes a real output. Green means observe.';
+      action='Open live register table';
+    } else {
+      h='Run — this throws real relays';
+      runBtn=true;
+      if(!connChk.checked){disabled=true;why='Connect the controller first (USB or twin).';}
+      else if(!loadChk.checked){disabled=true;why='Load your application before running — nothing is installed yet.';}
+      else {why='Loaded ✓ · connected ✓ · ready. Running energises the physical outputs.';whyOk=true;}
+      h='Run — this throws real relays';
+      body='A deliberate red mode: the consequence is physical. Readiness is explicit, not guessed.';
+      action='▶ Start RUN';
+    }
+    panel.innerHTML='<div class="mh">'+h+'</div><p class="muted" style="margin:.2em 0 12px;font-size:.92rem">'+body+'</p>'+
+      '<button class="primary'+(runBtn?' run':'')+'"'+(disabled?' disabled':'')+'>'+action+'</button>'+
+      (why?'<div class="why'+(whyOk?' ok':'')+'">'+why+'</div>':'');
+  }
+  function renderWF(){renderRail();renderPanel();}
+  document.querySelectorAll('.modechip[data-mode]').forEach(function(b){
+    b.addEventListener('click',function(){mode=b.dataset.mode;renderWF();});
+  });
+  connChk.addEventListener('change',renderWF);
+  loadChk.addEventListener('change',renderWF);
+  renderWF();
+
+  // ---- recommendations ----
+  var R=[
+    ['Group &amp; gate the instruction palette','Ship the skill-level palette (Prototype 01). It’s the highest-impact, lowest-risk fix and directly undoes the overwhelm the new instructions introduced.','Low effort · high impact'],
+    ['Make the workflow persistent','Add the stateful rail + one-primary-action-per-mode with self-explaining disabled states (Prototype 02). Fixes the "can’t find RUN" failure for experts and the "what next" gap for novices at the same time.','Medium · high impact'],
+    ['Unify the shell','One header, one accent discipline, one spacing scale across Logic / Circuit / Protocol / Analyzer, with a single "you are here" switcher. Borrow Protocol Studio’s calm.','Medium · compounding'],
+    ['Fix the Analyzer’s objective bugs','Badge overprint, clipped Val column, flyouts covering the table, colour-only legend, click-trapping tour. A fix list, not a redesign — do it before any restyle.','Low · removes blockers'],
+    ['Add beginner captions + a connection map','A dismissible plain-language layer over jargon, and a one-screen "how the tools connect" entry point for first-timers. Off by default so experts never see it.','Low · onboarding']
+  ];
+  var recs=document.getElementById('recs');
+  R.forEach(function(r,i){
+    var d=document.createElement('div');d.className='rec';
+    d.innerHTML='<div class="rn">'+(i+1)+'</div><div class="rb"><h3>'+r[0]+'</h3><p>'+r[1]+'</p><div class="eff">'+r[2]+'</div></div>';
+    recs.appendChild(d);
+  });
+})();
+</script>
