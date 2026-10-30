@@ -28,12 +28,34 @@
  code{color:#ffd166;font-family:ui-monospace,monospace}
  .sensor{display:flex;flex-direction:column;gap:9px}
  .srow{display:flex;align-items:center;justify-content:space-between;gap:12px}
- .sname{font-weight:650}.sdesc{color:#8aa0ba;font-size:12px}
+ .sname{font-weight:650}.sdesc{color:#8aa0ba;font:12px}
  .sval{font:13px/1.4 ui-monospace,monospace;color:#5ff0b0;background:#0e1622;border:1px solid #1e2a38;
        border-radius:9px;padding:9px 11px;word-break:break-all;min-height:38px}
  .sval.na{color:#6b7f99}
+ .sval.spoof{color:#ffce7a;border-color:#6b5320;background:#1c160a}
+ .sval.off{color:#8aa0ba;border-color:#3a2330;background:#180f14}
  .tp{font:11px ui-monospace,monospace;color:#6b7f99}
  .pill{font:10px ui-monospace,monospace;color:#8aa0ba;border:1px solid #28364a;border-radius:999px;padding:2px 7px}
+ .pill.wired{color:#8fd0ff;border-color:#2b4d6b}
+ /* control bar: transmit on/off + override */
+ .ctl{display:none;flex-direction:column;gap:10px;border-top:1px dashed #27384f;padding-top:11px;margin-top:2px}
+ .ctl.show{display:flex}
+ .ctl .line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+ .lab{font:12px ui-monospace,monospace;color:#9fb4cc;min-width:74px}
+ .seg{display:inline-flex;border:1px solid #2a3b57;border-radius:9px;overflow:hidden}
+ .seg button{border-radius:0;padding:7px 13px;font-size:13px;font-weight:650;background:#15202f;color:#9fb4cc}
+ .seg button.sel{background:#1f6f4d;color:#d6ffe9}
+ .seg button.sel.warn{background:#7a5312;color:#ffe3ad}
+ .seg button.sel.danger{background:#7a2130;color:#ffd0d6}
+ input[type=range]{flex:1;min-width:120px;accent-color:#ffce7a}
+ input[type=number]{width:92px;background:#0e1622;border:1px solid #2a3b57;color:#e7eef6;border-radius:8px;padding:7px 9px;font:13px ui-monospace,monospace}
+ .ovhint{font:11px ui-monospace,monospace;color:#6b7f99}
+ .statechip{font:10px/1 ui-monospace,monospace;padding:3px 8px;border-radius:999px;border:1px solid #28364a;color:#8aa0ba}
+ .statechip.live{color:#5ff0b0;border-color:#1f6f4d}
+ .statechip.spoof{color:#ffce7a;border-color:#6b5320}
+ .statechip.off{color:#ff9aa6;border-color:#5a2630}
+ .lead{background:#10233a;border:1px solid #244a6b;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#bcd4ee}
+ .lead b{color:#fff}
 </style>
 </head>
 <body>
@@ -47,11 +69,19 @@
   ones it wants and maps them to <code>%IW</code> input registers.</div>
 </div>
 
+<div class="lead">
+  <b>You are the sensor &mdash; and the attacker.</b> Share a sensor to feed the PLC live.
+  Then use its two controls: <b>Transmit</b> (turn it off and the PLC loses the reading &mdash;
+  an <b>availability</b> attack) and <b>Override</b> (send any value you choose while the plant
+  believes it &mdash; an <b>integrity</b> / false-data-injection attack). Watch what the logic does.
+</div>
+
 <div class="card">
   <button id="go" class="bigbtn">Connect to broker</button>
   <div class="status"><span class="dot" id="bdot"></span><span id="bstat">broker: not connected</span> · <span id="cnt">0 msgs</span></div>
   <div class="note">Client id <code id="cid">—</code>. Each sensor is shared only after you grant its
-  permission below. Topics: <code>phone/&lt;id&gt;/&lt;sensor&gt;</code>.</div>
+  permission below. Topics: <code>phone/&lt;id&gt;/&lt;sensor&gt;</code>. A <span class="pill wired">used by logic</span>
+  tag marks the sensors this PLC maps into its input registers.</div>
 </div>
 
 <!-- phone as PLC I/O: momentary buttons (phone -> %IX) + a PLC-logic-driven background -->
@@ -89,31 +119,103 @@ function pub(topic, obj){
 let lastPub = {};
 function throttled(topic, fn, hz=8){ const now=Date.now(); if(now-(lastPub[topic]||0) > 1000/hz){ lastPub[topic]=now; fn(); } }
 
+// ---- per-sensor control state: transmit on/off + override ----
+const tx = {};      // sid -> transmitting?
+const ov = {};      // sid -> override active?
+const ovv = {};     // sid -> override value (number)
+const liveReal = {};// sid -> last real primary value (for the "real vs spoofed" readout)
+
+// gpub: the gate every sensor publish passes through.
+//   transmit OFF  -> nothing leaves the phone (the PLC ages the point out: availability attack)
+//   override ON   -> the primary field is replaced with the chosen value (integrity / FDI);
+//                    every OTHER byte on the wire looks completely normal.
+function gpub(sid, topic, obj){
+  const S = SMAP[sid];
+  if(S && topic===S.prim && obj && S.key in obj) liveReal[sid] = obj[S.key];
+  if(!tx[sid]) return;                                   // transmission off
+  let out = obj, spoof=false;
+  if(ov[sid] && S && topic===S.prim){ out = Object.assign({}, obj, {[S.key]: ovv[sid]}); spoof=true; }
+  pub(topic, out);
+  if(topic===(S&&S.prim)) paintState(sid, spoof);
+}
+
 // ---- sensor registry: each entry renders a card with its own Share (permission) button ----
+// prim/key/min/max/unit describe the PRIMARY scalar the PLC consumes (what Override drives).
 const SENSORS = [
- { id:'motion', name:'Motion', desc:'accelerometer (m/s²) + gyroscope (°/s)', topics:'accel, gyro', start:startMotion },
- { id:'orient', name:'Orientation', desc:'compass heading α + tilt β,γ (attitude — not the gyro)', topics:'orient', start:startOrientation },
- { id:'geo',    name:'Geolocation', desc:'latitude, longitude, accuracy, speed, heading', topics:'geo', start:startGeo },
- { id:'sound',  name:'Microphone level', desc:'RMS loudness 0–100 (no audio is sent)', topics:'sound', start:startSound },
- { id:'light',  name:'Ambient light', desc:'illuminance in lux (Android Chrome only)', topics:'light', start:startLight },
- { id:'battery',name:'Battery', desc:'charge level % and charging state', topics:'battery', start:startBattery },
+ { id:'motion', name:'Motion', desc:'accelerometer (m/s²) + gyroscope (°/s)', topics:'accel, gyro', start:startMotion,
+   wired:true, prim:'accel', key:'mag', min:0, max:40, step:0.1, unit:'m/s²', maps:'%IW (accel magnitude)' },
+ { id:'orient', name:'Orientation', desc:'compass heading α + tilt β,γ (attitude — not the gyro)', topics:'orient', start:startOrientation,
+   wired:true, prim:'orient', key:'beta', min:-180, max:180, step:1, unit:'° tilt', maps:'%IW (tilt β)' },
+ { id:'light',  name:'Ambient light', desc:'illuminance in lux (Android Chrome only)', topics:'light', start:startLight,
+   wired:true, prim:'light', key:'lux', min:0, max:2000, step:1, unit:'lux', maps:'%IW (light level)' },
+ { id:'sound',  name:'Microphone level', desc:'RMS loudness 0–100 (no audio is sent)', topics:'sound', start:startSound,
+   wired:false, prim:'sound', key:'level', min:0, max:100, step:1, unit:'/100', maps:null },
+ { id:'geo',    name:'Geolocation', desc:'latitude, longitude, accuracy, speed, heading', topics:'geo', start:startGeo,
+   wired:false, prim:null },
+ { id:'battery',name:'Battery', desc:'charge level % and charging state', topics:'battery', start:startBattery,
+   wired:false, prim:null },
 ];
+const SMAP = Object.fromEntries(SENSORS.map(s=>[s.id,s]));
 const host = document.getElementById('sensors');
 for(const s of SENSORS){
   const c = document.createElement('div'); c.className='card sensor'; c.id='card-'+s.id;
+  const canOverride = !!s.prim;
   c.innerHTML = `<div class="srow">
-     <div><div class="sname">${s.name}</div><div class="sdesc">${s.desc}</div></div>
+     <div><div class="sname">${s.name} ${s.wired?'<span class="pill wired">used by logic</span>':''}</div>
+       <div class="sdesc">${s.desc}</div></div>
      <button class="ghost" id="btn-${s.id}" disabled>Share</button></div>
-    <div class="sval na" id="val-${s.id}">connect to the broker first</div>
+    <div class="srow"><div class="sval na" id="val-${s.id}" style="flex:1">connect to the broker first</div>
+       <span class="statechip" id="chip-${s.id}">idle</span></div>
+    <div class="ctl" id="ctl-${s.id}">
+      <div class="line"><span class="lab">Transmit</span>
+        <span class="seg"><button id="tx-on-${s.id}" class="sel">ON</button><button id="tx-off-${s.id}">OFF</button></span>
+        <span class="ovhint">off = the PLC loses this reading (availability)</span></div>
+      ${canOverride?`<div class="line"><span class="lab">Override</span>
+        <span class="seg"><button id="ov-off-${s.id}" class="sel">real</button><button id="ov-on-${s.id}">spoof</button></span>
+        <input type="range" id="ovr-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${((s.min+s.max)/2).toFixed(0)}" disabled>
+        <input type="number" id="ovn-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${((s.min+s.max)/2).toFixed(0)}" disabled>
+        <span class="ovhint">${s.unit}</span></div>
+        <div class="ovhint">Spoof replaces only <code>${s.key}</code> &mdash; every other byte on the wire stays normal (${s.maps||'input'}).</div>`:''}
+    </div>
     <div class="tp">topic phone/…/${s.topics}</div>`;
   host.appendChild(c);
   el('btn-'+s.id).onclick = async () => {
     el('btn-'+s.id).disabled = true; el('btn-'+s.id).textContent = 'Requesting…';
     try { const ok = await s.start(); el('btn-'+s.id).textContent = ok ? 'Sharing' : 'Unavailable';
-          el('btn-'+s.id).className = ok ? 'on' : 'ghost'; if(!ok) setVal(s.id,'not available on this device',false); }
+          el('btn-'+s.id).className = ok ? 'on' : 'ghost';
+          if(ok){ tx[s.id]=true; el('ctl-'+s.id).classList.add('show'); paintState(s.id,false); }
+          else setVal(s.id,'not available on this device',false); }
     catch(e){ el('btn-'+s.id).textContent='Denied'; el('btn-'+s.id).className='ghost'; setVal(s.id,'permission denied',false); }
   };
+  // wire the per-sensor controls
+  wireControls(s);
 }
+function wireControls(s){
+  const sid=s.id;
+  el('tx-on-'+sid).onclick  = ()=>{ tx[sid]=true;  seg('tx',sid,'on');  paintState(sid, ov[sid]); };
+  el('tx-off-'+sid).onclick = ()=>{ tx[sid]=false; seg('tx',sid,'off'); paintState(sid, ov[sid]); };
+  if(!s.prim) return;
+  const r=el('ovr-'+sid), n=el('ovn-'+sid);
+  ovv[sid]=+r.value;
+  const setv=v=>{ ovv[sid]=+v; r.value=v; n.value=v; if(ov[sid]) paintState(sid,true); };
+  r.oninput=()=>setv(r.value); n.oninput=()=>setv(n.value);
+  el('ov-off-'+sid).onclick = ()=>{ ov[sid]=false; seg('ov',sid,'off'); r.disabled=true;  n.disabled=true;  paintState(sid,false); };
+  el('ov-on-'+sid).onclick  = ()=>{ ov[sid]=true;  seg('ov',sid,'on');  r.disabled=false; n.disabled=false; paintState(sid,true); };
+}
+// segmented-control visual state
+function seg(kind,sid,which){
+  if(kind==='tx'){ el('tx-on-'+sid).className = which==='on'?'sel':''; el('tx-off-'+sid).className = which==='off'?'sel danger':''; }
+  else { el('ov-off-'+sid).className = which==='off'?'sel':''; el('ov-on-'+sid).className = which==='on'?'sel warn':''; }
+}
+function paintState(sid, spoof){
+  const chip=el('chip-'+sid), v=el('val-'+sid);
+  if(!tx[sid]){ chip.textContent='OFF — PLC losing it'; chip.className='statechip off'; v.classList.remove('spoof'); v.classList.add('off'); return; }
+  v.classList.remove('off');
+  if(spoof){ chip.textContent='SPOOFED '+fmt(ovv[sid]); chip.className='statechip spoof'; v.classList.add('spoof');
+    const real = liveReal[sid]; v.textContent = `sending ${SMAP[sid].key}=${fmt(ovv[sid])}  (real ≈ ${real==null?'—':fmt(real)})`; return; }
+  chip.textContent='LIVE'; chip.className='statechip live'; v.classList.remove('spoof');
+}
+function fmt(x){ return typeof x==='number' ? (Math.abs(x)>=100?Math.round(x):+x.toFixed(2)) : x; }
 function setVal(id, text, ok=true){ const v=el('val-'+id); v.textContent=text; v.classList.toggle('na',!ok); }
 function enableShares(){ for(const s of SENSORS){ const b=el('btn-'+s.id); b.disabled=false; if(b.textContent==='Share') setVal(s.id,'tap Share to grant permission',false);} }
 
@@ -127,10 +229,10 @@ async function startMotion(){
     const a=e.accelerationIncludingGravity||e.acceleration, r=e.rotationRate;
     if(a && a.x!=null){ got=true;
       const mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
-      setVal('motion', `accel x ${a.x.toFixed(2)} y ${a.y.toFixed(2)} z ${a.z.toFixed(2)} |${mag.toFixed(2)}|\n`+
+      if(!(ov.motion||!tx.motion)) setVal('motion', `accel x ${a.x.toFixed(2)} y ${a.y.toFixed(2)} z ${a.z.toFixed(2)} |${mag.toFixed(2)}|\n`+
         (r&&r.alpha!=null?`gyro  α ${(r.alpha||0).toFixed(1)} β ${(r.beta||0).toFixed(1)} γ ${(r.gamma||0).toFixed(1)} °/s`:'gyro  n/a'));
-      throttled('accel',()=>pub('accel',{x:+a.x.toFixed(3),y:+a.y.toFixed(3),z:+a.z.toFixed(3),mag:+mag.toFixed(3)}));
-      if(r&&r.alpha!=null) throttled('gyro',()=>pub('gyro',{alpha:+(r.alpha||0).toFixed(2),beta:+(r.beta||0).toFixed(2),gamma:+(r.gamma||0).toFixed(2)}));
+      throttled('accel',()=>gpub('motion','accel',{x:+a.x.toFixed(3),y:+a.y.toFixed(3),z:+a.z.toFixed(3),mag:+mag.toFixed(3)}));
+      if(r&&r.alpha!=null) throttled('gyro',()=>gpub('motion','gyro',{alpha:+(r.alpha||0).toFixed(2),beta:+(r.beta||0).toFixed(2),gamma:+(r.gamma||0).toFixed(2)}));
     }
   });
   setTimeout(()=>{ if(!got) setVal('motion','no motion events (sensor may be blocked)',false); }, 2500);
@@ -140,8 +242,8 @@ async function startOrientation(){
   if(!(await iosPerm(window.DeviceOrientationEvent))) return false;
   window.addEventListener('deviceorientation', e=>{
     if(e.alpha==null && e.beta==null) return;
-    setVal('orient', `compass α ${(e.alpha||0).toFixed(1)}°   tilt β ${(e.beta||0).toFixed(1)}° γ ${(e.gamma||0).toFixed(1)}°`);
-    throttled('orient',()=>pub('orient',{alpha:+(e.alpha||0).toFixed(2),beta:+(e.beta||0).toFixed(2),gamma:+(e.gamma||0).toFixed(2)}));
+    if(!(ov.orient||!tx.orient)) setVal('orient', `compass α ${(e.alpha||0).toFixed(1)}°   tilt β ${(e.beta||0).toFixed(1)}° γ ${(e.gamma||0).toFixed(1)}°`);
+    throttled('orient',()=>gpub('orient','orient',{alpha:+(e.alpha||0).toFixed(2),beta:+(e.beta||0).toFixed(2),gamma:+(e.gamma||0).toFixed(2)}));
   });
   return true;
 }
@@ -150,8 +252,8 @@ function startGeo(){
     if(!navigator.geolocation) return res(false);
     navigator.geolocation.watchPosition(p=>{
       const c=p.coords;
-      setVal('geo', `lat ${c.latitude.toFixed(5)}  lon ${c.longitude.toFixed(5)}\nacc ${Math.round(c.accuracy)} m  spd ${c.speed==null?'—':c.speed.toFixed(1)} m/s  hdg ${c.heading==null?'—':Math.round(c.heading)+'°'}`);
-      throttled('geo',()=>pub('geo',{lat:+c.latitude.toFixed(6),lon:+c.longitude.toFixed(6),acc:+c.accuracy.toFixed(1),alt:c.altitude,spd:c.speed,hdg:c.heading}),2);
+      if(tx.geo) setVal('geo', `lat ${c.latitude.toFixed(5)}  lon ${c.longitude.toFixed(5)}\nacc ${Math.round(c.accuracy)} m  spd ${c.speed==null?'—':c.speed.toFixed(1)} m/s  hdg ${c.heading==null?'—':Math.round(c.heading)+'°'}`);
+      throttled('geo',()=>gpub('geo','geo',{lat:+c.latitude.toFixed(6),lon:+c.longitude.toFixed(6),acc:+c.accuracy.toFixed(1),alt:c.altitude,spd:c.speed,hdg:c.heading}),2);
       res(true);
     }, err=>{ setVal('geo','permission denied / unavailable',false); res(false); }, {enableHighAccuracy:true, maximumAge:1000});
   });
@@ -166,27 +268,27 @@ async function startSound(){
     an.getByteTimeDomainData(buf);
     let sum=0; for(const v of buf){ const d=(v-128)/128; sum+=d*d; }
     const level = Math.min(100, Math.round(Math.sqrt(sum/buf.length)*300));
-    setVal('sound', `level ${level} / 100  ${'█'.repeat(Math.round(level/5))}`);
-    throttled('sound',()=>pub('sound',{level}),6);
+    if(!(ov.sound||!tx.sound)) setVal('sound', `level ${level} / 100  ${'█'.repeat(Math.round(level/5))}`);
+    throttled('sound',()=>gpub('sound','sound',{level}),6);
     requestAnimationFrame(tick);
   }
   tick(); return true;
 }
 async function startLight(){
   if(!('AmbientLightSensor' in window)) {
-    window.addEventListener('devicelight', e=>{ setVal('light', e.value.toFixed(0)+' lux'); throttled('light',()=>pub('light',{lux:+e.value.toFixed(1)})); });
+    window.addEventListener('devicelight', e=>{ if(!(ov.light||!tx.light)) setVal('light', e.value.toFixed(0)+' lux'); throttled('light',()=>gpub('light','light',{lux:+e.value.toFixed(1)})); });
     return false; // Generic Sensor not present; iOS has no web light sensor
   }
   const als = new AmbientLightSensor({frequency:5});
-  als.addEventListener('reading',()=>{ setVal('light', als.illuminance.toFixed(0)+' lux'); throttled('light',()=>pub('light',{lux:+als.illuminance.toFixed(1)})); });
+  als.addEventListener('reading',()=>{ if(!(ov.light||!tx.light)) setVal('light', als.illuminance.toFixed(0)+' lux'); throttled('light',()=>gpub('light','light',{lux:+als.illuminance.toFixed(1)})); });
   als.addEventListener('error',()=> setVal('light','sensor blocked',false));
   als.start(); return true;
 }
 async function startBattery(){
   if(!navigator.getBattery) return false;
   const b = await navigator.getBattery();
-  const upd=()=>{ setVal('battery', `${Math.round(b.level*100)} %  ${b.charging?'charging':'on battery'}`);
-    pub('battery',{level:Math.round(b.level*100),charging:b.charging}); };
+  const upd=()=>{ if(tx.battery) setVal('battery', `${Math.round(b.level*100)} %  ${b.charging?'charging':'on battery'}`);
+    gpub('battery','battery',{level:Math.round(b.level*100),charging:b.charging}); };
   b.addEventListener('levelchange',upd); b.addEventListener('chargingchange',upd); upd(); return true;
 }
 
