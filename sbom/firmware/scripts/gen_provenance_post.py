@@ -12,9 +12,11 @@ import sys
 
 Import("env")  # noqa: F821  (PlatformIO/SCons injects this)
 
-# repo layout: this file is sbom/firmware/scripts/ -> repo root is parents[3]
-HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+# PlatformIO executes extra scripts without a module-level __file__, so derive the
+# repo root from the build environment instead of __file__ (using __file__ here
+# raises NameError and FAILS the whole build). PROJECT_DIR is sbom/firmware; the
+# repo root is two levels up.
+REPO = os.path.abspath(os.path.join(env.subst("$PROJECT_DIR"), "..", ".."))  # noqa: F821
 GEN = os.path.join(REPO, "tools", "gen-provenance-map.py")
 
 
