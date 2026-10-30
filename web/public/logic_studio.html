@@ -526,6 +526,7 @@ body.hero-collapsed #heroStrip{display:flex}
       <button class="btn" id="bProject">Project ▾</button>
       <button class="btn" data-tbd-help="registers">? Registers help</button>
       <button class="btn" id="bRegisters">Register table</button>
+      <button class="btn" id="bNetCfg" title="Configure the device network: W5500 Ethernet (if present) + WiFi (STA/setup-AP), static or DHCP">⚙ Network</button>
       <button class="btn" id="bSensors">Grove devices</button>
       <button class="btn" id="bBench" title="Pick a simple test circuit and drive it on the running firmware">⚡ Test bench</button>
       <button class="btn" id="bConnect">Connect USB</button>
@@ -4264,7 +4265,7 @@ function onLine(line){
 }
 async function send(t,busOwner=false){
   if(busBusy&&!busOwner){log('Diagnostic capture owns this console; other commands wait.','rx');return false;}
-  if(MODE==='online'&&!['pjson','status','project json','execution json','proto json','logs status','devices status','devices samples','portc status','bindings json'].includes(t)&&!/^logs read [1-9][0-9]{0,15}$/.test(t)&&!/^screen (request|(?:manifest|cancel) [0-9a-f]{32} [0-9a-f]{16}|read [0-9a-f]{32} [0-9a-f]{16} [0-9]{1,5} [0-9]{1,3})$/.test(t)){log('Monitor is read-only; no controller change sent.','er');return false;}
+  if(MODE==='online'&&!['pjson','status','project json','execution json','proto json','netcfg json','logs status','devices status','devices samples','portc status','bindings json'].includes(t)&&!/^logs read [1-9][0-9]{0,15}$/.test(t)&&!/^screen (request|(?:manifest|cancel) [0-9a-f]{32} [0-9a-f]{16}|read [0-9a-f]{32} [0-9a-f]{16} [0-9]{1,5} [0-9]{1,3})$/.test(t)){log('Monitor is read-only; no controller change sent.','er');return false;}
   if(!conn||(!writer&&!wsSock)){log('Not connected.','er');return false;}
   try{ if(wsSock){wsSock.send(t+'\n');} else {await writer.write(strBytes(t+'\n'));} if(!t.startsWith('pjson')&&!t.startsWith('screen read '))log('» '+t.slice(0,58)+(t.length>58?'…':''),'tx');return true;}
   catch(e){log('write failed: '+e.message,'er');await disconnect();return false;}
@@ -4444,6 +4445,57 @@ document.getElementById('bProjectModules').onclick=openProjectModules;
 document.getElementById('bReadProject').onclick=()=>readProjectIdentity().catch(e=>log('Readback unavailable: '+e.message,'er'));
 document.getElementById('bExportProjectReadback').onclick=()=>{if(lastProjectEvidence)downloadText((lastProjectEvidence.readback.project_id||'unconfigured')+'-readback.json',JSON.stringify(lastProjectEvidence,null,2),'application/json');};
 document.getElementById('bRegisters').onclick=openRegisterTable;
+function openNetConfig(){
+  showModal(`<h3>Network configuration</h3><div class="body">
+    <p style="font-size:12.5px;color:var(--ink2)">Per-interface addressing. The W5500 Ethernet is configurable only when present; WiFi is always available. Addressing changes apply on the next reboot.</p>
+    <p id="ncStatus" style="font-size:12px;color:var(--ink2)">Reading current device config…</p>
+    <fieldset id="ncEth" style="border:1px solid var(--line);border-radius:8px;margin:10px 0;padding:10px"><legend style="color:var(--violet);padding:0 6px">Ethernet (W5500) <span id="ncEthP" style="color:var(--muted);font-size:11px"></span></legend>
+      <label>Addressing</label><select id="ncEthMode" style="width:100%"><option value="dhcp">DHCP</option><option value="static">Static</option></select>
+      <div id="ncEthStatic"><div class="row" style="gap:8px"><div style="flex:1"><label>IP</label><input id="ncEthIp" style="width:100%"></div><div style="flex:1"><label>Gateway</label><input id="ncEthGw" style="width:100%"></div></div><label>Subnet mask</label><input id="ncEthMask" style="width:100%"></div>
+    </fieldset>
+    <fieldset style="border:1px solid var(--line);border-radius:8px;margin:10px 0;padding:10px"><legend style="color:var(--violet);padding:0 6px">WiFi</legend>
+      <label>Mode</label><select id="ncWMode" style="width:100%"><option value="off">Off (contained)</option><option value="sta">STA — join a network</option><option value="ap">AP — setup / provisioning</option></select>
+      <div id="ncSta"><label>SSID</label><input id="ncSsid" style="width:100%"><label>Password</label><input id="ncPass" type="password" placeholder="(leave blank to keep)" style="width:100%"><label>Addressing</label><select id="ncWAddr" style="width:100%"><option value="dhcp">DHCP</option><option value="static">Static</option></select><div id="ncWStatic"><div class="row" style="gap:8px"><div style="flex:1"><label>IP</label><input id="ncWIp" style="width:100%"></div><div style="flex:1"><label>Gateway</label><input id="ncWGw" style="width:100%"></div></div><label>Subnet mask</label><input id="ncWMask" style="width:100%"></div></div>
+      <div id="ncAp" style="font-size:12px;color:var(--ink2)">AP broadcasts <b id="ncApName"></b> (default pass <code>stamplc-setup</code>) — connect and browse <code>http://192.168.4.1:8080/setup</code>.</div>
+    </fieldset>
+    <p id="ncMsg" style="font-size:12px;color:var(--ink2)"></p>
+    <div class="row"><button class="btn pri" id="ncApply">Save to device</button><button class="btn" id="ncReload">Re-read</button><button class="btn" onclick="closeModal()">Close</button></div>
+  </div>`);
+  const g=id=>document.getElementById(id); let ethPresent=false;
+  const tgl=()=>{ g('ncEthStatic').style.display=g('ncEthMode').value==='static'?'':'none'; g('ncSta').style.display=g('ncWMode').value==='sta'?'':'none'; g('ncAp').style.display=g('ncWMode').value==='ap'?'':'none'; g('ncWStatic').style.display=(g('ncWMode').value==='sta'&&g('ncWAddr').value==='static')?'':'none'; };
+  g('ncEthMode').onchange=tgl; g('ncWMode').onchange=tgl; g('ncWAddr').onchange=tgl;
+  async function load(){
+    if(!conn){g('ncStatus').textContent='Not connected — press Connect USB (physical board) or Connect twin first, then Re-read.';return;}
+    try{
+      const line=await busCommand('netcfg json',l=>{l=l.trim();return l.startsWith('{')&&l.includes('"eth"')&&l.includes('"wifi"');});
+      const c=JSON.parse(line.trim());
+      ethPresent=!!c.eth.present;
+      g('ncEthP').textContent=ethPresent?('present · link '+c.eth.link):'not present (section disabled)';
+      g('ncEth').style.opacity=ethPresent?'1':'.5'; g('ncEthMode').disabled=g('ncEthIp').disabled=g('ncEthGw').disabled=g('ncEthMask').disabled=!ethPresent;
+      g('ncEthMode').value=c.eth.mode; g('ncEthIp').value=c.eth.ip; g('ncEthGw').value=c.eth.gw; g('ncEthMask').value=c.eth.mask;
+      g('ncWMode').value=c.wifi.mode; g('ncSsid').value=c.wifi.ssid; g('ncWAddr').value=c.wifi.addr;
+      g('ncWIp').value=c.wifi.ip; g('ncWGw').value=c.wifi.gw; g('ncWMask').value=c.wifi.mask; g('ncApName').textContent=c.wifi.ap_ssid;
+      g('ncStatus').textContent='Live device config. Edit and Save to device, then reboot to apply.'; tgl();
+    }catch(e){ g('ncStatus').textContent='Read failed: '+e.message+' (is the device connected?)'; }
+  }
+  g('ncReload').onclick=load;
+  g('ncApply').onclick=async()=>{
+    if(!conn){g('ncMsg').textContent='Not connected.';return;}
+    const cmds=[];
+    if(ethPresent) cmds.push(g('ncEthMode').value==='static' ? ('netcfg eth static '+g('ncEthIp').value.trim()+' '+g('ncEthGw').value.trim()+' '+g('ncEthMask').value.trim()) : 'netcfg eth dhcp');
+    const wm=g('ncWMode').value;
+    if(wm==='off') cmds.push('netcfg wifi off');
+    else if(wm==='ap') cmds.push('netcfg wifi ap');
+    else { cmds.push('netcfg wifi sta '+g('ncSsid').value.trim()+(g('ncPass').value?(' '+g('ncPass').value):'')); cmds.push(g('ncWAddr').value==='static' ? ('netcfg wifi static '+g('ncWIp').value.trim()+' '+g('ncWGw').value.trim()+' '+g('ncWMask').value.trim()) : 'netcfg wifi dhcp'); }
+    cmds.push('netcfg save');
+    g('ncMsg').textContent='Applying…';
+    for(const c of cmds){ if(!rawSend(c)){g('ncMsg').textContent='Send failed — connection lost.';return;} await new Promise(r=>setTimeout(r,200)); }
+    g('ncMsg').textContent='Saved to device ('+cmds.length+' commands). Reboot the StampLC to apply addressing changes.';
+    log('Network config written to device; reboot to apply.','ok');
+  };
+  load();
+}
+document.getElementById('bNetCfg').onclick=openNetConfig;
 document.getElementById('bSensors').onclick=openSensors;
 document.getElementById('bBench').onclick=openTestBench;
 document.getElementById('bSFC').onclick=openSFC;
