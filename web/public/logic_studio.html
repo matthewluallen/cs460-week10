@@ -2771,104 +2771,6 @@ function openCoilEditor(n){
 }
 function openPrompt(t,val,after){showModal(`<h3>${t}</h3><div class="body"><div class="field"><input id="pv" value="${(val||'').replace(/"/g,'&quot;')}"></div><div class="row"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" id="mOk">OK</button></div></div>`);const inp=modalInner.querySelector('#pv');inp.focus();inp.select();const go=()=>{after(inp.value);closeModal();};modalInner.querySelector('#mOk').onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go();};}
 
-/* ===== genuine target build workflow ===== */
-function openCompile(){
-  if(PROJECT){log('The experimental generated OpenPLC firmware path does not admit project-v1 mappings or module settings. Use Application artifact for the generic runtime.','er');return;}
-  if(stDraftState?.dirty){log('Apply or save and replace the ST draft before building.','er');return;}
-  const snapshot=JSON.parse(JSON.stringify(PROG));
-  showModal(`<h3>Build controller program</h3><div class="body">
-    <p>Genuine OpenPLC · M5StamPLC firmware · 20 ms task</p>
-    <p>Build the applied ladder and its equivalent Structured Text. Inputs IX0–7 and base relays QX0–3 use the controller I/O image; MX bits remain internal program state.</p>
-    <div class="field"><label for="buildAnalog">IW0 source (if used)</label><select id="buildAnalog"><option value="">Not bound</option><option value="board-temperature-celsius-x10">Board temperature · tenths of °C</option></select></div>
-    <p>IW1–3 use the controller’s configured Grove or network process sources. Read the configuration, then explicitly include it in this build.</p>
-    <button class="btn" id="buildReadBindings">Read controller bindings</button><label><input type="checkbox" id="buildUseBindings"> Use these process bindings</label><div id="buildBindingsSummary" style="overflow-wrap:anywhere">No controller configuration selected.</div>
-    <p id="buildStatus" role="status">Checking classroom build service…</p>
-    <details id="buildIdentity" hidden><summary>Build identity and acceptance</summary><pre id="buildReceipt" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
-    <div class="row"><button class="btn" id="buildPrevious" style="display:none">Previous build</button><button class="btn" id="legacyCompile">Legacy VM details</button><button class="btn pri" id="buildSubmit" disabled>Build firmware</button><button class="btn" onclick="closeModal()">Close</button></div>
-    <p>Building does not install firmware. QEMU, physical-controller and release checks remain separate.</p></div>`);
-  const status=modalInner.querySelector('#buildStatus'),button=modalInner.querySelector('#buildSubmit'),binding=modalInner.querySelector('#buildAnalog');
-  let selectedBindings=null,selectedEpoch=null;
-  const readBindingButton=document.getElementById('buildReadBindings'),useBindings=document.getElementById('buildUseBindings'),bindingSummary=document.getElementById('buildBindingsSummary');
-  readBindingButton.disabled=!conn;
-  readBindingButton.onclick=async()=>{
-    selectedBindings=null;selectedEpoch=null;useBindings.checked=false;readBindingButton.disabled=true;
-    try{const result=await readProcessBindings();selectedBindings=result;selectedEpoch=busEpoch;
-      bindingSummary.replaceChildren();
-      for(const row of StudioBindings.readings(result,performance.now()-processBindingsAt)){const p=document.createElement('p');p.textContent='IW'+row.iw+' · '+row.label+' · '+row.unit+' · '+row.scale+' raw units per unit (configuration snapshot)';bindingSummary.appendChild(p);}
-    }catch(e){bindingSummary.textContent=e.message;}finally{readBindingButton.disabled=!conn;}
-  };
-  modalInner.querySelector('#legacyCompile').onclick=openLegacyCompile;
-  async function api(path,options){const r=await fetch(path,{cache:'no-store',...options});const data=await r.json();if(!r.ok)throw Error(data.error||'Build service unavailable');return data;}
-  let followEpoch=0;let recovered=null;const previous=modalInner.querySelector('#buildPrevious');
-  previous.onclick=()=>{if(recovered){previous.disabled=true;button.disabled=true;binding.disabled=true;binding.parentElement.style.display='none';binding.parentElement.nextElementSibling.style.display='none';modalInner.querySelector('h3').textContent='Previous build · may differ from current ladder';follow(recovered);}};
-  async function follow(job,epoch=++followEpoch){
-    if(!status.isConnected||epoch!==followEpoch)return;
-    status.textContent=job.status==='built'?'Firmware built. It has not been installed or device-tested.':job.status==='failed'?(job.error||'Build failed.'): 'Build '+job.status+'…';
-    document.getElementById('buildReceipt').textContent=JSON.stringify(job,null,2);document.getElementById('buildIdentity').hidden=false;
-    if(['built','failed'].includes(job.status))return;
-    setTimeout(async()=>{if(!status.isConnected||epoch!==followEpoch)return;try{await follow(await api('/api/logic/builds/'+encodeURIComponent(job.id)),epoch);}catch(e){if(status.isConnected&&epoch===followEpoch)status.textContent=e.message+' · build may still be running; reopen this panel to recover it.';}},1000);
-  }
-  api('/api/logic/builds').then(data=>{if(status.isConnected){status.textContent='Ready to build this applied program.';button.disabled=false;if(data.jobs?.length){recovered=data.jobs[data.jobs.length-1];previous.style.display="";}}}).catch(e=>{if(status.isConnected)status.textContent=e.message;});
-  button.onclick=async()=>{
-    button.disabled=true;binding.disabled=true;previous.disabled=true;status.textContent='Submitting program…';
-    ++followEpoch;let submitted=false;
-    try{
-
-      const preview=window.StudioST.exportStructuredText(snapshot,{scanMs:20});
-      if(preview.scanMs!==20)throw Error('This target requires a 20 ms task. Update the project task period first.');
-      const analog=preview.bindings.filter(v=>v.io==='IW');
-      const selected=useBindings.checked&&conn&&selectedEpoch===busEpoch?selectedBindings:null;
-      const analogBindings=StudioBindings.buildBindings(analog.map(v=>v.idx),binding.value,selected);
-      submitted=true;readBindingButton.disabled=true;useBindings.disabled=true;
-      let job=await api('/api/logic/builds',{method:'POST',headers:{'Content-Type':'application/json','X-Build-Request':crypto.randomUUID()},body:JSON.stringify({target:'m5stamplc-openplc-generated-v1',project:snapshot,analogBindings})});
-      await follow(job);
-    }catch(e){if(status.isConnected){status.textContent=e.message+(submitted?' · close and reopen this panel to inspect previous builds before retrying.':'');binding.disabled=false;if(!submitted){button.disabled=false;previous.disabled=false;}}}
-  };
-}
-
-/* ===== compile modal ===== */
-function openLegacyCompile(){
-  const {code}=compile(),json=irJson(),crc=crc32(strBytes(json)).toString(16).padStart(8,'0'),frame=`PLCLOAD ${crc} ${btoa(json)}`;
-  const bc=code.map((c,i)=>`${String(i).padStart(2)}  ${opName(c[0]).padEnd(7)} ${c.slice(1).join(' ')}`).join('\n');
-  showModal(`<h3>Compiled program</h3><div class="body"><p style="margin:0 0 8px;color:var(--ink2)">${code.length} instructions · ${PROG.nets.length} networks</p>
-    <label style="font-size:12px;font-weight:600">Custom VM bytecode · not the genuine OpenPLC firmware target</label><pre>${bc}</pre>
-    <p>Compiled from the applied ladder; excludes unapplied ST drafts. Controller target and execution must be verified separately.</p><details><summary>Engineering check · program admission</summary><p>Confirm the intended controller, authority, program origin/integrity, bindings and readback before operation. CRC checks transmission errors; it does not authenticate the program. Preserve recovery and an independent physical limit.</p><p>Illustrative references, not detected findings: <a href="https://cwe.mitre.org/data/definitions/306.html" target="_blank" rel="noopener">CWE-306 · missing authentication for a critical function</a>; <a href="https://cwe.mitre.org/data/definitions/494.html" target="_blank" rel="noopener">CWE-494 · code download without integrity verification</a>. Both are organized under View 1358. These checks are requirements, not a claim that this loader enforces them.</p></details><label style="font-size:12px;font-weight:600">PLCLOAD frame — paste into the plc&gt; console if not downloading over USB</label><pre id="frame">${frame}</pre>
-    <div class="row"><button class="btn" id="mCopy">Copy frame</button><button class="btn pri" onclick="closeModal()">Close</button></div></div>`);
-  modalInner.querySelector('#mCopy').onclick=()=>{navigator.clipboard.writeText(frame);modalInner.querySelector('#mCopy').textContent='Copied ✓';};
-}
-const opName=op=>Object.keys(OP).find(k=>OP[k]===op)||('?'+op);
-
-/* ===== Project: PLCopen XML export + native save/load (LS-13) ===== */
-const stPlain=()=>genST().replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
-function collectVars(){const vars=[],seen=new Set();
-  const add=(io,idx)=>{const k=io+idx;if(seen.has(k))return;seen.add(k);vars.push({name:stIdent(io,idx),io,idx,type:io==='IW'?'INT':'BOOL',addr:io==='MX'?null:({IX:'%IX',QX:'%QX',IW:'%IW'}[io]+idx)});};
-  PROG.nets.forEach(n=>{add(n.coil.io,n.coil.idx);const w=nd=>{if(!nd)return;if(nd.t==='c')add(nd.io,nd.idx);if(nd.t==='cmp')add('IW',nd.idx);if(nd.kids)nd.kids.forEach(w);if(nd.in)w(nd.in);};w(n.expr);});
-  return vars;}
-function genPLCopenXML(){
-  if(PROG.startup)throw Error('PLCopen XML export does not support the Studio startup declaration. Save the complete .csco project or its Studio ST draft.');
-  const vars=collectVars(),now=new Date().toISOString().replace(/\.\d+Z$/,'');
-  const io=vars.filter(v=>v.addr),mem=vars.filter(v=>!v.addr);
-  const vd=v=>`        <variable name="${v.name}"${v.addr?` address="${v.addr}"`:''}><type><${v.type}/></type></variable>`;
-  const body=stPlain().split('\n').map(l=>l===''?'':escapeHtml(l)).join('\n');
-  return `<?xml version="1.0" encoding="utf-8"?>
-<project xmlns="http://www.plcopen.org/xml/tc6_0201">
-  <fileHeader companyName="TBD" productName="Logic Studio" productVersion="1" creationDateTime="${now}"/>
-  <contentHeader name="TBD Program"><coordinateInfo><fbd><scaling x="1" y="1"/></fbd><ld><scaling x="1" y="1"/></ld><sfc><scaling x="1" y="1"/></sfc></coordinateInfo></contentHeader>
-  <types><dataTypes/><pous>
-    <pou name="main" pouType="program"><interface>
-      <externalVars>
-${io.map(vd).join('\n')}
-      </externalVars>
-      <localVars>
-${mem.map(vd).join('\n')||'        <!-- no memory bits -->'}
-      </localVars>
-    </interface><body><ST><xhtml xmlns="http://www.w3.org/1999/xhtml">
-${body}
-</xhtml></ST></body></pou>
-  </pous></types>
-  <instances><configurations/></instances>
-</project>`;
-}
 function downloadText(name,text,mime){try{const b=new Blob([text],{type:mime||'text/plain'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);log('downloaded '+name,'rx');}catch(e){log('download blocked in this preview — use Copy instead, or open the standalone page','er');}}
 function adoptProject(project,{migrated=false}={}){
   const next=StudioProject.validateProject(project); // Validate before changing any current state.
@@ -3497,10 +3399,6 @@ function openTestBench(){
     benchRefresh(); },500);
 }
 function openSensors(){openProjectModules();}
-function openLegacySensors(){
- showModal(`<h3>Grove devices</h3><div class="body"><p>Controller-reported devices and supported readings. Grove can connect sensors, relays, displays, inputs and communications modules. Discovery does not mean a driver or control operation is supported. Refresh reads cached inventory and samples; it does not scan, change bindings or operate outputs.</p><button class="btn" id="readSensors">Read devices</button> <button class="btn" onclick="openAssignment()">Use a sensor in logic</button><button class="btn" data-tbd-help="ncir-temperature">About NCIR temperatures</button><div id="sensorReadings"></div><details><summary>Using readings in logic</summary><p>Observed sensors are not automatically assigned to %IW. A verified binding must name the route, measurement, units and invalid-input behavior. The generic runtime uses the sources explicitly selected for each IW in your project. Choose “Use a sensor in logic” to inspect module requirements and stage a supported measurement in the project. Load the complete application to apply it.</p><p>Calibration is provisional. SGP30 CO₂ is an estimate without humidity compensation or restored baseline. MAX30100 values are raw optical counts, not heart rate or oxygen saturation. Displayed sample age conservatively includes the full request round trip.</p></details><div class="row"><button class="btn" onclick="closeModal()">Close</button></div></div>`);
- document.getElementById('readSensors').onclick=readSensors;renderSensors();
-}
 /* Explicit assignment; refresh never writes or changes controller mode. */
 function openAssignment(){openProjectModules();}
 
