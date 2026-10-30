@@ -1002,7 +1002,7 @@ body.hero-collapsed #heroStrip{display:flex}
   let netTimer=null;
   function startPoll(){ if(pollTimer)return; pollTimer=setInterval(()=>{ if((typeof conn!=='undefined')&&conn){try{rawSend('io');}catch(e){}} },600);
     // light the network lane: a real Modbus heartbeat read over :502 via the bridge (no-op over USB)
-    if(!netTimer)netTimer=setInterval(()=>{ fetch('/modbus?fc=3&addr=25&count=1',{cache:'no-store'}).then(r=>r.json()).then(j=>{if(j&&j.ok)window.__netPulse=performance.now();}).catch(()=>{}); },1300); }
+    if(!netTimer){let netFails=0;netTimer=setInterval(()=>{ if(document.hidden)return; fetch('/modbus?fc=3&addr=25&count=1',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject(0)).then(j=>{netFails=0;if(j&&j.ok)window.__netPulse=performance.now();}).catch(()=>{ if(++netFails>=5&&netTimer){clearInterval(netTimer);netTimer=null;} }); },1300);} }
   function stopPoll(){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;} if(netTimer){clearInterval(netTimer);netTimer=null;} }
   function clearOurForces(){ Object.keys(forcedByFlow).forEach(i=>{ if(forcedByFlow[i]&&(typeof conn!=='undefined')&&conn){try{rawSend('force IX'+i+' 0');}catch(e){}} forcedByFlow[i]=false; }); }
 
@@ -3424,7 +3424,7 @@ async function readSensors(){
  }catch(e){sensorSamples=null;sensorMessage='Sensor read unavailable: '+e.message;}
  finally{busBusy=false;renderSensors();if(wasMonitoring&&conn&&epoch===busEpoch)toggleMonitor();}
 }
-setInterval(()=>{renderSensors();renderDeviceAssembly();renderDeviceScreen();if(processBindings){renderRegisterTable();for(const line of document.querySelectorAll('[data-binding-iw]')){const row=StudioBindings.readings(processBindings,performance.now()-processBindingsAt).find(r=>r.iw===Number(line.dataset.bindingIw));if(row)line.textContent=bindingValueText(row);}}},500);
+setInterval(()=>{if(document.hidden)return;renderSensors();renderDeviceAssembly();renderDeviceScreen();if(processBindings){renderRegisterTable();for(const line of document.querySelectorAll('[data-binding-iw]')){const row=StudioBindings.readings(processBindings,performance.now()-processBindingsAt).find(r=>r.iw===Number(line.dataset.bindingIw));if(row)line.textContent=bindingValueText(row);}}},500);
 
 /* ===== protocols panel (LS-17) — full TBD catalog, live state from `proto json` ===== */
 const PROTO_CATALOG=[
@@ -4240,7 +4240,7 @@ function toggleMonitor(){
   log('Read-only monitoring. Received values do not establish the loaded program, source acquisition time, or physical contact feedback.','ok');renderControllerStatus();
 }
 let priorFresh=false;
-setInterval(()=>{const fresh=sampleFresh();renderControllerStatus();renderProjectModuleRows();renderProtocolStates();try{reconcileLiveBus();}catch(e){}if(fresh!==priorFresh){priorFresh=fresh;renderRegs();renderLadder(MODE==='online'?monitorLive:null);renderRegisterTable();}},500);
+setInterval(()=>{if(document.hidden)return;const fresh=sampleFresh();renderControllerStatus();renderProjectModuleRows();renderProtocolStates();try{reconcileLiveBus();}catch(e){}if(fresh!==priorFresh){priorFresh=fresh;renderRegs();renderLadder(MODE==='online'?monitorLive:null);renderRegisterTable();}},500);
 
 /* ===== Read-only register inspector: live replies or an explicit recording ===== */
 let registerCapture=null;
