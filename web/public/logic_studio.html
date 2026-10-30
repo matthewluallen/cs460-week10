@@ -80,17 +80,22 @@ button:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--accent);ou
 #palette .pgrp{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);align-self:center;margin:0 1px 0 7px;white-space:nowrap;opacity:.85}
 #palette .pgrp:first-of-type{margin-left:2px}
 #palette [data-grp][hidden]{display:none!important}
-main{display:flex;flex:1;min-height:0}
+main{display:flex;flex:1;min-height:0;--fg-ladder:1.4;--fg-stl:.95;--w-regs:250px}
 .col{display:flex;flex-direction:column;min-width:0;min-height:0}
-.col.ladder{flex:1.4;border-right:1px solid var(--line)}
-.col.stl{flex:.95;border-right:1px solid var(--line)}
-.col.regs{flex:0 0 250px;background:var(--panel)}
+.col.ladder{flex:var(--fg-ladder) 1 0}
+.col.stl{flex:var(--fg-stl) 1 0}
+.col.regs{flex:0 0 var(--w-regs);background:var(--panel)}
+/* drag-resizable gutters between panels (double-click to reset) */
+.gutter{flex:0 0 6px;align-self:stretch;position:relative;cursor:col-resize;background:transparent;z-index:6;touch-action:none}
+.gutter::before{content:"";position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);width:1px;background:var(--line)}
+.gutter:hover::before,.gutter.drag::before{width:3px;background:var(--accent)}
 /* logic view modes: split (default) / ladder-only / text-only, + register toggle + focus */
 main.lv-ladder .col.stl{display:none}
 main.lv-text .col.ladder{display:none}
-main.lv-ladder .col.ladder{flex:1}
-main.lv-text .col.stl{flex:1}
-body.regs-hidden .col.regs{display:none}
+main.lv-ladder .col.ladder{flex:1 1 0}
+main.lv-text .col.stl{flex:1 1 0}
+main.lv-ladder .gutter[data-split="ls"],main.lv-text .gutter[data-split="ls"]{display:none}
+body.regs-hidden .col.regs,body.regs-hidden .gutter[data-split="sr"]{display:none}
 .lvseg{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
 .lvseg button{border:0;background:var(--panel2);color:var(--ink2);font-size:11px;font-weight:700;padding:3px 10px;cursor:pointer}
 .lvseg button.on{background:var(--accent);color:var(--accent-ink)}
@@ -728,6 +733,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
       <div class="col-head"><h2>Ladder</h2><span class="hint" id="ladderHint">click an element to edit · hover or focus to trace corresponding text</span></div>
       <div class="scroll"><div class="rungs" id="rungs"></div></div>
     </section>
+    <div class="gutter" data-split="ls" title="Drag to resize · double-click to reset" aria-hidden="true"></div>
     <section class="col stl">
       <div class="col-head"><h2>Program text</h2><span class="stl-toggle" id="stlToggle" style="margin-left:auto"><button data-v="view" class="on">STL</button><button data-v="edit">Edit</button><button data-v="st">Structured Text</button><button data-v="st-edit">Edit ST</button></span><button class="btn" id="bTags" style="padding:4px 9px;font-size:11px" title="Name your I/O and see where each is used">⌗ Tags &amp; xref</button></div>
       <div class="stl-wrap">
@@ -743,6 +749,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
         <div class="stl-status ok" id="stlStatus">in sync</div>
       </div>
     </section>
+    <div class="gutter" data-split="sr" title="Drag to resize · double-click to reset" aria-hidden="true"></div>
     <section class="col regs">
       <div class="col-head"><h2>Registers</h2><button class="btn" id="bProto" style="margin-left:auto;padding:4px 7px;font-size:11px" title="Selectable industrial protocols — inspect/attack/defend">◈ Proto</button><button class="btn" id="bBusMap" style="padding:4px 7px;font-size:11px" title="Bus topology">⇄ Bus</button><button class="btn" id="bTermMap" style="padding:4px 7px;font-size:11px" title="Physical ↔ logical">⧉ Term</button></div>
       <div class="scroll" id="regPanel"></div>
@@ -4970,6 +4977,38 @@ document.querySelectorAll('#palette .pbtn').forEach(b=>b.onclick=()=>insertEleme
   const wf=document.getElementById('bToggleWf');
   if(wf){ try{ if(localStorage.getItem('cs460_wf_collapsed')==='1')document.body.classList.add('wf-collapsed'); }catch(e){}
     wf.addEventListener('click',()=>{ const c=document.body.classList.toggle('wf-collapsed'); try{localStorage.setItem('cs460_wf_collapsed',c?'1':'0');}catch(e){} }); }
+})();
+/* Resizable editor panels: drag the gutters between Ladder | Text | Registers;
+   remembered per viewer; double-click a gutter to reset to defaults. */
+(function(){
+  const main=document.querySelector('main'); if(!main)return;
+  const DEF={fgLadder:'1.4',fgStl:'.95',wRegs:'250px'};
+  try{const s=JSON.parse(localStorage.getItem('cs460_cols')||'{}');
+    if(s.fgLadder)main.style.setProperty('--fg-ladder',s.fgLadder);
+    if(s.fgStl)main.style.setProperty('--fg-stl',s.fgStl);
+    if(s.wRegs)main.style.setProperty('--w-regs',s.wRegs);
+  }catch(e){}
+  const save=()=>{try{localStorage.setItem('cs460_cols',JSON.stringify({
+    fgLadder:main.style.getPropertyValue('--fg-ladder'),
+    fgStl:main.style.getPropertyValue('--fg-stl'),
+    wRegs:main.style.getPropertyValue('--w-regs')}));}catch(e){}};
+  main.querySelectorAll('.gutter').forEach(g=>{
+    g.addEventListener('dblclick',()=>{
+      if(g.dataset.split==='sr')main.style.setProperty('--w-regs',DEF.wRegs);
+      else{main.style.setProperty('--fg-ladder',DEF.fgLadder);main.style.setProperty('--fg-stl',DEF.fgStl);}
+      save();
+    });
+    g.addEventListener('pointerdown',e=>{
+      e.preventDefault();g.classList.add('drag');try{g.setPointerCapture(e.pointerId);}catch(_){}
+      const split=g.dataset.split, ladder=main.querySelector('.col.ladder'), stl=main.querySelector('.col.stl');
+      const move=ev=>{
+        if(split==='sr'){const r=main.getBoundingClientRect();let w=r.right-ev.clientX;w=Math.max(180,Math.min(w,r.width*0.55));main.style.setProperty('--w-regs',Math.round(w)+'px');}
+        else{const lr=ladder.getBoundingClientRect(),srr=stl.getBoundingClientRect();const left=lr.left,total=srr.right-left;if(total<=0)return;let f=(ev.clientX-left)/total;f=Math.max(0.2,Math.min(0.8,f));main.style.setProperty('--fg-ladder',(f*2).toFixed(3));main.style.setProperty('--fg-stl',((1-f)*2).toFixed(3));}
+      };
+      const up=()=>{g.classList.remove('drag');try{g.releasePointerCapture(e.pointerId);}catch(_){}main.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);save();};
+      main.addEventListener('pointermove',move);window.addEventListener('pointerup',up);
+    });
+  });
 })();
 const ta=document.getElementById('stl');ta.addEventListener('blur',rebuildFromSTL);ta.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();rebuildFromSTL();}});
 
