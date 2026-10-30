@@ -42,13 +42,14 @@ const char* validate_program(const Instr* prog, int n) {
       case OP_ST_QW: limit = NQW; need = 1; break;
       case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: need = 2; produced = 1; break;
       case OP_LIMIT: case OP_SEL: need = 3; produced = 1; break;
+      case OP_PID: need = 7; produced = 1; limit = NINST; break;
       case OP_FBQ: limit = NINST; produced = 1; break;
       default: return "opcode";
     }
     if (limit && (c.a < 0 || c.a >= limit)) return "index";
     if (!limit && !uses_a && c.a != 0) return "unused operand";
     if (uses_b ? c.b < 0 : c.b != 0) return "preset/unused operand";
-    if (c.op == OP_TON || c.op == OP_TOF || c.op == OP_RTRIG || c.op == OP_FTRIG || c.op == OP_CTUD) {
+    if (c.op == OP_TON || c.op == OP_TOF || c.op == OP_RTRIG || c.op == OP_FTRIG || c.op == OP_CTUD || c.op == OP_PID) {
       if (fb_kind[c.a] && fb_kind[c.a] != c.op) return "FB type conflict";
       fb_kind[c.a] = c.op;
     }
@@ -109,6 +110,26 @@ bool Engine::scan(const Instr* prog, int n, uint32_t now_ms) {
                      push(b==0 ? 0 : (a==(-2147483647-1)&&b==-1) ? 2147483647 : a/b); } break;
       case OP_LIMIT: { int32_t mx=pop(),in=pop(),mn=pop(); push(in<mn ? mn : (in>mx ? mx : in)); } break;
       case OP_SEL:   { int32_t in1=pop(),in0=pop(),g=pop(); push(g ? in1 : in0); } break;
+      case OP_PID: {                        // discrete PID, fixed-point (gains x100)
+        FbInst& f = inst_[c.a];
+        // operands pushed SP,PV,KP,KI,KD,OUTMIN,OUTMAX -> stack top is OUTMAX
+        int32_t outmax=pop(), outmin=pop(), kd=pop(), ki=pop(), kp=pop(), pv=pop(), sp=pop();
+        int32_t e = sp - pv;
+        int64_t P = (int64_t)kp * e;
+        int64_t D = (int64_t)kd * (e - f.prev_e);
+        int64_t I = f.integ + (int64_t)ki * e;           // tentative integral
+        int64_t out = (P + I + D) / PID_SCALE;
+        int32_t cv;
+        if (out > outmax) cv = outmax;
+        else if (out < outmin) cv = outmin;
+        else cv = (int32_t)out;
+        // Conditional-integration anti-windup: only commit the integral while the
+        // unclamped output is within the actuator limits; freeze it when saturated.
+        if (out <= outmax && out >= outmin) f.integ = I;
+        f.prev_e = e;
+        f.cv = cv;
+        push(cv);
+      } break;
       case OP_DROP: (void)pop(); break;      // discard (FB-call statement result)
       case OP_TON: {                       // IEC TON: Q after IN true for PT ms
         FbInst& f = inst_[c.a];

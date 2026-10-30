@@ -638,6 +638,7 @@ body.hero-collapsed #heroStrip{display:flex}
     <button class="pbtn" data-ins="move" title="MOVE — copy a word (or a constant) into a memory word %MW or analog output %QW.">→ <span>MOVE</span></button>
     <button class="pbtn" data-ins="limit" title="LIMIT(MN, IN, MX) — clamp IN to the range [MN, MX].">⊓ <span>LIMIT</span></button>
     <button class="pbtn" data-ins="sel" title="SEL(G, IN0, IN1) — pick IN1 when G is nonzero, otherwise IN0.">⋔ <span>SEL</span></button>
+    <button class="pbtn" data-ins="pid" title="PID controller — closed-loop control. Error = SP − PV; output CV = KP·e + KI·∑e + KD·Δe, clamped to [OUTMIN, OUTMAX] with anti-windup. Gains are fixed-point hundredths. CV drives an analog output %QW.">∿ <span>PID</span></button>
     <span class="sep"></span>
     <button class="pbtn" data-ins="orbranch" title="Parallel OR branch on selected network">⑃ <span>OR branch</span></button>
     <button class="pbtn" data-ins="coil" title="Set the network's coil">( ) <span>Coil</span></button>
@@ -647,7 +648,7 @@ body.hero-collapsed #heroStrip{display:flex}
     <button class="pbtn" data-ins="net" title="Add a network">＋ <span>Network</span></button>
     <button class="pbtn" data-ins="startup" id="bStartup" title="Add an explicit boot-admission declaration outside scan logic">↻ <span>Reboot RUN</span></button>
     <span class="lbl" style="margin-left:8px" id="palHint">keys: n·NO  /·NC  m·CMP  t·TON  r·R_TRIG  f·F_TRIG  o·OR  c·coil  e·network</span>
-    <span class="hint" style="font-size:11px;color:var(--ink2)">Boolean logic, comparisons, timers, counters and scaled-integer word math · PID is not yet supported by this compiler/runtime.</span>
+    <span class="hint" style="font-size:11px;color:var(--ink2)">Boolean logic, comparisons, timers, counters, scaled-integer word math and a fixed-point PID loop — all run on the device IR.</span>
     <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">
       <span class="lbl">View</span>
       <span class="lvseg" id="logicViewSeg" title="How much room the ladder vs the program text gets"><button type="button" data-lv="split" class="on">Split</button><button type="button" data-lv="ladder">Ladder</button><button type="button" data-lv="text">Text</button></span>
@@ -1373,13 +1374,22 @@ function exportStructuredText(program, {scanMs} = {}) {
     if(!coil)throw new Error('Missing coil');
     if(coil.io==='MW'||coil.io==='QW') {
       const m=network.expr;
-      if(!m||m.t!=='math')throw new Error('A word output requires a math expression');
+      if(!m||(m.t!=='math'&&m.t!=='pid'))throw new Error('A word output requires a math or PID expression');
       claim(m.id);
+      if(m.t==='pid'){
+        integer(m.inst,0,15,'function block instance');
+        const name='FB'+m.inst;
+        if(blocks.has(name)&&blocks.get(name)!=='PID')throw new Error('Function block type conflict');
+        blocks.set(name,'PID');
+        const args=['sp','pv','kp','ki','kd','omin','omax'].map(k=>operandST(m[k]));
+        emit(`${variable(coil.io,coil.idx,true)} := ${name}(SP := ${args[0]}, PV := ${args[1]}, KP := ${args[2]}, KI := ${args[3]}, KD := ${args[4]}, OUTMIN := ${args[5]}, OUTMAX := ${args[6]});`,m.id);
+      } else {
       const opsym={add:'+',sub:'-',mul:'*',div:'/'}[m.op];
       const rhs=m.op==='move'?operandST(m.a)
         :(m.op==='limit'||m.op==='sel')?`${m.op.toUpperCase()}(${operandST(m.a)}, ${operandST(m.b)}, ${operandST(m.c)})`
         :`${operandST(m.a)} ${opsym} ${operandST(m.b)}`;
       emit(`${variable(coil.io,coil.idx,true)} := ${rhs};`,m.id);
+      }
     } else {
       const result=expression(network.expr);
       emit(`${variable(coil.io,coil.idx,true)} := ${neg(coil.neg)?'NOT ':''}${result};`,network.id+'coil');
@@ -1445,8 +1455,9 @@ function parseStructuredText(source) {
     if((m=/^(MW\d+|QW\d+)\s*:=\s*(.+)$/.exec(line))) {
       if(pending)fail('Uncaptured function block output');
       const wop=tok=>{let mm;if((mm=/^(-?\d+)$/.exec(tok)))return {t:'k',k:Number(mm[1])};if((mm=/^(IW|MW|QW)(\d+)$/.exec(tok)))return {t:'wsrc',io:mm[1],idx:Number(mm[2])};fail('Unsupported word operand '+tok);};
-      const wrhs=m[2].trim();let mnode,bm,fm;
-      if((fm=/^(LIMIT|SEL)\(\s*([^,]+?)\s*,\s*([^,]+?)\s*,\s*([^,)]+?)\s*\)$/i.exec(wrhs)))mnode={t:'math',op:fm[1].toLowerCase(),a:wop(fm[2].trim()),b:wop(fm[3].trim()),c:wop(fm[4].trim()),id:id()};
+      const wrhs=m[2].trim();let mnode,bm,fm,pm;
+      if((pm=/^FB(\d+)\(\s*SP\s*:=\s*(\S+)\s*,\s*PV\s*:=\s*(\S+)\s*,\s*KP\s*:=\s*(\S+)\s*,\s*KI\s*:=\s*(\S+)\s*,\s*KD\s*:=\s*(\S+)\s*,\s*OUTMIN\s*:=\s*(\S+)\s*,\s*OUTMAX\s*:=\s*(\S+)\s*\)$/.exec(wrhs)))mnode={t:'pid',inst:Number(pm[1]),sp:wop(pm[2]),pv:wop(pm[3]),kp:wop(pm[4]),ki:wop(pm[5]),kd:wop(pm[6]),omin:wop(pm[7]),omax:wop(pm[8]),id:id()};
+      else if((fm=/^(LIMIT|SEL)\(\s*([^,]+?)\s*,\s*([^,]+?)\s*,\s*([^,)]+?)\s*\)$/i.exec(wrhs)))mnode={t:'math',op:fm[1].toLowerCase(),a:wop(fm[2].trim()),b:wop(fm[3].trim()),c:wop(fm[4].trim()),id:id()};
       else if((bm=/^(\S+)\s*([-+*/])\s*(\S+)$/.exec(wrhs)))mnode={t:'math',op:({'+':'add','-':'sub','*':'mul','/':'div'})[bm[2]],a:wop(bm[1]),b:wop(bm[3]),id:id()};
       else mnode={t:'math',op:'move',a:wop(wrhs),id:id()};
       nets.push({id:`N${nets.length+1}`,label:'',expr:mnode,coil:{io:m[1].slice(0,2),idx:Number(m[1].slice(2))}});
@@ -1906,7 +1917,7 @@ const WCOUNTS={MW:16,QW:4};                 // word classes (scratch + analog ou
 const wordClasses=['IW','MW','QW'];         // valid word operand sources
 const wordLimit=io=>io==='IW'?COUNTS.IW:WCOUNTS[io];
 const PROCESS_FIELDS=PROCESS_DRIVER_FIELDS;
-const OPS={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31,LIMIT:32,SEL:33};
+const OPS={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31,LIMIT:32,SEL:33,PID:34};
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const integer=(value,min,max,label)=>need(Number.isInteger(value)&&value>=min&&value<=max,`${label} must be an integer from ${min} to ${max}.`);
@@ -1917,8 +1928,9 @@ function object(value,required,optional,label){
  need(required.every(k=>Object.hasOwn(value,k))&&keys.every(k=>allowed.has(k)),`${label} has missing or unsupported fields. Credentials and firmware-profile settings are not project fields.`);
 }
 function operand(value){
- const match=typeof value==='string'&&/^(IX|QX|MX|IW)(0|[1-9][0-9]?)$/.exec(value);
- need(match&&Number(match[2])<COUNTS[match[1]],`Unsupported operand: ${String(value)}`);
+ const match=typeof value==='string'&&/^(IX|QX|MX|IW|MW|QW)(0|[1-9][0-9]?)$/.exec(value);
+ const lim=match&&(Object.hasOwn(COUNTS,match[1])?COUNTS[match[1]]:WCOUNTS[match[1]]);
+ need(match&&Number(match[2])<lim,`Unsupported operand: ${String(value)}`);
  return {io:match[1],idx:Number(match[2])};
 }
 function parseJSON(text){
@@ -2040,6 +2052,11 @@ function validateProject(project){
    object(n,['t','id','op','a',...(n.op==='move'?[]:['b']),...(three?['c']:[])],[],'Math');
    need(['add','sub','mul','div','move','limit','sel'].includes(n.op),'Unsupported math operation.');
    wordOperand(n.a);if(n.op!=='move')wordOperand(n.b);if(three)wordOperand(n.c);
+  }
+  else if(n.t==='pid'){
+   object(n,['t','id','inst','sp','pv','kp','ki','kd','omin','omax'],[],'PID');integer(n.inst,0,15,'Function block instance');
+   need(!blocks.has(n.inst)||blocks.get(n.inst)==='pid','A function block instance cannot have two types.');blocks.set(n.inst,'pid');
+   for(const k of ['sp','pv','kp','ki','kd','omin','omax'])wordOperand(n[k]);
   }else throw new Error('Unsupported expression type.');
  }
  const wordOperand=o=>{
@@ -2052,7 +2069,7 @@ function validateProject(project){
   object(net,['id','label','expr','coil'],[],'Network');claim(net.id);claim(net.id+'coil');
   need(typeof net.label==='string'&&net.label.length<=120&&!/[\x00-\x1f]/.test(net.label),'Network label exceeds 120 characters or contains controls.');
   const wordNet=Object.hasOwn(WCOUNTS,net.coil.io);
-  if(net.expr!==null){node(net.expr);need(wordNet===(net.expr.t==='math'),wordNet?'A word output requires a math expression.':'A bit coil cannot be driven by a math expression.');}
+  if(net.expr!==null){node(net.expr);const wordExpr=net.expr.t==='math'||net.expr.t==='pid';need(wordNet===wordExpr,wordNet?'A word output requires a math or PID expression.':'A bit coil cannot be driven by a word expression.');}
   if(wordNet){object(net.coil,['io','idx'],[],'Word coil');address(net.coil.io,net.coil.idx,true);}
   else{object(net.coil,['io','idx','neg'],[],'Coil');address(net.coil.io,net.coil.idx,true);flag(net.coil.neg);}
  }
@@ -2108,6 +2125,7 @@ function compileProgram(program){
     if(n.op==='limit'||n.op==='sel'){emitOperand(n.b,n.id);emitOperand(n.c,n.id);push([n.op==='limit'?OPS.LIMIT:OPS.SEL],n.id);}
     else if(n.op!=='move'){emitOperand(n.b,n.id);push([{add:OPS.ADD,sub:OPS.SUB,mul:OPS.MUL,div:OPS.DIV}[n.op]],n.id);}
   }
+  else if(n.t==='pid'){for(const k of ['sp','pv','kp','ki','kd','omin','omax'])emitOperand(n[k],n.id);push([OPS.PID,n.inst],n.id);}
   else throw new Error('Unsupported expression type.');
  }
  function emitOperand(o,id){if(o.t==='k')push([OPS.PUSH_I,o.k],id);else push([OPS['LD_'+o.io],o.idx],id);}
@@ -2324,7 +2342,7 @@ return {EXECUTION_SCHEMA,EXECUTION_MAX_AGE_MS,parseExecutionReadback,validateExe
 <!-- PROJECT-ADAPTER-END -->
 <script>
 /* ===== opcodes: match firmware/src/plc_engine.h ===== */
-const OP={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,XOR:10,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,FBQ:19,DROP:20,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31,LIMIT:32,SEL:33};
+const OP={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,XOR:10,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,FBQ:19,DROP:20,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31,LIMIT:32,SEL:33,PID:34};
 const LD={IX:OP.LD_IX,QX:OP.LD_QX,MX:OP.LD_MX};
 const ST={QX:OP.ST_QX,MX:OP.ST_MX};
 const CMP={GT:OP.GT,LT:OP.LT,GE:OP.GE,LE:OP.LE,EQ:OP.EQ};
@@ -2393,6 +2411,13 @@ function renderSTL(){
     }
   }
   PROG.nets.forEach((n,i)=>{if(i)add('');add(`// NET ${i+1}${n.label?'  — '+n.label:''}`);
+    if(n.coil&&(n.coil.io==='MW'||n.coil.io==='QW')&&n.expr&&n.expr.t==='pid'){
+      const p=n.expr,opTxt=o=>!o?'?':o.t==='k'?String(o.k):nodeName(o.io,o.idx);
+      add(`PID   #${p.inst}`,p.id);
+      add(`  SP=${opTxt(p.sp)} PV=${opTxt(p.pv)} KP=${opTxt(p.kp)} KI=${opTxt(p.ki)} KD=${opTxt(p.kd)} MIN=${opTxt(p.omin)} MAX=${opTxt(p.omax)}`,p.id);
+      add(`ST    ${nodeName(n.coil.io,n.coil.idx)}`,p.id);
+      return;
+    }
     if(n.coil&&(n.coil.io==='MW'||n.coil.io==='QW')&&n.expr&&n.expr.t==='math'){
       const m=n.expr,opc={add:'ADD',sub:'SUB',mul:'MUL',div:'DIV'}[m.op];
       const opTxt=o=>!o?'?':o.t==='k'?String(o.k):nodeName(o.io,o.idx);
@@ -2557,10 +2582,27 @@ function renderLadder(live){
     let W,Ht,S;
     if(wordNet){
       const dest=`%${n.coil.io}${n.coil.idx}`;
+      const opTxt=o=>!o?'?':o.t==='k'?String(o.k):`%${o.io}${o.idx}`;
+      const cvLive=(live&&live[n.coil.io])?live[n.coil.io][n.coil.idx]:null;
+      if(n.expr&&n.expr.t==='pid'){
+        const p=n.expr;const gain=o=>o.t==='k'?(o.k/100).toFixed(2):`%${o.io}${o.idx}`;
+        const boxW=Math.max(360,labelWidth(`KP=${gain(p.kp)}  KI=${gain(p.ki)}  KD=${gain(p.kd)}`,false,11)+64);
+        Ht=4*28+24;W=PADX*2+boxW;S=mkSVG();
+        S.raw(`<path class="rail" d="M ${PADX} 8 L ${PADX} ${Ht-8}"/>`);
+        const ey=Ht/2,bx=PADX+16,bw=boxW-32,top=12,bh=Ht-24;
+        S.wire(PADX,ey,bx,ey,'wire');
+        S.el(p.id,
+          `<rect class="fbx${cvLive!=null?' live':''}" x="${bx}" y="${top}" width="${bw}" height="${bh}" rx="5"/>`+
+          `<text class="tag-lbl" x="${bx+bw/2}" y="${top+20}" text-anchor="middle" style="font-size:12px">PID #${p.inst}  →  ${dest}${cvLive!=null?`   (CV=${cvLive})`:''}</text>`+
+          `<text class="tag-sub" x="${bx+bw/2}" y="${top+40}" text-anchor="middle">SP=${opTxt(p.sp)}   PV=${opTxt(p.pv)}</text>`+
+          `<text class="tag-sub" x="${bx+bw/2}" y="${top+58}" text-anchor="middle">KP=${gain(p.kp)}  KI=${gain(p.ki)}  KD=${gain(p.kd)}  (gains ×100)</text>`+
+          `<text class="tag-sub" x="${bx+bw/2}" y="${top+76}" text-anchor="middle">output clamped [${opTxt(p.omin)} .. ${opTxt(p.omax)}]</text>`);
+        S.wire(bx+bw,ey,PADX+boxW,ey,'wire');
+        S.raw(`<path class="rail" d="M ${PADX+boxW} 8 L ${PADX+boxW} ${Ht-8}"/>`);
+      } else {
       const mexpr=(n.expr&&n.expr.t==='math')?n.expr:null;
       const op=mexpr?mexpr.op:'move';
       const opsym={add:'+',sub:'−',mul:'×',div:'÷'}[op]||'';
-      const opTxt=o=>!o?'?':o.t==='k'?String(o.k):`%${o.io}${o.idx}`;
       const three=op==='limit'||op==='sel';
       const rhs=op==='move'?opTxt(mexpr&&mexpr.a)
         :three?`${op.toUpperCase()}(${opTxt(mexpr&&mexpr.a)}, ${opTxt(mexpr&&mexpr.b)}, ${opTxt(mexpr&&mexpr.c)})`
@@ -2571,13 +2613,13 @@ function renderLadder(live){
       S.raw(`<path class="rail" d="M ${PADX} 8 L ${PADX} ${Ht-8}"/>`);
       const ey=Ht/2,bx=PADX+16,bw=boxW-32;
       S.wire(PADX,ey,bx,ey,'wire');
-      const cvLive=(live&&live[n.coil.io])?live[n.coil.io][n.coil.idx]:null;
       S.el(mexpr?mexpr.id:n.id+'coil',
         `<rect class="fbx" x="${bx}" y="${ey-20}" width="${bw}" height="40" rx="4"/>`+
         `<text class="tag-lbl" x="${bx+bw/2}" y="${ey-2}" text-anchor="middle" style="font-size:12px">${escapeHtml(title)}</text>`+
         `<text class="tag-sub" x="${bx+bw/2}" y="${ey+14}" text-anchor="middle">${op==='move'?'MOVE · assign word':'word math (scaled integer)'}${cvLive!=null?`  ·  = ${cvLive}`:''}</text>`);
       S.wire(bx+bw,ey,PADX+boxW,ey,'wire');
       S.raw(`<path class="rail" d="M ${PADX+boxW} 8 L ${PADX+boxW} ${Ht-8}"/>`);
+      }
     } else {
     const m=measure(n.expr),cols=Math.max(m.w,1),rows=Math.max(m.h,1);
     const coilWidth=Math.max(128,labelWidth(symName(n.coil.io,n.coil.idx))+40,labelWidth(nodeName(n.coil.io,n.coil.idx),true,11)+64);
@@ -2721,6 +2763,11 @@ function stNode(node,calls){
 const stChild=(k,calls)=>{const e=stNode(k,calls);return (k.t==='series'||k.t==='par')?'('+e+')':e;};
 function genST(){const out=[];PROG.nets.forEach((n,i)=>{if(i)out.push('');
   out.push(`<span class="cmt">(* NET ${i+1}${n.label?' — '+escapeHtml(n.label):''} *)</span>`);
+  if(n.coil&&(n.coil.io==='MW'||n.coil.io==='QW')&&n.expr&&n.expr.t==='pid'){
+    const p=n.expr,opTxt=o=>!o?'?':o.t==='k'?String(o.k):stIdent(o.io,o.idx);
+    out.push(`${stIdent(n.coil.io,n.coil.idx)} <span class="asg">:=</span> <span class="kw">PID</span>${p.inst}(SP <span class="asg">:=</span> ${opTxt(p.sp)}, PV <span class="asg">:=</span> ${opTxt(p.pv)}, KP <span class="asg">:=</span> ${opTxt(p.kp)}, KI <span class="asg">:=</span> ${opTxt(p.ki)}, KD <span class="asg">:=</span> ${opTxt(p.kd)}, OUTMIN <span class="asg">:=</span> ${opTxt(p.omin)}, OUTMAX <span class="asg">:=</span> ${opTxt(p.omax)});`);
+    return;
+  }
   if(n.coil&&(n.coil.io==='MW'||n.coil.io==='QW')&&n.expr&&n.expr.t==='math'){
     const m=n.expr,opsym={add:'+',sub:'−',mul:'×',div:'÷'}[m.op];
     const opTxt=o=>!o?'?':o.t==='k'?String(o.k):stIdent(o.io,o.idx);
@@ -2788,6 +2835,7 @@ function onElementClick(eid,n){
     setHL(eid);log('Monitor is read-only. Highlighted the corresponding logic; no controller command sent.','rx');
     return;
   }
+  if(n.expr&&n.expr.t==='pid'){openPidEditor(n,rebuildFromModel);return;}
   if(n.expr&&n.expr.t==='math'){openMathEditor(n,rebuildFromModel);return;}
   if(eid.endsWith('coil')){openCoilEditor(n);return;}
   const f=findNode(n.expr,eid);if(!f)return;
@@ -2846,6 +2894,21 @@ function insertElement(kind){
     openMathEditor(nn,rebuildFromModel);
     return;
   }
+  if(kind==='pid'){
+    // PID controller: a word network whose output (control value CV) drives an
+    // analog output %QW. Gains are fixed-point hundredths. Instance holds the
+    // integral + previous-error state.
+    let instMax=-1;const walkInst=nd=>{if(!nd)return;if(['ton','tof','rtrig','ftrig','ctud','pid'].includes(nd.t))instMax=Math.max(instMax,nd.inst);['in','cu','cd','r','ld'].forEach(k=>nd[k]&&walkInst(nd[k]));};
+    PROG.nets.forEach(x=>walkInst(x.expr));
+    const expr={t:'pid',inst:Math.min(instMax+1,15),
+      sp:{t:'wsrc',io:'IW',idx:0},pv:{t:'wsrc',io:'IW',idx:1},
+      kp:{t:'k',k:100},ki:{t:'k',k:0},kd:{t:'k',k:0},
+      omin:{t:'k',k:0},omax:{t:'k',k:255},id:uid()};
+    const nn=net(expr,{io:'QW',idx:0},'PID control loop');
+    PROG.nets.push(nn);selNet=nn.id;rebuildFromModel();
+    openPidEditor(nn,rebuildFromModel);
+    return;
+  }
   const n=PROG.nets.find(x=>x.id===selNet)||PROG.nets[PROG.nets.length-1];
   if(!n){log('add a network first','rx');return;}
   selNet=n.id;
@@ -2871,7 +2934,7 @@ function insertElement(kind){
   else if(node.t==='cmp')openCmpEditor(node,rebuildFromModel);
   else if(node.in)openContactEditor(node.in,rebuildFromModel);
 }
-function nextInst(kind){let m=-1;const walk=nd=>{if(!nd)return;if(nd.t==='ton'||nd.t==='tof'||nd.t==='rtrig'||nd.t==='ftrig'||nd.t==='ctud')m=Math.max(m,nd.inst);if(nd.kids)nd.kids.forEach(walk);if(nd.in)walk(nd.in);if(nd.t==='ctud'){walk(nd.cu);walk(nd.cd);walk(nd.r);walk(nd.ld);}};PROG.nets.forEach(n=>walk(n.expr));return m+1;}
+function nextInst(kind){let m=-1;const walk=nd=>{if(!nd)return;if(nd.t==='ton'||nd.t==='tof'||nd.t==='rtrig'||nd.t==='ftrig'||nd.t==='ctud'||nd.t==='pid')m=Math.max(m,nd.inst);if(nd.kids)nd.kids.forEach(walk);if(nd.in)walk(nd.in);if(nd.t==='ctud'){walk(nd.cu);walk(nd.cd);walk(nd.r);walk(nd.ld);}};PROG.nets.forEach(n=>walk(n.expr));return m+1;}
 function addNetwork(){const n=net(contact('IX',0,false),{io:'QX',idx:0,neg:false},'New network');PROG.nets.push(n);selNet=n.id;rebuildFromModel();openContactEditor(n.expr,rebuildFromModel);}
 function netAction(act,n){
   if(act==='del'){PROG.nets=PROG.nets.filter(x=>x!==n);selNet=PROG.nets.length?PROG.nets[0].id:null;rebuildFromModel();return;}
@@ -3073,6 +3136,39 @@ function openMathEditor(netObj,after){
   };
   q('#mDel').onclick=()=>{const i=PROG.nets.indexOf(netObj);if(i>=0)PROG.nets.splice(i,1);closeModal();after&&after();};
 }
+function openPidEditor(netObj,after){
+  const p=netObj.expr,coil=netObj.coil;
+  const wsel=(id,io)=>`<select id="${id}">${['IW','MW','QW'].map(c=>`<option value="${c}"${c===io?' selected':''}>%${c}</option>`).join('')}</select>`;
+  // One compact row per operand: kind toggle + source picker OR constant input.
+  const row=(id,label,o,hint)=>`
+    <div class="field"><label>${label}</label>
+      <select id="${id}t" style="width:92px"><option value="wsrc"${o.t==='wsrc'?' selected':''}>source</option><option value="k"${o.t==='k'?' selected':''}>constant</option></select>
+      <span class="${id}w">${wsel(id+'io',o.io||'IW')} <input id="${id}idx" type="number" min="0" value="${o.idx||0}" style="width:56px"></span>
+      <input class="${id}k" id="${id}k" type="number" value="${o.k!=null?o.k:0}" style="width:96px">
+      <span class="lbl" style="font-size:10px;color:var(--ink2);margin-left:6px">${hint||''}</span></div>`;
+  showModal(`<h3>Edit PID controller</h3><div class="body" style="max-height:70vh;overflow:auto">
+    <p class="hint" style="font-size:11px;color:var(--ink2);margin:0 0 6px">Discrete PID. Error = SP − PV; output CV = KP·e + KI·∑e + KD·Δe, clamped to [OUTMIN, OUTMAX], with anti-windup. Gains are fixed-point hundredths (enter 150 for KP = 1.50). The instance holds the integral + previous error. CV is written to the chosen analog output / memory word.</p>
+    <div class="field"><label>Instance #</label><input id="inst" type="number" min="0" max="15" value="${p.inst}"></div>
+    <div class="field"><label>Output CV to</label><select id="dio"><option value="QW"${coil.io==='QW'?' selected':''}>%QW (analog out)</option><option value="MW"${coil.io==='MW'?' selected':''}>%MW (scratch)</option></select><input id="didx" type="number" min="0" value="${coil.idx}" style="width:56px;margin-left:6px"></div>
+    ${row('sp','Setpoint SP',p.sp,'process target')}
+    ${row('pv','Process value PV',p.pv,'measurement, e.g. %IW')}
+    ${row('kp','Gain KP',p.kp,'×100')}
+    ${row('ki','Gain KI',p.ki,'×100')}
+    ${row('kd','Gain KD',p.kd,'×100')}
+    ${row('omin','Output min',p.omin,'actuator floor')}
+    ${row('omax','Output max',p.omax,'actuator ceiling')}
+    <div class="row"><button class="btn" id="mDel">Delete</button><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" id="mOk">Apply</button></div></div>`);
+  const q=s=>modalInner.querySelector(s);const keys=['sp','pv','kp','ki','kd','omin','omax'];
+  const refresh=()=>{for(const k of keys){const isK=q('#'+k+'t').value==='k';modalInner.querySelectorAll('.'+k+'w').forEach(e=>e.style.display=isK?'none':'');modalInner.querySelectorAll('.'+k+'k').forEach(e=>e.style.display=isK?'':'none');}};
+  keys.forEach(k=>q('#'+k+'t').onchange=refresh);refresh();
+  const read=k=>q('#'+k+'t').value==='k'?{t:'k',k:parseInt(q('#'+k+'k').value,10)||0}:{t:'wsrc',io:q('#'+k+'io').value,idx:parseInt(q('#'+k+'idx').value,10)||0};
+  q('#mOk').onclick=()=>{
+    p.inst=parseInt(q('#inst').value,10)||0;netObj.coil={io:q('#dio').value,idx:parseInt(q('#didx').value,10)||0};
+    for(const k of keys)p[k]=read(k);
+    closeModal();after&&after();
+  };
+  q('#mDel').onclick=()=>{const i=PROG.nets.indexOf(netObj);if(i>=0)PROG.nets.splice(i,1);closeModal();after&&after();};
+}
 function openPrompt(t,val,after){showModal(`<h3>${t}</h3><div class="body"><div class="field"><input id="pv" value="${(val||'').replace(/"/g,'&quot;')}"></div><div class="row"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" id="mOk">OK</button></div></div>`);const inp=modalInner.querySelector('#pv');inp.focus();inp.select();const go=()=>{after(inp.value);closeModal();};modalInner.querySelector('#mOk').onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go();};}
 
 function downloadText(name,text,mime){try{const b=new Blob([text],{type:mime||'text/plain'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);log('downloaded '+name,'rx');}catch(e){log('download blocked in this preview — use Copy instead, or open the standalone page','er');}}
@@ -3121,6 +3217,7 @@ function openExampleProjects(){
     <p><button class="btn" data-example="indicator">Open Input indicator</button> <a href="projects/indicator.csco" download>Download indicator.csco</a></p>
     <p><button class="btn" data-example="interlocked-pair">Open Ventilation interlock</button> <a href="projects/interlocked-pair.csco" download>Download interlocked-pair.csco</a></p>
     <p><button class="btn" data-example="io-expansion">Open IO expansion level alarm</button> <a href="projects/io-expansion.csco" download>Download io-expansion.csco</a></p>
+    <p><button class="btn" data-example="reservoir-pid">Open Reservoir level PID</button> <a href="projects/reservoir-pid.csco" download>Download reservoir-pid.csco</a> — a closed-loop analog example: PID holds tank level at setpoint (CV → pump) with high/low level alarms.</p>
     <p><button class="btn" data-example="reboot-run-indicator">Open Reboot RUN indicator</button> <a href="projects/reboot-run-indicator.csco" download>Complete project</a> · <a href="projects/reboot-run-indicator.st" download>Matching Studio ST</a></p><p>The first three examples retain default PROGRAM on reboot. Reboot RUN indicator explicitly adds the separate startup rung and equivalent ST declaration; its host policy is disabled. The .st file contains logic and the startup declaration only; use .csco to retain symbols, settings and host rules.</p><p id="projectImportError" role="alert"></p><p>When using a standalone file page, download an example and choose Open .csco.</p>
     <div class="row"><button class="btn" id="exampleFile">Open another file</button><button class="btn" onclick="closeModal()">Close</button></div></div>`);
   document.getElementById('exampleFile').onclick=openProject;

@@ -34,7 +34,11 @@ enum Op : uint8_t {
   OP_ADD, OP_SUB, OP_MUL, OP_DIV,         // int32 arithmetic (saturating; DIV/0 -> 0)
   OP_LIMIT,     // pop MN,IN,MX            push clamp(IN, MN, MX)
   OP_SEL,       // pop G,IN0,IN1           push G ? IN1 : IN0
+  OP_PID,       // arg=inst  pop SP,PV,KP,KI,KD,OUTMIN,OUTMAX; push clamped CV
 };
+
+// PID gains are entered as fixed-point hundredths (KP=1.50 -> 150).
+static const int32_t PID_SCALE = 100;
 
 struct Instr { uint8_t op; int32_t a; int32_t b; };
 
@@ -52,9 +56,11 @@ struct FbInst {         // one function-block instance (timer / edge / counter)
   bool     prev = false;// previous input (edge detect / TON IN latch / CU edge)
   uint32_t t0 = 0;      // TON start millis
   bool     running = false;
-  int32_t  cv = 0;      // CTUD current count value
+  int32_t  cv = 0;      // CTUD current count value / PID last output (readback)
   bool     prevd = false;// previous CD input (CTUD down-edge detect)
   bool     qd = false;  // CTUD down output (CV <= 0)
+  int64_t  integ = 0;   // PID integral accumulator (scaled)
+  int32_t  prev_e = 0;  // PID previous error (derivative term)
 };
 
 class Engine {

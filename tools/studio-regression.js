@@ -12,7 +12,7 @@ const ROOT=fs.existsSync('logic_studio.html')?'.':'web/public';
  const port=srv.address().port;const b=await chromium.launch({args:['--no-sandbox']});const pg=await b.newPage({viewport:{width:1440,height:900}});
  await pg.goto('http://127.0.0.1:'+port+'/logic_studio.html',{waitUntil:'networkidle'});
  await pg.evaluate(()=>{ if(typeof closeModal==='function')closeModal(); });
- const examples=['pushbutton','two-led-nonc','indicator','interlocked-pair','io-expansion','reboot-run-indicator'];
+ const examples=['pushbutton','two-led-nonc','indicator','interlocked-pair','io-expansion','reboot-run-indicator','reservoir-pid'];
  const results=[];
  for(const name of examples){
    const text=fs.readFileSync(path.join(ROOT,'projects',name+'.csco'),'utf8');
