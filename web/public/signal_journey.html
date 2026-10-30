@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal Journey</title>
+<style>
+:root{
+ --bg:#0a1018; --panel:#101a28; --panel2:#152335; --edge:#223550; 
+ --edge2:#2d4360; --ink:#e7eefb; --ink2:#aebdd4; --muted:#7f90ab;
+ --accent:#4aa3ff; --hot:#ffcf5c; --good:#43d17a; --bad:#ff6b6b; --warn:#ffb24a;
+ --wire:#4aa3ff; --code:#a78bfa; --logic:#43d17a; --bus:#ff9e4a; --phys:#ff6b8b;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+ --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:
+   radial-gradient(1200px 500px at 15% -10%,#132233,transparent),
+   radial-gradient(900px 500px at 100% 0%,#101d30,transparent),
+   var(--bg);
+ color:var(--ink);font:15px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+.hdr{padding:22px 26px 10px;max-width:1280px;margin:0 auto}
+.kick{font:600 12px/1 var(--sans);letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 7px}
+h1{font-size:27px;line-height:1.12;margin:0 0 6px;letter-spacing:-.4px;font-weight:720}
+.lede{color:var(--ink2);font-size:15px;max-width:760px;margin:0}
+.lede b{color:var(--ink)}
+.wrap{max-width:1280px;margin:0 auto;padding:6px 26px 60px}
+
+/* scenario chooser */
+.scen{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 6px}
+.scard{flex:1;min-width:230px;text-align:left;cursor:pointer;background:var(--panel);
+ border:1px solid var(--edge);border-radius:13px;padding:13px 15px;transition:.15s;position:relative;overflow:hidden}
+.scard:hover{border-color:var(--edge2)}
+.scard.on{border-color:var(--accent);background:var(--panel2);box-shadow:0 0 0 1px var(--accent) inset,0 10px 30px -14px #4aa3ff66}
+.scard .tag{font:700 10.5px/1 var(--mono);letter-spacing:.06em;padding:3px 7px;border-radius:5px;display:inline-block;margin-bottom:8px}
+.t-ok{background:#123a24;color:#6ee89f} .t-hide{background:#3a1116;color:#ff9aa6} .t-lie{background:#3a2a0e;color:#ffce7a}
+.scard h3{margin:0 0 3px;font-size:14.5px;font-weight:650}
+.scard p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.4}
+.scard .verdict{margin-top:8px;font-size:11.5px;font-weight:600}
+
+/* controls */
+.bar{display:flex;align-items:center;gap:12px;margin:16px 0 8px;flex-wrap:wrap}
+.btn{font:600 13px var(--sans);color:var(--ink);background:var(--panel2);border:1px solid var(--edge2);
+ border-radius:9px;padding:8px 15px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{border-color:var(--accent)}
+.btn.play{background:linear-gradient(180deg,#2f6fd6,#245bb5);border-color:#3f7fe0;color:#fff}
+.hint{color:var(--muted);font-size:12.5px}
+.legend{margin-left:auto;display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+.legend b{font-weight:600}
+.ldot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+
+/* the pipeline */
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:12px;position:relative}
+@media(max-width:1000px){.pipe{grid-template-columns:1fr;gap:12px}}
+.lens{position:relative;background:var(--panel);border:1px solid var(--edge);border-radius:14px;margin:0 7px;
+ padding:0;display:flex;flex-direction:column;min-height:330px;transition:.2s;overflow:hidden}
+@media(max-width:1000px){.lens{margin:0}}
+.lens.dim{opacity:.32;filter:saturate(.4)}
+.lens.active{border-color:var(--ln);box-shadow:0 0 0 1px var(--ln) inset,0 14px 34px -18px var(--ln)}
+.lens .lh{padding:12px 14px 10px;border-bottom:1px solid var(--edge);background:linear-gradient(180deg,var(--panel2),transparent)}
+.lens .num{font:700 10px/1 var(--mono);color:var(--ln);letter-spacing:.1em}
+.lens .tool{display:flex;align-items:center;gap:8px;margin-top:5px}
+.lens .tool .ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--edge2);flex:0 0 auto}
+.lens .tool .ic svg{width:15px;height:15px;stroke:var(--ln);fill:none;stroke-width:1.8}
+.lens .tool h2{font-size:14.5px;margin:0;font-weight:680}
+.lens .tool .sub{font-size:11px;color:var(--muted);margin-top:1px}
+.whatis{font-size:11.5px;color:var(--ink2);background:#0c1622;border:1px dashed var(--edge2);border-radius:8px;
+ padding:7px 9px;margin:10px 14px 0;line-height:1.45}
+.whatis b{color:var(--ln)}
+.lbody{padding:11px 14px 0;flex:1;display:flex;flex-direction:column;gap:8px}
+.cap{font-size:12px;color:var(--ink2);line-height:1.45;padding:10px 14px 13px}
+.cap b{color:var(--ink)}
+
+/* byte chips */
+.bytes{display:flex;flex-wrap:wrap;gap:4px}
+.byte{font:600 12px/1 var(--mono);padding:5px 6px;border-radius:5px;background:#0c1724;border:1px solid var(--edge2);color:var(--ink2);position:relative}
+.byte.hot{background:#3a300f;border-color:var(--hot);color:var(--hot);box-shadow:0 0 0 1px var(--hot) inset}
+.byte small{display:block;font:500 8.5px/1.2 var(--sans);color:var(--muted);margin-top:3px;letter-spacing:.02em;text-transform:uppercase}
+.byte.hot small{color:#e3b74e}
+.i2c{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.i2c .f{font:600 12px/1 var(--mono);padding:6px 8px;border-radius:6px;background:#0c1724;border:1px solid var(--edge2);text-align:center}
+.i2c .f small{display:block;font:500 8.5px/1.2 var(--sans);color:var(--muted);margin-top:3px;text-transform:uppercase}
+.i2c .f.hot{background:#3a2410;border-color:var(--bus);color:#ffc187;box-shadow:0 0 0 1px var(--bus) inset}
+.i2c .st{color:var(--muted);font-weight:700}
+
+/* code lens */
+pre.src{margin:0;background:#0a1320;border:1px solid var(--edge2);border-radius:8px;padding:8px 0;overflow:auto;font:11.5px/1.5 var(--mono);max-height:150px}
+pre.src .ln{display:block;padding:0 11px;white-space:pre;color:#8fa3c0}
+pre.src .ln b{color:#55688a;display:inline-block;width:30px;user-select:none}
+pre.src .ln.hit{background:#1a2740;color:#dce8fb}
+pre.src .ln.hit b{color:var(--code)}
+.srcref{font:11.5px var(--mono);color:var(--code)}
+.disasm{background:#0a1320;border:1px solid var(--edge2);border-radius:8px;padding:8px 10px;font:11px/1.5 var(--mono);color:#8fa3c0}
+.disasm .op{color:#9ecbff} .disasm .cm{color:#6f7f99}
+.deeper{font-size:11px;color:var(--muted);cursor:pointer;user-select:none;margin-top:2px}
+.deeper:hover{color:var(--ink2)}
+.deeper b{color:var(--code)}
+.hidden{display:none}
+
+/* absent / spoof overlays */
+.absent{margin:auto;text-align:center;padding:24px 14px;color:var(--muted)}
+.absent .big{font-size:30px;margin-bottom:6px}
+.absent.gap .big{color:var(--bad)} .absent.gap{color:#e39aa2}
+.flag{display:inline-flex;align-items:center;gap:6px;font:700 10.5px/1 var(--mono);padding:4px 8px;border-radius:6px;margin-top:9px}
+.flag.hide{background:#3a1116;color:#ff9aa6} .flag.lie{background:#3a2a0e;color:#ffce7a} .flag.catch{background:#123a24;color:#6ee89f}
+
+/* travelling token */
+#token{position:absolute;z-index:40;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;
+ font:700 12px var(--mono);background:var(--hot);color:#2a2103;box-shadow:0 8px 24px #ffcf5c66,0 0 0 3px #ffcf5c33;
+ transition:left .55s cubic-bezier(.5,.05,.3,1),top .55s cubic-bezier(.5,.05,.3,1),opacity .3s;opacity:0;pointer-events:none}
+
+/* takeaway */
+.takeaway{margin-top:22px;border-radius:14px;padding:16px 18px;border:1px solid var(--edge2);background:linear-gradient(180deg,var(--panel2),var(--panel))}
+.takeaway h3{margin:0 0 6px;font-size:15px}
+.takeaway p{margin:5px 0;font-size:13.5px;color:var(--ink2);line-height:1.5}
+.takeaway .cie{margin-top:10px;font-size:12.5px;color:var(--good);border-left:3px solid var(--good);padding-left:11px}
+.foot{max-width:1280px;margin:18px auto 0;padding:0 26px;color:var(--muted);font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="hdr">
+ <p class="kick">Follow the byte &middot; one value, five lenses</p>
+ <h1>Signal Journey</h1>
+ <p class="lede">Watch a single command travel from the <b>network wire</b> &rarr; the <b>firmware code</b> &rarr; the <b>control logic</b> &rarr; the <b>hardware bus</b> &rarr; the <b>physical relay</b>. The same value lights up in each lens as it changes form. Then switch to an attack and watch <b>which lenses still see it</b> &mdash; and which go dark.</p>
+</div>
+
+<div class="wrap">
+ <div class="scen" id="scen"></div>
+
+ <div class="bar">
+  <button class="btn play" id="play">&#9654;&nbsp; Play the journey</button>
+  <button class="btn" id="stepBtn">Step &rarr;</button>
+  <button class="btn" id="resetBtn">Reset</button>
+  <span class="hint" id="hint">Pick an attack above, or press Play to trace a normal command.</span>
+  <span class="legend">
+   <span><span class="ldot" style="background:var(--wire)"></span>wire</span>
+   <span><span class="ldot" style="background:var(--code)"></span>code</span>
+   <span><span class="ldot" style="background:var(--logic)"></span>logic</span>
+   <span><span class="ldot" style="background:var(--bus)"></span>bus</span>
+   <span><span class="ldot" style="background:var(--phys)"></span>physical</span>
+  </span>
+ </div>
+
+ <div class="pipe" id="pipe"></div>
+ <div id="token">Q2</div>
+
+ <div class="takeaway" id="takeaway"></div>
+
+ <p class="foot" id="foot"></p>
+</div>
+
+<script>
+const INLINE = {"prov_meta": {"generated_utc": "2026-10-30T18:06:44Z", "source": "sbom/firmware/src/*.cpp plc_log() call sites", "live_feed": "/api/log  (web_api_log_json) and serial 'log' / busstream", "note": "STATIC half of the Logic-Studio association. A live /api/log line is matched to a row by its 'match' regex -> source file:line + CWE. An output change with no matching WRITE/FORCE row is the provenance gap that reveals an unaudited (memory-corruption) write.", "count": 56}, "snip": {"modbus_tcp_server.cpp:311": [[305, "    // Faithful PLC behavior: the write lands in the coil image and is applied to"], [306, "    // the physical output at the next scan boundary (plc_core_scan), where forcing"], [307, "    // and RUN/PROGRAM mode also apply. Record it with its source: CWE-306 checks no"], [308, "    // authorization, so this audit trail is the only evidence of who wrote what."], [309, "    {"], [310, "        const TagDef* t = plc_tag_for(TK_COIL, coil_addr);"], [311, "        plc_log(SRC_MODBUS, source, \"WRITE coil %u (%s) = %d\", coil_addr,"], [312, "                t ? t->name : \"coil\", value == 0xFF00 ? 1 : 0);"]], "plc_core.cpp:38": [[38, "#ifdef ENABLE_CWE_DEMOS"], [39, "// [CWE-787 / CWE-120] Teaching \"build break\": a fixed tag-label scratch buffer placed in"], [40, "// the SAME object as the I/O force image, immediately before the force masks. The"], [41, "// unauthenticated writer plc_tag_write() copies attacker-controlled bytes into scratch[]"], [42, "// with NO bounds check, so an overflow runs straight on into coil_force_val/en and forces"], [43, "// a relay by MEMORY CORRUPTION. It never calls the audited plc_force_coil(), so the force"], [44, "// appears with no source/who in the audit log. The struct guarantees scratch sits right"], [45, "// before the masks (offsetof is the exploit's whole \"memory map\"); tools/derive-force-offset.py"], [46, "// re-derives it from each build. The secure build (#else) keeps the masks with NO adjacent"]], "web_api.cpp:84": [[80, "    if (!t || !t->writable) return \"{\\\"err\\\":\\\"not writable\\\"}\";"], [81, "    char* end=nullptr;const long long v=strtoll(val,&end,10);"], [82, "    if(!val[0]||!end||*end||v<INT32_MIN||v>INT32_MAX)return \"{\\\"err\\\":\\\"int32 value required\\\"}\";"], [83, "    if(!plc_tag_set(t,int32_t(v)))return \"{\\\"err\\\":\\\"write refused\\\"}\";"], [84, "    plc_log(SRC_WEB,\"\",\"SET %s = %ld (live value)\",t->name,(long)v);"], [85, "    return \"{\\\"ok\\\":1}\";"], [86, "}"]]}};
+const SNIP = INLINE.snip;
+
+const LENS = [
+ {key:'wire', num:'LENS 1', tool:'On the wire', sub:'Wireshark · network packet capture', color:'var(--wire)',
+  whatis:'<b>Wireshark</b> is a network sniffer. It shows the raw bytes of every packet travelling over the Ethernet cable — here, a Modbus/TCP command on port 502.',
+  icon:'<path d="M2 12h4l2-7 3 14 3-10 2 5h4"/>'},
+ {key:'code', num:'LENS 2', tool:'In the code', sub:'firmware source + disassembler', color:'var(--code)',
+  whatis:'This is the <b>firmware</b> — the program running on the PLC chip. The source is what the engineer wrote; a <b>disassembler</b> (Ghidra/objdump) shows the same code as raw machine instructions the processor actually runs.',
+  icon:'<path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/>'},
+ {key:'logic', num:'LENS 3', tool:'In the logic', sub:'ladder / PLC control program', color:'var(--logic)',
+  whatis:'The <b>control logic</b> is the ladder program that decides what the PLC does. It reads points (coils, inputs) and drives outputs — the automation the plant actually relies on.',
+  icon:'<path d="M4 4v16M20 4v16M4 9h6a3 3 0 010 6H4M14 9h6"/>'},
+ {key:'bus', num:'LENS 4', tool:'On the bus', sub:'sigrok / PulseView · logic analyzer', color:'var(--bus)',
+  whatis:'A <b>logic analyzer</b> (sigrok/PulseView) clips onto the physical wires between chips and records the electrical signals. Here it decodes the <b>I²C bus</b> that drives the relay board.',
+  icon:'<path d="M2 16h3v-8h4v8h4v-5h4v5h3"/>'},
+ {key:'phys', num:'LENS 5', tool:'In the world', sub:'the physical relay & load', color:'var(--phys)',
+  whatis:'The <b>physical output</b> — the relay contact that actually switches a motor, pump or valve. This is where bytes become motion, and where real-world consequences happen.',
+  icon:'<path d="M12 2v8M7 6a7 7 0 1010 0"/>'},
+];
+
+// I2C write that sets relay 2 ON: AW9523B @ 0x59, reg 0x02, low nibble=relays, bit2=0x04
+const I2C_RELAY2 = [
+ {hex:'S',label:'start',st:1},
+ {hex:'B2',label:'0x59 + W'},
+ {hex:'02',label:'reg: outputs'},
+ {hex:'04',label:'bit 2 = ON',hot:1},
+ {hex:'P',label:'stop',st:1},
+];
+
+const SCEN = {
+ legit:{
+  tag:'t-ok', tagtext:'NORMAL', title:'Operator writes coil 2 over Modbus',
+  blurb:'A supervised write in REMOTE mode. The honest baseline.',
+  verdict:'<span style="color:var(--good)">All five lenses agree.</span>', token:'Q2',
+  wire:{bytes:[
+    {hex:'00 01',label:'txn id'},{hex:'00 00',label:'proto=modbus'},{hex:'00 06',label:'length'},
+    {hex:'01',label:'unit'},{hex:'05',label:'fn: write coil',hot:1},{hex:'00 02',label:'coil 2',hot:1},{hex:'FF 00',label:'= ON',hot:1}],
+   cap:'<b>Wireshark</b> shows 12 bytes arrive on port 502. Three matter: <b>05</b> = “write one coil”, <b>00 02</b> = coil #2, <b>FF 00</b> = ON.'},
+  code:{src:'modbus_tcp_server.cpp:311', hit:311,
+   reads:['coil_addr = (req[1]&lt;&lt;8)|req[2]  &rarr; <b>2</b>','value = (req[3]&lt;&lt;8)|req[4]  &rarr; <b>0xFF00</b> (ON)'],
+   cap:'The firmware reads the <b>same bytes</b> off the wire into variables, checks mode + arbiter, flips the coil bit, and records it: <code>plc_log(… "WRITE coil 2 = 1")</code>.'},
+  logic:{point:'coil 2  (%QX0.2)', val:'ON', body:'Coil 2 is now <b>1</b> in the process image. On the next scan the logic copies it to physical output 2 &mdash; <code>io.relay_set(2, true)</code>.',
+   cap:'The <b>control logic</b> sees coil 2 high and drives output 2 at the scan boundary.'},
+  bus:{i2c:I2C_RELAY2, chip:'AW9523B @ 0x59',
+   cap:'<b>PulseView</b> on the internal I²C bus decodes the write: to chip <b>0x59</b>, register <b>0x02</b>, data <b>0x04</b> &mdash; bit 2 is relay 2.'},
+  phys:{icon:'on', what:'Relay 2 closes', effect:'the pump energizes',
+   cap:'The contact clicks shut. <b>The physical world changed</b> &mdash; and every lens behind it told the same story.'},
+  hit:{wire:1,code:1,logic:1,bus:1,phys:1},
+  takeaway:{title:'The honest path: every lens agrees',
+   body:'A legitimate command leaves the same fingerprint everywhere — on the wire, in the code’s audit log, in the logic, on the bus, and in the relay. When all five lenses tell one consistent story, you can trust it. The next two scenarios break that agreement in two different ways.',
+   cie:'CIE – the baseline for detection: you can only notice a lie or a gap if you know what agreement looks like first.'}
+ },
+ attack:{
+  tag:'t-hide', tagtext:'HIDES', title:'Memory-corruption force (CWE-787)',
+  blurb:'A buffer overflow writes the force masks directly in RAM. The relay moves with no command.',
+  verdict:'<span style="color:var(--bad)">Wire &amp; log go dark — bus &amp; physical still see it.</span>', token:'??',
+  wire:{absent:'gap', big:'⌀', line:'No packet. Nothing on port 502.',
+   cap:'<b>Wireshark sees nothing.</b> No Modbus frame was ever sent — the attacker corrupted memory through an already-open channel, so there is no network byte to catch.'},
+  code:{absent:'gap', src:'plc_core.cpp:38', hit:38, big:'⌀', line:'No plc_log entry.',
+   cap:'<b>No audit record.</b> The overflow writes the force masks directly and <b>never calls the audited <code>plc_force_coil()</code></b>, so the code that normally logs a write is bypassed. The firmware’s own comment says so.'},
+  logic:{point:'coil 2 force mask', val:'forced ON', body:'The overflow sets coil 2’s <b>force mask</b> in memory. The logic program was never changed — the scan simply treats coil 2 as ON because the mask overrides it.',
+   cap:'The logic looks normal; the forced value is injected underneath it.'},
+  bus:{i2c:I2C_RELAY2, chip:'AW9523B @ 0x59', flag:'catch',
+   cap:'But the I²C write <b>still happens</b> — <b>PulseView shows relay 2 going ON</b>, byte-for-byte identical to the legitimate case. The bus cannot be bypassed.'},
+  phys:{icon:'on', what:'Relay 2 closes', effect:'the pump energizes', flag:'catch',
+   cap:'The relay clicks shut — <b>identical physical effect</b>, with zero network trace and zero audit log.'},
+  hit:{wire:0,code:0,logic:'partial',bus:1,phys:1},
+  takeaway:{title:'An attack that HIDES: watch which lenses go dark',
+   body:'This is the whole reason to look at more than one lens. The network sniffer and the audit log — the two places most monitoring lives — show nothing. Yet the logic analyzer on the bus and the physical relay both fire. <b>If you only watch the network, you miss this entirely.</b> The absence of a matching record, next to a real physical change, IS the detection.',
+   cie:'CIE – defense in depth & sensor placement: monitoring must reach the bus and the physical output, not stop at the network. The lower lenses are the ones memory corruption can’t fake.'}
+ },
+ spoof:{
+  tag:'t-lie', tagtext:'LIES', title:'Phone sensor spoof (false-data injection)',
+  blurb:'Your phone feeds a sensor value to the PLC. Override it, and the logic acts on a lie.',
+  verdict:'<span style="color:var(--warn)">Every lens agrees — on a false value.</span>', token:'20',
+  wire:{bytes:[
+    {hex:'POST',label:'http'},{hex:'/api/set',label:'endpoint'},{hex:'tag=level',label:'which point',hot:0},
+    {hex:'val=20',label:'spoofed!',hot:1}],
+   cap:'Your <b>phone</b> posts a sensor reading to the PLC. Wireshark shows a perfectly normal, well-formed request — <b>but the value (20) is a lie</b> you chose. The real tank is at 95.'},
+  code:{src:'web_api.cpp:84', hit:84,
+   reads:['tag &rarr; <b>level</b>','val &rarr; <b>20</b>  (SRC_WEB, logged as legitimate)'],
+   cap:'The firmware accepts and <b>logs</b> it: <code>plc_log(SRC_WEB, "SET level = 20")</code>. It is fully attributable — the log just can’t tell that 20 is false.'},
+  logic:{point:'input: level', val:'20 (real: 95)', body:'The logic compares <b>level &lt; 90</b> and concludes the tank is safe, so it <b>never opens the drain</b>. It is reasoning correctly on a corrupted input.',
+   cap:'Garbage in, confident out: the logic trusts the sensor and makes the wrong call.'},
+  bus:{absent:'lie', big:'—', line:'No output fires (that’s the danger).',
+   cap:'Because the logic thinks all is well, <b>no protective relay fires</b>. The bus is quiet precisely when it should be acting.'},
+  phys:{icon:'bad', what:'Tank overflows', effect:'no alarm, no drain',
+   cap:'The real level hits 95 and keeps rising. <b>The physical world diverged from every digital lens</b> — all of which reported “safe.”'},
+  hit:{wire:1,code:1,logic:'lie',bus:0,phys:1},
+  takeaway:{title:'An attack that LIES: every lens agrees, and all are wrong',
+   body:'The opposite of the hidden attack. Here the byte appears on the wire, in the log, and in the logic — all consistent, all attributable to your phone. Nothing looks anomalous, because the <b>data itself</b> is the weapon. You cannot catch this by watching bytes move; you catch it with an <b>independent check</b> — a second sensor, a physical high-level float, a plausibility limit. This is the lab you run with your own phone: turn transmission off (availability) or override the value (integrity) and watch the plant believe you.',
+   cie:'CIE – don’t trust a single sensor: critical decisions need redundant, independent, or physically-bounded measurement. A logged value is not a true value.'}
+ }
+};
+const ORDER=['legit','attack','spoof'];
+
+let cur='legit', step=-1, playing=null;
+const pipe=document.getElementById('pipe'), scenEl=document.getElementById('scen');
+const token=document.getElementById('token');
+
+// scenario cards
+scenEl.innerHTML=ORDER.map(k=>{const s=SCEN[k];return `
+ <button class="scard${k===cur?' on':''}" data-k="${k}">
+  <span class="tag ${s.tag}">${s.tagtext}</span>
+  <h3>${s.title}</h3><p>${s.blurb}</p>
+  <div class="verdict">${s.verdict}</div>
+ </button>`}).join('');
+scenEl.querySelectorAll('.scard').forEach(b=>b.onclick=()=>{cur=b.dataset.k;reset();renderCards();});
+
+function iconPhys(kind){
+ if(kind==='bad') return '<svg viewBox="0 0 24 24" style="width:34px;height:34px;stroke:var(--bad);fill:none;stroke-width:1.7"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg>';
+ return '<svg viewBox="0 0 24 24" style="width:34px;height:34px;stroke:var(--good);fill:none;stroke-width:1.7"><rect x="4" y="8" width="16" height="9" rx="2"/><path d="M8 8V6a4 4 0 018 0v2"/></svg>';
+}
+
+function lensBody(L,s){
+ const d=s[L.key];
+ if(!d) return '<div class="absent">—</div>';
+ if(d.absent){
+  const cls=d.absent==='gap'?'absent gap':'absent';
+  const flag=d.absent==='gap'?'<div class="flag hide">⌀ nothing to see</div>':'<div class="flag lie">silent when it shouldn’t be</div>';
+  return `<div class="lbody"><div class="${cls}"><div class="big">${d.big||'⌀'}</div>${d.line||''}${flag}</div></div>
+          <div class="cap">${d.cap}</div>`;
+ }
+ let inner='';
+ if(L.key==='wire') inner=`<div class="bytes">${d.bytes.map(b=>`<span class="byte${b.hot?' hot':''}">${b.hex}<small>${b.label}</small></span>`).join('')}</div>`;
+ if(L.key==='code'){
+  const snip=SNIP[d.src]||SNIP[d.src.replace(/:\d+$/,':'+d.hit)]||null;
+  const code = snip?`<pre class="src">${snip.map(([n,t])=>`<span class="ln${n===d.hit?' hit':''}"><b>${n}</b>${esc(t)}</span>`).join('')}</pre>`:'';
+  const reads=d.reads?`<div style="font:11.5px/1.7 var(--mono);color:var(--ink2)">${d.reads.map(r=>'&rarr; '+r).join('<br>')}</div>`:'';
+  const dis=`<div class="deeper" data-deeper>&#9662; <b>Deeper:</b> what the chip actually runs (disassembler)</div>
+   <div class="disasm hidden" data-disbox><span class="cm">; Xtensa — same code, as Ghidra/objdump shows it</span><br>
+   4203d20c: <span class="op">entry</span> a1, 48<br>4203d20f: <span class="op">l32r</span> a8, 0x4203c1a0<br>
+   4203d212: <span class="op">s32i</span> a10, a1, 4 <span class="cm">; coil_addr</span><br>4203d215: <span class="op">call8</span> plc_log</div>`;
+  inner=`<div class="srcref">${d.src}</div>${reads}${code}${dis}`;
+ }
+ if(L.key==='logic') inner=`
+   <div style="display:flex;align-items:center;gap:9px">
+     <span class="byte hot" style="font-size:13px">${d.val}</span>
+     <span style="font:12px var(--mono);color:var(--ink2)">${d.point}</span>
+   </div>
+   <div style="font-size:12px;color:var(--ink2);line-height:1.5">${d.body}</div>`;
+ if(L.key==='bus') inner=`<div style="font:11px var(--mono);color:var(--muted);margin-bottom:2px">${d.chip}</div>
+   <div class="i2c">${d.i2c.map(f=>f.st?`<span class="st">${f.hex}</span>`:`<span class="f${f.hot?' hot':''}">${f.hex}<small>${f.label}</small></span>`).join('')}</div>
+   ${d.flag?'<div class="flag catch" style="align-self:flex-start">✔ caught here</div>':''}`;
+ if(L.key==='phys') inner=`<div style="display:flex;flex-direction:column;align-items:center;gap:7px;padding-top:4px">
+     ${iconPhys(d.icon)}
+     <div style="font-weight:650;font-size:14px;text-align:center">${d.what}</div>
+     <div style="font-size:12px;color:var(--ink2);text-align:center">${d.effect}</div>
+     ${d.flag?'<div class="flag catch">✔ caught here</div>':''}
+   </div>`;
+ return `<div class="lbody">${inner}</div><div class="cap">${d.cap}</div>`;
+}
+
+function renderCards(){
+ const s=SCEN[cur];
+ token.textContent=s.token;
+ pipe.innerHTML=LENS.map((L,i)=>{
+  const hit=s.hit[L.key];
+  const dim=(hit===0)?'dim':'';
+  return `<div class="lens ${dim}" data-i="${i}" style="--ln:${L.color}">
+    <div class="lh"><div class="num">${L.num}</div>
+     <div class="tool"><span class="ic"><svg viewBox="0 0 24 24">${L.icon}</svg></span>
+      <div><h2>${L.tool}</h2><div class="sub">${L.sub}</div></div></div>
+    </div>
+    <div class="whatis">${L.whatis}</div>
+    ${lensBody(L,s)}
+  </div>`}).join('');
+ pipe.querySelectorAll('[data-deeper]').forEach(d=>d.onclick=()=>{
+   const box=d.parentElement.querySelector('[data-disbox]');box.classList.toggle('hidden');
+   d.innerHTML=box.classList.contains('hidden')?'&#9662; <b>Deeper:</b> what the chip actually runs (disassembler)':'&#9652; <b>Hide</b> disassembly';
+ });
+ pipe.querySelectorAll('pre.src').forEach(pre=>{const h=pre.querySelector('.ln.hit');if(h)pre.scrollTop=Math.max(0,h.offsetTop-pre.clientHeight/2+h.offsetHeight/2);});
+ const t=SCEN[cur].takeaway;
+ document.getElementById('takeaway').innerHTML=`<h3>${t.title}</h3><p>${t.body}</p><div class="cie">${t.cie}</div>`;
+ document.getElementById('scen').querySelectorAll('.scard').forEach(b=>b.classList.toggle('on',b.dataset.k===cur));
+ positionToken(-1);
+}
+function esc(s){return String(s).replace(/&(?!\w+;)/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function positionToken(i){
+ const s=SCEN[cur];
+ if(i<0){token.style.opacity=0;return;}
+ // skip dark lenses for the token but still advance
+ const lensEl=pipe.children[i];
+ const pr=pipe.getBoundingClientRect(), lr=lensEl.getBoundingClientRect();
+ const dark = s.hit[LENS[i].key]===0;
+ token.style.opacity = dark?0.0:1;
+ token.style.left=(lr.left-pr.left+lr.width/2-20)+'px';
+ token.style.top=(lr.top-pr.top+54)+'px';
+ pipe.querySelectorAll('.lens').forEach((el,j)=>el.classList.toggle('active',j===i && !dark));
+ // update hint
+ const hints=['Lens 1 — the bytes on the network wire.','Lens 2 — the firmware reads those bytes.','Lens 3 — the control logic acts on the value.','Lens 4 — the hardware bus carries it to the relay.','Lens 5 — the physical output moves.'];
+ document.getElementById('hint').textContent=hints[i]||'';
+}
+function doStep(){
+ step++;
+ if(step>=LENS.length){step=LENS.length-1;}
+ positionToken(step);
+}
+function reset(){step=-1;clearInterval(playing);playing=null;document.getElementById('hint').textContent='Pick an attack above, or press Play to trace a normal command.';positionToken(-1);document.getElementById('play').innerHTML='&#9654;&nbsp; Play the journey';}
+function play(){
+ if(playing){clearInterval(playing);playing=null;document.getElementById('play').innerHTML='&#9654;&nbsp; Play the journey';return;}
+ if(step>=LENS.length-1)step=-1;
+ document.getElementById('play').innerHTML='&#10073;&#10073;&nbsp; Pause';
+ playing=setInterval(()=>{if(step>=LENS.length-1){clearInterval(playing);playing=null;document.getElementById('play').innerHTML='&#8635;&nbsp; Replay';return;}doStep();},900);
+}
+document.getElementById('play').onclick=play;
+document.getElementById('stepBtn').onclick=()=>{if(step<LENS.length-1)doStep();};
+document.getElementById('resetBtn').onclick=reset;
+window.addEventListener('resize',()=>{if(step>=0)positionToken(step);});
+document.getElementById('foot').textContent='Byte values are hardware-accurate to the M5StampLC twin: Modbus/TCP FC5 on :502, AW9523B I²C expander @ 0x59 reg 0x02, source map generated '+INLINE.prov_meta.generated_utc+'. Standalone demo — pairs with the live Provenance Studio tap on /api/log.';
+
+renderCards();
+</script>
+</body>
+</html>
