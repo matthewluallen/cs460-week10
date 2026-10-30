@@ -34,6 +34,17 @@ header{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(
 .brand small{font-weight:500;color:var(--muted);font-size:11.5px}
 .spacer{flex:1}
 .tbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tbar-div{width:1px;align-self:stretch;min-height:20px;background:var(--line2);margin:0 2px}
+/* toolbar overflow menu (groups the secondary tools so the bar isn't a wall of buttons) */
+.menu{position:relative;display:inline-flex}
+.menu>summary{list-style:none}
+.menu>summary::-webkit-details-marker{display:none}
+.menu>summary::marker{content:""}
+.menu[open]>summary.btn{border-color:var(--accent);color:var(--accent)}
+.menu-pop{position:absolute;top:calc(100% + 6px);right:0;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:11px;box-shadow:0 14px 34px -12px rgba(0,0,0,.55),0 1px 0 var(--line2);padding:7px;display:flex;flex-direction:column;gap:3px;min-width:210px;max-height:72vh;overflow:auto}
+.menu-pop .btn,.menu-pop a.btn{justify-content:flex-start;text-align:left;width:100%}
+.menu-sep{height:1px;background:var(--line);margin:5px 2px}
+.menu-lbl{font:600 9px/1.4 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:6px 7px 2px}
 button.btn{font-family:var(--sans);font-size:12.5px;font-weight:600;color:var(--ink);background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:6px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.12s}
 button.btn:hover{border-color:var(--accent);color:var(--accent)}
 button.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -509,6 +520,14 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
 .htile{padding:9px 13px}.htile .v{font-size:21px;margin-top:6px}
 .hero{padding:10px 14px}
 body.hero-collapsed #heroBand{display:none}
+/* Collapsed overview = give the logic the screen. The compact heroStrip already
+   carries mode/conn/scan/bus, so hide the duplicate controller-status band and the
+   two reference accordions (they return when Overview is expanded). */
+body.hero-collapsed [aria-label="Controller status"],
+body.hero-collapsed #controllerModeHelp,
+body.hero-collapsed #executionPanel{display:none}
+/* and tuck the project-workspace actions behind a disclosure so only title+state show */
+body.hero-collapsed section.controller-status[aria-label="Project workspace"]{font-size:11.5px;padding-top:4px;padding-bottom:4px}
 /* slim status strip, shown only when the overview is collapsed */
 #heroStrip{display:none;align-items:center;gap:8px 16px;flex-wrap:wrap;padding:6px 14px;background:linear-gradient(180deg,var(--panel2),var(--panel));border-bottom:1px solid var(--line);font:600 11.5px/1 var(--mono);color:var(--ink2);flex:0 0 auto}
 body.hero-collapsed #heroStrip{display:flex}
@@ -528,27 +547,43 @@ body.hero-collapsed #heroStrip{display:flex}
     </span>
     <div class="spacer"></div>
     <div class="tbar">
-      <a class="btn" href="protocol_studio.html">Protocol Studio</a>
-      <a class="btn" href="i2c-analyzer.html">Bus Analyzer</a>
-      <a class="btn" href="threat-map.html">Threat Map</a>
       <button class="btn" id="bUndo" title="Undo (⌘/Ctrl+Z)" style="padding:6px 9px">↶</button>
       <button class="btn" id="bRedo" title="Redo (⌘/Ctrl+Shift+Z)" style="padding:6px 9px">↷</button>
+      <span class="tbar-div"></span>
       <button class="btn" id="bVerify" title="Validate the project and runtime limits">✓ Validate</button>
       <button class="btn" id="bExample">Examples</button>
-      <button class="btn" id="bCompile">Application artifact</button>
-      <button class="btn" id="bSFC">◇ SFC</button>
       <button class="btn" id="bProject">Project ▾</button>
-      <button class="btn" data-tbd-help="registers">? Registers help</button>
-      <button class="btn" id="bRegisters">Register table</button>
-      <button class="btn" id="bNetCfg" title="Configure the device network: W5500 Ethernet (if present) + WiFi (STA/setup-AP), static or DHCP">⚙ Network</button>
-      <button class="btn" id="bSensors">Grove devices</button>
-      <button class="btn" id="bBench" title="Pick a simple test circuit and drive it on the running firmware">⚡ Test bench</button>
+      <span class="tbar-div"></span>
       <button class="btn" id="bConnect">Connect USB</button>
       <button class="btn" id="bConnectTwin" title="Drive the QEMU twin over the twin-bridge WebSocket (no USB)">Connect twin</button>
-      <button class="btn" id="bReadStatus" disabled>Read controller status</button>
       <button class="btn pri" id="bDownload" disabled>Load application ▸</button>
       <button class="btn" id="bMonitor" disabled>Start monitoring</button>
       <span class="pill off" id="connPill"><span class="dot"></span>USB disconnected</span>
+      <span class="tbar-div"></span>
+      <details class="menu" id="toolsMenu">
+        <summary class="btn" title="More tools, tables and views">⋯ Tools ▾</summary>
+        <div class="menu-pop">
+          <div class="menu-lbl">Controller</div>
+          <button class="btn" id="bReadStatus" disabled>Read controller status</button>
+          <button class="btn" id="bReadProject" disabled>Read installed application</button>
+          <button class="btn" id="bExportProjectReadback" disabled>Export readback evidence</button>
+          <button class="btn" id="bBench" title="Pick a simple test circuit and drive it on the running firmware">⚡ Test bench</button>
+          <button class="btn" id="bNetCfg" title="Configure the device network (WiFi STA/setup-AP, and W5500 Ethernet if fitted), static or DHCP">⚙ Network</button>
+          <button class="btn" id="bSensors">Grove devices</button>
+          <div class="menu-sep"></div>
+          <div class="menu-lbl">Program &amp; tables</div>
+          <button class="btn" id="bProjectModules" disabled>Modules &amp; sources</button>
+          <button class="btn" id="bCompile">Application artifact</button>
+          <button class="btn" id="bSFC">◇ SFC</button>
+          <button class="btn" id="bRegisters">Register table</button>
+          <button class="btn" data-tbd-help="registers">? Registers help</button>
+          <div class="menu-sep"></div>
+          <div class="menu-lbl">Open in a new tab</div>
+          <a class="btn" href="protocol_studio.html">Protocol Studio</a>
+          <a class="btn" href="i2c-analyzer.html">Bus Analyzer</a>
+          <a class="btn" href="threat-map.html">Threat Map</a>
+        </div>
+      </details>
       <button class="btn" id="bHero" title="Show or hide the overview band — hide it to give the ladder and text more room">▾ Overview</button>
       <button class="btn" id="bTheme" title="Theme">◐</button>
     </div>
@@ -600,9 +635,6 @@ body.hero-collapsed #heroStrip{display:flex}
     <span id="projectState" role="status">Open a project to inspect its logic and settings.</span>
     <button class="btn" id="bOpenProject">Open project…</button>
     <button class="btn" id="bProjectSettings" disabled>Project settings</button>
-    <button class="btn" id="bProjectModules" disabled>Modules &amp; sources</button>
-    <button class="btn" id="bReadProject" disabled>Read installed application</button>
-    <button class="btn" id="bExportProjectReadback" disabled>Export readback evidence</button>
   </section>
 
   <div class="controller-status" aria-label="Controller status">
@@ -4914,6 +4946,13 @@ document.querySelectorAll('#palette .pbtn').forEach(b=>b.onclick=()=>insertEleme
   }
   seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{tier=+b.dataset.tier;apply();}));
   apply();
+})();
+/* Tools overflow menu: close after a choice, on outside click, or on Escape. */
+(function(){
+  const menu=document.getElementById('toolsMenu'); if(!menu)return;
+  menu.querySelectorAll('.menu-pop .btn,.menu-pop a').forEach(el=>el.addEventListener('click',()=>{menu.open=false;}));
+  document.addEventListener('click',e=>{ if(menu.open&&!menu.contains(e.target))menu.open=false; });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&menu.open)menu.open=false; });
 })();
 const ta=document.getElementById('stl');ta.addEventListener('blur',rebuildFromSTL);ta.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();rebuildFromSTL();}});
 
