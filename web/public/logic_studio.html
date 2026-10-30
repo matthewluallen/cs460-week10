@@ -45,6 +45,8 @@ header{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(
 .menu-pop .btn,.menu-pop a.btn{justify-content:flex-start;text-align:left;width:100%}
 .menu-sep{height:1px;background:var(--line);margin:5px 2px}
 .menu-lbl{font:600 9px/1.4 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:6px 7px 2px}
+/* Help lives in the header (top-right), not a floating pill that covers the registers. */
+.tbd-help-launch{display:none!important}
 /* command palette (Ctrl/Cmd+K) */
 #cmdk{position:fixed;inset:0;z-index:200;background:rgba(5,8,13,.5);display:flex;align-items:flex-start;justify-content:center;padding-top:12vh}
 #cmdk[hidden]{display:none}
@@ -616,6 +618,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
         </div>
       </details>
       <button class="btn" id="bHero" title="Show or hide the overview band — hide it to give the ladder and text more room">▾ Overview</button>
+      <button class="btn" id="bHelp" data-tbd-help title="Understand this system — components, terms, and the MITRE / cyber-informed-engineering framing">? Help</button>
       <button class="btn" id="bTheme" title="Theme">◐</button>
     </div>
   </header>
