@@ -451,6 +451,9 @@ button.btn.pri{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transpar
 .wfguide{background:linear-gradient(180deg,var(--panel2),var(--panel))}
 .wfguide .wstep.cur .wnum{box-shadow:0 0 10px -2px var(--accent)}
 .wfguide .wstep.done .wnum{box-shadow:0 0 10px -3px var(--live)}
+body.wf-collapsed #workflowGuide{display:none}
+#bToggleWf::before{content:"";display:inline-block;width:13px;margin-right:4px;color:var(--accent);font-weight:700}
+body:not(.wf-collapsed) #bToggleWf::before{content:"\2713"}
 /* Controller-mode identity: which mode the device is actually in, and that RUN
    energises relays / REMOTE opens network writes (the security-relevant state). */
 #modeChips button[data-m].is-active{font-weight:700;border-width:2px;padding-top:2px;padding-bottom:2px}
@@ -523,20 +526,21 @@ body.hero-collapsed #heroBand{display:none}
 /* Collapsed overview = give the logic the screen. The compact heroStrip already
    carries mode/conn/scan/bus, so hide the duplicate controller-status band and the
    two reference accordions (they return when Overview is expanded). */
-body.hero-collapsed [aria-label="Controller status"],
+body.hero-collapsed .controller-status[aria-label="Controller status"],
 body.hero-collapsed #controllerModeHelp,
 body.hero-collapsed #executionPanel{display:none}
-/* the project line merges into the compact strip (project name shown there);
+/* the project line merges into the status bar (project name shown there);
    the full project band returns when Overview is expanded */
 body.hero-collapsed section.controller-status[aria-label="Project workspace"]{display:none}
 #heroStrip .hs-sep{width:1px;align-self:stretch;min-height:13px;background:var(--line2)}
-/* slim status strip, shown only when the overview is collapsed */
-#heroStrip{display:none;align-items:center;gap:8px 16px;flex-wrap:wrap;padding:6px 14px;background:linear-gradient(180deg,var(--panel2),var(--panel));border-bottom:1px solid var(--line);font:600 11.5px/1 var(--mono);color:var(--ink2);flex:0 0 auto}
-body.hero-collapsed #heroStrip{display:flex}
-#heroStrip .hs-mode{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+/* status strip lives in the bottom status bar (professional: status at the foot) */
+#heroStrip{display:flex;align-items:center;gap:5px 13px;flex-wrap:nowrap;padding:0;background:none;border:0;font:600 11px/1 var(--mono);color:var(--ink2);flex:0 1 auto;min-width:0;overflow:hidden;text-transform:none;letter-spacing:0}
+#heroStrip>strong{color:var(--ink);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+#heroStrip .hs-mode{display:inline-flex;align-items:center;gap:6px;font-weight:700;white-space:nowrap}
 #heroStrip .hs-mode .d{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 7px currentColor}
 #heroStrip .hs-k{color:var(--muted);font-weight:600}
-#heroStrip .hs-live{margin-left:auto;cursor:pointer;border:1px solid var(--line2);border-radius:999px;padding:3px 10px;color:var(--muted);background:var(--panel)}
+#heroStrip>span:not(.hs-sep):not(.hs-mode):not(.hs-live){white-space:nowrap}
+#heroStrip .hs-live{cursor:pointer;border:1px solid var(--line2);border-radius:999px;padding:2px 9px;color:var(--muted);background:var(--panel);white-space:nowrap}
 #heroStrip .hs-live.on{color:var(--live);border-color:color-mix(in srgb,var(--live) 45%,transparent)}
 </style>
 
@@ -565,6 +569,9 @@ body.hero-collapsed #heroStrip{display:flex}
       <details class="menu" id="toolsMenu">
         <summary class="btn" title="More tools, tables and views">⋯ Tools ▾</summary>
         <div class="menu-pop">
+          <div class="menu-lbl">View</div>
+          <button class="btn" id="bToggleWf" data-keepopen="1">Workflow steps</button>
+          <div class="menu-sep"></div>
           <div class="menu-lbl">Controller</div>
           <button class="btn" id="bReadStatus" disabled>Read controller status</button>
           <button class="btn" id="bReadProject" disabled>Read installed application</button>
@@ -624,16 +631,6 @@ body.hero-collapsed #heroStrip{display:flex}
     </div>
   </section>
 
-  <div id="heroStrip" aria-label="Controller overview (compact)">
-    <strong id="hsProjName" style="color:var(--ink);font-weight:700;letter-spacing:0" title="Open project is under Project ▾ / Examples; expand Overview for settings and readback">No project</strong>
-    <span class="hs-sep"></span>
-    <span class="hs-mode" id="hsMode"><span class="d"></span><span id="hsModeT">Unknown</span></span>
-    <span><span class="hs-k">conn</span> <span id="hsConn">—</span></span>
-    <span><span class="hs-k">scan</span> <span id="hsScan">—</span></span>
-    <span><span class="hs-k">bus/s</span> <span id="hsBus">—</span></span>
-    <span class="hs-live" id="hsEnlarge" title="Open the StampLC screen large enough to read and interact with">⤢ PLC screen</span>
-    <span class="hs-live" id="hsLive" title="Stream real @BUS transactions to the overview scope">go live ▸</span>
-  </div>
 
   <section class="controller-status" aria-label="Project workspace">
     <strong id="projectTitle">No project open</strong>
@@ -812,6 +809,17 @@ body.hero-collapsed #heroStrip{display:flex}
 
   <section class="console" id="studioConsole">
     <div class="console-head">
+      <div id="heroStrip" aria-label="Controller status">
+        <strong id="hsProjName" title="Open project is under Project ▾ / Examples">No project</strong>
+        <span class="hs-sep"></span>
+        <span class="hs-mode" id="hsMode"><span class="d"></span><span id="hsModeT">Unknown</span></span>
+        <span><span class="hs-k">conn</span> <span id="hsConn">—</span></span>
+        <span><span class="hs-k">scan</span> <span id="hsScan">—</span></span>
+        <span><span class="hs-k">bus/s</span> <span id="hsBus">—</span></span>
+        <span class="hs-live" id="hsEnlarge" title="Open the StampLC screen large enough to read and interact with">⤢ screen</span>
+        <span class="hs-live" id="hsLive" title="Stream real @BUS transactions to the overview scope">go live ▸</span>
+      </div>
+      <span class="hs-sep" style="margin:0 2px"></span>
       <span class="contabs"><button data-tab="link" class="on">Link</button><button data-tab="bus">Bus monitor</button><button data-tab="trend">I/O trend</button></span>
       <button class="btn" style="padding:3px 9px;font-size:11px" id="bBusTrace" title="Enable software annotations briefly, acknowledge OFF, then read retained records">Capture 1 s</button>
       <span class="spacer" style="flex:1"></span>
@@ -4955,9 +4963,13 @@ document.querySelectorAll('#palette .pbtn').forEach(b=>b.onclick=()=>insertEleme
 /* Tools overflow menu: close after a choice, on outside click, or on Escape. */
 (function(){
   const menu=document.getElementById('toolsMenu'); if(!menu)return;
-  menu.querySelectorAll('.menu-pop .btn,.menu-pop a').forEach(el=>el.addEventListener('click',()=>{menu.open=false;}));
+  menu.querySelectorAll('.menu-pop .btn,.menu-pop a').forEach(el=>el.addEventListener('click',()=>{ if(!el.dataset.keepopen)menu.open=false; }));
   document.addEventListener('click',e=>{ if(menu.open&&!menu.contains(e.target))menu.open=false; });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&menu.open)menu.open=false; });
+  // View › Workflow steps (remembered) — pros can reclaim the band
+  const wf=document.getElementById('bToggleWf');
+  if(wf){ try{ if(localStorage.getItem('cs460_wf_collapsed')==='1')document.body.classList.add('wf-collapsed'); }catch(e){}
+    wf.addEventListener('click',()=>{ const c=document.body.classList.toggle('wf-collapsed'); try{localStorage.setItem('cs460_wf_collapsed',c?'1':'0');}catch(e){} }); }
 })();
 const ta=document.getElementById('stl');ta.addEventListener('blur',rebuildFromSTL);ta.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();rebuildFromSTL();}});
 
