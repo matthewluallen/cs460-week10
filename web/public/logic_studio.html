@@ -636,6 +636,8 @@ body.hero-collapsed #heroStrip{display:flex}
     <button class="pbtn" data-ins="mul" title="Word math — multiply (MUL). Overflow saturates to the int32 range.">× <span>MUL</span></button>
     <button class="pbtn" data-ins="div" title="Word math — integer divide (DIV). Truncates toward zero; divide-by-zero yields 0.">÷ <span>DIV</span></button>
     <button class="pbtn" data-ins="move" title="MOVE — copy a word (or a constant) into a memory word %MW or analog output %QW.">→ <span>MOVE</span></button>
+    <button class="pbtn" data-ins="limit" title="LIMIT(MN, IN, MX) — clamp IN to the range [MN, MX].">⊓ <span>LIMIT</span></button>
+    <button class="pbtn" data-ins="sel" title="SEL(G, IN0, IN1) — pick IN1 when G is nonzero, otherwise IN0.">⋔ <span>SEL</span></button>
     <span class="sep"></span>
     <button class="pbtn" data-ins="orbranch" title="Parallel OR branch on selected network">⑃ <span>OR branch</span></button>
     <button class="pbtn" data-ins="coil" title="Set the network's coil">( ) <span>Coil</span></button>
@@ -1374,7 +1376,9 @@ function exportStructuredText(program, {scanMs} = {}) {
       if(!m||m.t!=='math')throw new Error('A word output requires a math expression');
       claim(m.id);
       const opsym={add:'+',sub:'-',mul:'*',div:'/'}[m.op];
-      const rhs=m.op==='move'?operandST(m.a):`${operandST(m.a)} ${opsym} ${operandST(m.b)}`;
+      const rhs=m.op==='move'?operandST(m.a)
+        :(m.op==='limit'||m.op==='sel')?`${m.op.toUpperCase()}(${operandST(m.a)}, ${operandST(m.b)}, ${operandST(m.c)})`
+        :`${operandST(m.a)} ${opsym} ${operandST(m.b)}`;
       emit(`${variable(coil.io,coil.idx,true)} := ${rhs};`,m.id);
     } else {
       const result=expression(network.expr);
@@ -1441,8 +1445,9 @@ function parseStructuredText(source) {
     if((m=/^(MW\d+|QW\d+)\s*:=\s*(.+)$/.exec(line))) {
       if(pending)fail('Uncaptured function block output');
       const wop=tok=>{let mm;if((mm=/^(-?\d+)$/.exec(tok)))return {t:'k',k:Number(mm[1])};if((mm=/^(IW|MW|QW)(\d+)$/.exec(tok)))return {t:'wsrc',io:mm[1],idx:Number(mm[2])};fail('Unsupported word operand '+tok);};
-      const wrhs=m[2].trim();let mnode,bm;
-      if((bm=/^(\S+)\s*([-+*/])\s*(\S+)$/.exec(wrhs)))mnode={t:'math',op:({'+':'add','-':'sub','*':'mul','/':'div'})[bm[2]],a:wop(bm[1]),b:wop(bm[3]),id:id()};
+      const wrhs=m[2].trim();let mnode,bm,fm;
+      if((fm=/^(LIMIT|SEL)\(\s*([^,]+?)\s*,\s*([^,]+?)\s*,\s*([^,)]+?)\s*\)$/i.exec(wrhs)))mnode={t:'math',op:fm[1].toLowerCase(),a:wop(fm[2].trim()),b:wop(fm[3].trim()),c:wop(fm[4].trim()),id:id()};
+      else if((bm=/^(\S+)\s*([-+*/])\s*(\S+)$/.exec(wrhs)))mnode={t:'math',op:({'+':'add','-':'sub','*':'mul','/':'div'})[bm[2]],a:wop(bm[1]),b:wop(bm[3]),id:id()};
       else mnode={t:'math',op:'move',a:wop(wrhs),id:id()};
       nets.push({id:`N${nets.length+1}`,label:'',expr:mnode,coil:{io:m[1].slice(0,2),idx:Number(m[1].slice(2))}});
       continue;
@@ -1901,7 +1906,7 @@ const WCOUNTS={MW:16,QW:4};                 // word classes (scratch + analog ou
 const wordClasses=['IW','MW','QW'];         // valid word operand sources
 const wordLimit=io=>io==='IW'?COUNTS.IW:WCOUNTS[io];
 const PROCESS_FIELDS=PROCESS_DRIVER_FIELDS;
-const OPS={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31};
+const OPS={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31,LIMIT:32,SEL:33};
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const integer=(value,min,max,label)=>need(Number.isInteger(value)&&value>=min&&value<=max,`${label} must be an integer from ${min} to ${max}.`);
@@ -2031,9 +2036,10 @@ function validateProject(project){
    integer(n.preset,0,2147483647,'Counter preset');node(n.cu,depth+1);node(n.cd,depth+1);node(n.r,depth+1);node(n.ld,depth+1);
   }
   else if(n.t==='math'){
-   object(n,['t','id','op','a',...(n.op==='move'?[]:['b'])],[],'Math');
-   need(['add','sub','mul','div','move'].includes(n.op),'Unsupported math operation.');
-   wordOperand(n.a);if(n.op!=='move')wordOperand(n.b);
+   const three=n.op==='limit'||n.op==='sel';
+   object(n,['t','id','op','a',...(n.op==='move'?[]:['b']),...(three?['c']:[])],[],'Math');
+   need(['add','sub','mul','div','move','limit','sel'].includes(n.op),'Unsupported math operation.');
+   wordOperand(n.a);if(n.op!=='move')wordOperand(n.b);if(three)wordOperand(n.c);
   }else throw new Error('Unsupported expression type.');
  }
  const wordOperand=o=>{
@@ -2097,7 +2103,11 @@ function compileProgram(program){
   else if(n.t==='series'||n.t==='par'){emit(n.kids[0]);for(let i=1;i<n.kids.length;i++){emit(n.kids[i]);push([n.t==='series'?OPS.AND:OPS.OR],n.id);}}
   else if(n.t==='ton'||n.t==='tof'||n.t==='rtrig'||n.t==='ftrig'){emit(n.in);const edge=n.t==='rtrig'||n.t==='ftrig';push(edge?[n.t==='ftrig'?OPS.FTRIG:OPS.RTRIG,n.inst]:[n.t==='tof'?OPS.TOF:OPS.TON,n.inst,n.preset],n.id);}
   else if(n.t==='ctud'){emit(n.cu);emit(n.cd);emit(n.r);emit(n.ld);push([OPS.CTUD,n.inst,n.preset],n.id);}
-  else if(n.t==='math'){emitOperand(n.a,n.id);if(n.op!=='move'){emitOperand(n.b,n.id);push([{add:OPS.ADD,sub:OPS.SUB,mul:OPS.MUL,div:OPS.DIV}[n.op]],n.id);}}
+  else if(n.t==='math'){
+    emitOperand(n.a,n.id);
+    if(n.op==='limit'||n.op==='sel'){emitOperand(n.b,n.id);emitOperand(n.c,n.id);push([n.op==='limit'?OPS.LIMIT:OPS.SEL],n.id);}
+    else if(n.op!=='move'){emitOperand(n.b,n.id);push([{add:OPS.ADD,sub:OPS.SUB,mul:OPS.MUL,div:OPS.DIV}[n.op]],n.id);}
+  }
   else throw new Error('Unsupported expression type.');
  }
  function emitOperand(o,id){if(o.t==='k')push([OPS.PUSH_I,o.k],id);else push([OPS['LD_'+o.io],o.idx],id);}
@@ -2314,7 +2324,7 @@ return {EXECUTION_SCHEMA,EXECUTION_MAX_AGE_MS,parseExecutionReadback,validateExe
 <!-- PROJECT-ADAPTER-END -->
 <script>
 /* ===== opcodes: match firmware/src/plc_engine.h ===== */
-const OP={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,XOR:10,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,FBQ:19,DROP:20,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31};
+const OP={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,XOR:10,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,FBQ:19,DROP:20,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31,LIMIT:32,SEL:33};
 const LD={IX:OP.LD_IX,QX:OP.LD_QX,MX:OP.LD_MX};
 const ST={QX:OP.ST_QX,MX:OP.ST_MX};
 const CMP={GT:OP.GT,LT:OP.LT,GE:OP.GE,LE:OP.LE,EQ:OP.EQ};
@@ -2386,8 +2396,12 @@ function renderSTL(){
     if(n.coil&&(n.coil.io==='MW'||n.coil.io==='QW')&&n.expr&&n.expr.t==='math'){
       const m=n.expr,opc={add:'ADD',sub:'SUB',mul:'MUL',div:'DIV'}[m.op];
       const opTxt=o=>!o?'?':o.t==='k'?String(o.k):nodeName(o.io,o.idx);
-      add(`LD    ${opTxt(m.a)}`,m.id);
-      if(m.op!=='move')add(`${opc.padEnd(4)}  ${opTxt(m.b)}`,m.id);
+      if(m.op==='limit'||m.op==='sel'){
+        add(`${m.op.toUpperCase().padEnd(5)} ${opTxt(m.a)}, ${opTxt(m.b)}, ${opTxt(m.c)}`,m.id);
+      } else {
+        add(`LD    ${opTxt(m.a)}`,m.id);
+        if(m.op!=='move')add(`${opc.padEnd(4)}  ${opTxt(m.b)}`,m.id);
+      }
       add(`ST    ${nodeName(n.coil.io,n.coil.idx)}`,m.id);
       return;
     }
@@ -2547,7 +2561,10 @@ function renderLadder(live){
       const op=mexpr?mexpr.op:'move';
       const opsym={add:'+',sub:'−',mul:'×',div:'÷'}[op]||'';
       const opTxt=o=>!o?'?':o.t==='k'?String(o.k):`%${o.io}${o.idx}`;
-      const rhs=op==='move'?opTxt(mexpr&&mexpr.a):`${opTxt(mexpr&&mexpr.a)} ${opsym} ${opTxt(mexpr&&mexpr.b)}`;
+      const three=op==='limit'||op==='sel';
+      const rhs=op==='move'?opTxt(mexpr&&mexpr.a)
+        :three?`${op.toUpperCase()}(${opTxt(mexpr&&mexpr.a)}, ${opTxt(mexpr&&mexpr.b)}, ${opTxt(mexpr&&mexpr.c)})`
+        :`${opTxt(mexpr&&mexpr.a)} ${opsym} ${opTxt(mexpr&&mexpr.b)}`;
       const title=`${dest} := ${rhs}`;
       const boxW=Math.max(240,labelWidth(title,false,12)+56);
       Ht=H+16;W=PADX*2+boxW;S=mkSVG();
@@ -2707,7 +2724,9 @@ function genST(){const out=[];PROG.nets.forEach((n,i)=>{if(i)out.push('');
   if(n.coil&&(n.coil.io==='MW'||n.coil.io==='QW')&&n.expr&&n.expr.t==='math'){
     const m=n.expr,opsym={add:'+',sub:'−',mul:'×',div:'÷'}[m.op];
     const opTxt=o=>!o?'?':o.t==='k'?String(o.k):stIdent(o.io,o.idx);
-    const rhs=m.op==='move'?opTxt(m.a):`${opTxt(m.a)} <span class="asg">${opsym}</span> ${opTxt(m.b)}`;
+    const rhs=m.op==='move'?opTxt(m.a)
+      :(m.op==='limit'||m.op==='sel')?`<span class="kw">${m.op.toUpperCase()}</span>(${opTxt(m.a)}, ${opTxt(m.b)}, ${opTxt(m.c)})`
+      :`${opTxt(m.a)} <span class="asg">${opsym}</span> ${opTxt(m.b)}`;
     out.push(`${stIdent(n.coil.io,n.coil.idx)} <span class="asg">:=</span> ${rhs};`);
     return;
   }
@@ -2814,14 +2833,15 @@ function insertElement(kind){
     openContactEditor(a1, rebuildFromModel);          // pick input A first
     return;
   }
-  if(kind==='add'||kind==='sub'||kind==='mul'||kind==='div'||kind==='move'){
+  if(['add','sub','mul','div','move','limit','sel'].includes(kind)){
     // Word-math network: writes a scaled-integer result into a memory/analog word.
     // One operation per network; chain through %MW scratch for multi-step math.
     let mwMax=-1;PROG.nets.forEach(x=>{if(x.coil&&x.coil.io==='MW')mwMax=Math.max(mwMax,x.coil.idx);});
     const idx=Math.min(mwMax+1,15);   // NMW=16 memory words (0..15)
     const expr={t:'math',op:kind,a:{t:'wsrc',io:'IW',idx:0},id:uid()};
     if(kind!=='move')expr.b={t:'wsrc',io:'IW',idx:1};
-    const nn=net(expr,{io:'MW',idx},kind==='move'?'MOVE — copy a word':'word math');
+    if(kind==='limit'||kind==='sel')expr.c={t:'wsrc',io:'IW',idx:2};
+    const nn=net(expr,{io:'MW',idx},kind==='move'?'MOVE — copy a word':kind==='limit'?'LIMIT — clamp to range':kind==='sel'?'SEL — select':'word math');
     PROG.nets.push(nn);selNet=nn.id;rebuildFromModel();
     openMathEditor(nn,rebuildFromModel);
     return;
@@ -3025,25 +3045,30 @@ function openMathEditor(netObj,after){
       <select id="${id}t"><option value="wsrc"${o.t==='wsrc'?' selected':''}>word source</option><option value="k"${o.t==='k'?' selected':''}>constant</option></select></div>
     <div class="field ${id}w"><label>&nbsp;· word</label>${wsel(id+'io',o.io||'IW')}<input id="${id}idx" type="number" min="0" value="${o.idx||0}" style="width:64px;margin-left:6px"></div>
     <div class="field ${id}k"><label>&nbsp;· value</label><input id="${id}k" type="number" value="${o.k!=null?o.k:0}"></div>`;
-  const opSel=['add','sub','mul','div','move'].map(o=>`<option value="${o}"${o===m.op?' selected':''}>${({add:'+  ADD',sub:'−  SUB',mul:'×  MUL',div:'÷  DIV',move:'MOVE (copy)'})[o]}</option>`).join('');
+  const opSel=['add','sub','mul','div','move','limit','sel'].map(o=>`<option value="${o}"${o===m.op?' selected':''}>${({add:'+  ADD',sub:'−  SUB',mul:'×  MUL',div:'÷  DIV',move:'MOVE (copy)',limit:'LIMIT (clamp)',sel:'SEL (select)'})[o]}</option>`).join('');
   showModal(`<h3>Edit word math</h3><div class="body">
-    <p class="hint" style="font-size:11px;color:var(--ink2);margin:0 0 6px">Scaled-integer math. The result writes to a memory word (%MW scratch) or an analog output (%QW). One operation per rung — chain through %MW for multi-step math. Division truncates toward zero; overflow saturates.</p>
+    <p class="hint" style="font-size:11px;color:var(--ink2);margin:0 0 6px">Scaled-integer math. Result writes to a memory word (%MW scratch) or analog output (%QW). One operation per rung — chain through %MW for multi-step math. Division truncates; overflow saturates. LIMIT(MN, IN, MX) clamps IN to the range; SEL(G, IN0, IN1) picks IN1 when G≠0, else IN0.</p>
     <div class="field"><label>Write result to</label><select id="dio"><option value="MW"${coil.io==='MW'?' selected':''}>%MW (scratch)</option><option value="QW"${coil.io==='QW'?' selected':''}>%QW (analog out)</option></select><input id="didx" type="number" min="0" value="${coil.idx}" style="width:64px;margin-left:6px"></div>
     <div class="field"><label>Operation</label><select id="op">${opSel}</select></div>
     ${operandHTML('a','Operand A kind',m.a||{t:'wsrc',io:'IW',idx:0})}
     <div id="bwrap">${operandHTML('b','Operand B kind',m.b||{t:'wsrc',io:'IW',idx:1})}</div>
+    <div id="cwrap">${operandHTML('c','Operand C kind',m.c||{t:'wsrc',io:'IW',idx:2})}</div>
     <div class="row"><button class="btn" id="mDel">Delete</button><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" id="mOk">Apply</button></div></div>`);
   const q=s=>modalInner.querySelector(s);
   const refresh=()=>{
-    q('#bwrap').style.display=q('#op').value==='move'?'none':'';
-    for(const p of ['a','b']){const isK=q('#'+p+'t').value==='k';modalInner.querySelectorAll('.'+p+'w').forEach(e=>e.style.display=isK?'none':'');modalInner.querySelectorAll('.'+p+'k').forEach(e=>e.style.display=isK?'':'none');}
+    const op=q('#op').value,three=op==='limit'||op==='sel';
+    q('#bwrap').style.display=op==='move'?'none':'';
+    q('#cwrap').style.display=three?'':'none';
+    for(const p of ['a','b','c']){const isK=q('#'+p+'t').value==='k';modalInner.querySelectorAll('.'+p+'w').forEach(e=>e.style.display=isK?'none':'');modalInner.querySelectorAll('.'+p+'k').forEach(e=>e.style.display=isK?'':'none');}
   };
-  q('#op').onchange=refresh;q('#at').onchange=refresh;q('#bt').onchange=refresh;refresh();
+  q('#op').onchange=refresh;q('#at').onchange=refresh;q('#bt').onchange=refresh;q('#ct').onchange=refresh;refresh();
   const readOperand=p=>q('#'+p+'t').value==='k'?{t:'k',k:parseInt(q('#'+p+'k').value,10)||0}:{t:'wsrc',io:q('#'+p+'io').value,idx:parseInt(q('#'+p+'idx').value,10)||0};
   q('#mOk').onclick=()=>{
     netObj.coil={io:q('#dio').value,idx:parseInt(q('#didx').value,10)||0};
     m.op=q('#op').value;m.a=readOperand('a');
-    if(m.op==='move')delete m.b;else m.b=readOperand('b');
+    if(m.op==='move'){delete m.b;delete m.c;}
+    else if(m.op==='limit'||m.op==='sel'){m.b=readOperand('b');m.c=readOperand('c');}
+    else {m.b=readOperand('b');delete m.c;}
     closeModal();after&&after();
   };
   q('#mDel').onclick=()=>{const i=PROG.nets.indexOf(netObj);if(i>=0)PROG.nets.splice(i,1);closeModal();after&&after();};

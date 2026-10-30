@@ -32,6 +32,8 @@ enum Op : uint8_t {
   OP_ST_MW,     // arg=word index         pop -> memory word %MW
   OP_ST_QW,     // arg=word index         pop -> analog output %QW
   OP_ADD, OP_SUB, OP_MUL, OP_DIV,         // int32 arithmetic (saturating; DIV/0 -> 0)
+  OP_LIMIT,     // pop MN,IN,MX            push clamp(IN, MN, MX)
+  OP_SEL,       // pop G,IN0,IN1           push G ? IN1 : IN0
 };
 
 struct Instr { uint8_t op; int32_t a; int32_t b; };

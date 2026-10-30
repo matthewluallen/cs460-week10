@@ -41,6 +41,7 @@ const char* validate_program(const Instr* prog, int n) {
       case OP_ST_MW: limit = NMW; need = 1; break;
       case OP_ST_QW: limit = NQW; need = 1; break;
       case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: need = 2; produced = 1; break;
+      case OP_LIMIT: case OP_SEL: need = 3; produced = 1; break;
       case OP_FBQ: limit = NINST; produced = 1; break;
       default: return "opcode";
     }
@@ -106,6 +107,8 @@ bool Engine::scan(const Instr* prog, int n, uint32_t now_ms) {
       case OP_MUL: { int64_t b=pop(),a=pop(); push(sat32(a*b)); } break;
       case OP_DIV: { int32_t b=(int32_t)pop(),a=(int32_t)pop();
                      push(b==0 ? 0 : (a==(-2147483647-1)&&b==-1) ? 2147483647 : a/b); } break;
+      case OP_LIMIT: { int32_t mx=pop(),in=pop(),mn=pop(); push(in<mn ? mn : (in>mx ? mx : in)); } break;
+      case OP_SEL:   { int32_t in1=pop(),in0=pop(),g=pop(); push(g ? in1 : in0); } break;
       case OP_DROP: (void)pop(); break;      // discard (FB-call statement result)
       case OP_TON: {                       // IEC TON: Q after IN true for PT ms
         FbInst& f = inst_[c.a];
