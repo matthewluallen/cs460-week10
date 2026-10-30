@@ -14,6 +14,32 @@ declare -F note    >/dev/null 2>&1 || note()    { printf '   %s\n' "$*"; }
 cd "$HERE"
 mkdir -p out
 
+# grype's first run downloads/loads a large vulnerability DB (hundreds of MB to a
+# few GB) and can take several minutes on a fresh Codespace — with no output, it
+# looks frozen. Run it with a live elapsed-time timer so students see it is alive,
+# then reuse the result. Warm runs take ~30s.
+grype_progress() {            # usage: grype_progress <outfile> <show:yes|no> <grype args...>
+  local out="$1" show="$2"; shift 2
+  if [ ! -f "$HERE/out/.grype_warm" ]; then
+    say "First scan only: grype now loads its vulnerability database. On a fresh Codespace this can take 1-5 minutes (it may need to download it); later scans take ~30s. The timer below proves it is working, not stuck — please wait."
+  fi
+  local tmp; tmp="$(mktemp)"; local err; err="$(mktemp)"
+  grype "$@" >"$tmp" 2>"$err" &
+  local pid=$! t0=$SECONDS
+  while kill -0 "$pid" 2>/dev/null; do
+    printf '\r   grype working... %3ss elapsed (first run loads/downloads the CVE database)   ' "$((SECONDS - t0))"
+    sleep 1
+  done
+  wait "$pid"; local rc=$?
+  printf '\r   grype finished in %ss.                                                      \n' "$((SECONDS - t0))"
+  cp "$tmp" "$out" 2>/dev/null || true
+  [ "$show" = yes ] && cat "$tmp"
+  [ -s "$err" ] && grep -viE 'no explicit name|the default behavior' "$err" >&2 || true
+  [ "$rc" -eq 0 ] && touch "$HERE/out/.grype_warm"
+  rm -f "$tmp" "$err"
+  return "$rc"
+}
+
 step "SBOM of the sample component ( sbom/vuln-sample/ )"
 say "An SBOM lists what is inside the software. We generate it two ways, then scan it for known CVEs."
 predict "Before scanning, write down which of the top CVEs you expect to be FIRMWARE-RESIDENT (run on the chip) vs BUILD-HOST/TOOLCHAIN-ONLY (present in this tree but never shipped). This scope call is the graded insight."
@@ -37,13 +63,13 @@ observe "SPDX packages: $SPDX_N   CycloneDX components: $CDX_N  (a concrete SPDX
 step "3 — Vulnerabilities (grype, reading your SBOM)"
 say "Scan the SBOM you just generated for known CVEs; being LISTED means the component version carries a CVE — not that the code path runs here."
 note '$ grype sbom:out/sbom.spdx.json -o table | tee out/grype.txt'
-grype sbom:out/sbom.spdx.json -o table | tee out/grype.txt
+grype_progress out/grype.txt yes sbom:out/sbom.spdx.json -o table
 observe "Read the table top-down: CVE, severity, component, version. Mark each top CVE firmware-resident vs build-host-only. The scan does NOT establish reachability."
 
 step "4 — Connect to the analyzer:  analyzer <-> SBOM <-> CWE <-> CVE"
 say "The CWE class is what joins a scanner CVE to the firmware's code and the analyzer's evidence. The bridge splits findings into observable-in-the-twin vs library-only."
 note '$ grype sbom:out/sbom.spdx.json -o json > out/grype.json'
-grype sbom:out/sbom.spdx.json -o json > out/grype.json 2>/dev/null
+grype_progress out/grype.json no sbom:out/sbom.spdx.json -o json
 note '$ python3 cwe_bridge.py out/grype.json --all | tee out/cwe-bridge.txt'
 python3 cwe_bridge.py out/grype.json --all | tee out/cwe-bridge.txt
 observe "Observable classes have vulnerable firmware code the analyzer can show; library-only classes are real CVEs with no reachable code here. An SBOM hit is a QUESTION, not a verdict."
