@@ -27,12 +27,18 @@ enum Op : uint8_t {
   OP_TOF,       // arg=inst, arg2=preset  pop IN, update TOF (off-delay), push Q
   OP_FTRIG,     // arg=inst               pop CLK, push falling edge
   OP_CTUD,      // arg=inst, arg2=PV      pop CU,CD,R,LD; update CV; push QU
+  OP_LD_MW,     // arg=word index         push memory word %MW (int)
+  OP_LD_QW,     // arg=word index         push analog output %QW (int, readback)
+  OP_ST_MW,     // arg=word index         pop -> memory word %MW
+  OP_ST_QW,     // arg=word index         pop -> analog output %QW
+  OP_ADD, OP_SUB, OP_MUL, OP_DIV,         // int32 arithmetic (saturating; DIV/0 -> 0)
 };
 
 struct Instr { uint8_t op; int32_t a; int32_t b; };
 
 // I/O image sizes (bench StamPLC: 8 DI, 4 relays; expandable later)
 static const int NDI = 8, NQ = 4, NMX = 32, NIW = pointmap::VM_WORD_COUNT, NINST = 16;
+static const int NMW = 16, NQW = 4;   // memory words (scratch) + analog output words
 static const int MAX_INSTRUCTIONS = 64, STACK_CAPACITY = 64;
 
 // Returns nullptr for valid bounded IR, otherwise a stable diagnostic. Operand
@@ -66,6 +72,9 @@ class Engine {
   int32_t  fbcv(int i) const      { return (i>=0 && i<NINST) ? inst_[i].cv : 0; }
   bool     fbqd(int i) const      { return (i>=0 && i<NINST) ? inst_[i].qd : false; }
   bool mem(int i) const           { return (i>=0 && i<NMX)? mx_[i] : false; }
+  int32_t memword(int i) const    { return (i>=0 && i<NMW) ? mw_[i] : 0; }
+  int32_t outword(int i) const    { return (i>=0 && i<NQW) ? qw_[i] : 0; }
+  void set_memword(int i, int32_t v){ if (i>=0 && i<NMW) mw_[i]=v; }
   // Run one scan of the loaded program.
   bool scan(const Instr* prog, int n, uint32_t now_ms);
  private:
@@ -73,6 +82,8 @@ class Engine {
   bool qx_[NQ]={false};
   bool mx_[NMX]={false};
   int32_t iw_[NIW]={0};
+  int32_t mw_[NMW]={0};
+  int32_t qw_[NQW]={0};
   FbInst inst_[NINST];
   int32_t stack_[64]; int sp_=0;
   void push(int32_t v){ if(sp_<64) stack_[sp_++]=v; }

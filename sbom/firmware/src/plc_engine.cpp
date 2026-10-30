@@ -3,6 +3,13 @@
 
 namespace plc {
 
+// Saturating narrow to int32 so teaching math never silently wraps.
+static inline int32_t sat32(int64_t v) {
+  if (v >  2147483647LL) return  2147483647;
+  if (v < -2147483648LL) return -2147483648;
+  return (int32_t)v;
+}
+
 const char* validate_program(const Instr* prog, int n) {
   if (!prog || n <= 0 || n > MAX_INSTRUCTIONS) return "length";
   int depth = 0;
@@ -29,6 +36,11 @@ const char* validate_program(const Instr* prog, int n) {
       case OP_TON: case OP_TOF: uses_b = true; // fall through
       case OP_RTRIG: case OP_FTRIG: need = 1; produced = 1; limit = NINST; break;
       case OP_CTUD: uses_b = true; need = 4; produced = 1; limit = NINST; break;
+      case OP_LD_MW: limit = NMW; produced = 1; break;
+      case OP_LD_QW: limit = NQW; produced = 1; break;
+      case OP_ST_MW: limit = NMW; need = 1; break;
+      case OP_ST_QW: limit = NQW; need = 1; break;
+      case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: need = 2; produced = 1; break;
       case OP_FBQ: limit = NINST; produced = 1; break;
       default: return "opcode";
     }
@@ -53,6 +65,8 @@ void Engine::reset() {
   for (int i=0;i<NIW;i++) iw_[i]=0;
   for (int i=0;i<NQ;i++) qx_[i]=false;
   for (int i=0;i<NMX;i++) mx_[i]=false;
+  for (int i=0;i<NMW;i++) mw_[i]=0;
+  for (int i=0;i<NQW;i++) qw_[i]=0;
   for (int i=0;i<NINST;i++) inst_[i]=FbInst();
   sp_=0;
 }
@@ -83,6 +97,15 @@ bool Engine::scan(const Instr* prog, int n, uint32_t now_ms) {
       case OP_LE:  { int32_t b=pop(),a=pop(); push((a<=b)?1:0);} break;
       case OP_EQ:  { int32_t b=pop(),a=pop(); push((a==b)?1:0);} break;
       case OP_FBQ: push(inst_[c.a].q ? 1:0); break;
+      case OP_LD_MW: push(mw_[c.a]); break;
+      case OP_LD_QW: push(qw_[c.a]); break;
+      case OP_ST_MW: mw_[c.a] = pop(); break;
+      case OP_ST_QW: qw_[c.a] = pop(); break;
+      case OP_ADD: { int64_t b=pop(),a=pop(); push(sat32(a+b)); } break;
+      case OP_SUB: { int64_t b=pop(),a=pop(); push(sat32(a-b)); } break;
+      case OP_MUL: { int64_t b=pop(),a=pop(); push(sat32(a*b)); } break;
+      case OP_DIV: { int32_t b=(int32_t)pop(),a=(int32_t)pop();
+                     push(b==0 ? 0 : (a==(-2147483647-1)&&b==-1) ? 2147483647 : a/b); } break;
       case OP_DROP: (void)pop(); break;      // discard (FB-call statement result)
       case OP_TON: {                       // IEC TON: Q after IN true for PT ms
         FbInst& f = inst_[c.a];

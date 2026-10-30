@@ -630,6 +630,12 @@ body.hero-collapsed #heroStrip{display:flex}
     <button class="pbtn" data-ins="rtrig" title="Rising-edge — Q pulses for one scan when the input goes OFF→ON">↑ <span>R_TRIG</span></button>
     <button class="pbtn" data-ins="ftrig" title="Falling-edge — Q pulses for one scan when the input goes ON→OFF">↓ <span>F_TRIG</span></button>
     <button class="pbtn" data-ins="ctud" title="Up/down counter (CTUD) — counts CU up and CD down; QU is true when the count reaches PV, QD when it returns to zero. R resets the count, LD loads PV.">⊞ <span>CTUD</span></button>
+    <span class="pdiv" style="width:1px;align-self:stretch;background:var(--line);margin:0 4px"></span>
+    <button class="pbtn" data-ins="add" title="Word math — add two scaled-integer words and store the result (ADD). Writes to a memory word %MW or analog output %QW.">＋ <span>ADD</span></button>
+    <button class="pbtn" data-ins="sub" title="Word math — subtract (SUB).">－ <span>SUB</span></button>
+    <button class="pbtn" data-ins="mul" title="Word math — multiply (MUL). Overflow saturates to the int32 range.">× <span>MUL</span></button>
+    <button class="pbtn" data-ins="div" title="Word math — integer divide (DIV). Truncates toward zero; divide-by-zero yields 0.">÷ <span>DIV</span></button>
+    <button class="pbtn" data-ins="move" title="MOVE — copy a word (or a constant) into a memory word %MW or analog output %QW.">→ <span>MOVE</span></button>
     <span class="sep"></span>
     <button class="pbtn" data-ins="orbranch" title="Parallel OR branch on selected network">⑃ <span>OR branch</span></button>
     <button class="pbtn" data-ins="coil" title="Set the network's coil">( ) <span>Coil</span></button>
@@ -639,7 +645,7 @@ body.hero-collapsed #heroStrip{display:flex}
     <button class="pbtn" data-ins="net" title="Add a network">＋ <span>Network</span></button>
     <button class="pbtn" data-ins="startup" id="bStartup" title="Add an explicit boot-admission declaration outside scan logic">↻ <span>Reboot RUN</span></button>
     <span class="lbl" style="margin-left:8px" id="palHint">keys: n·NO  /·NC  m·CMP  t·TON  r·R_TRIG  f·F_TRIG  o·OR  c·coil  e·network</span>
-    <span class="hint" style="font-size:11px;color:var(--ink2)">Boolean logic, comparisons and timers · PID is not yet supported by this compiler/runtime.</span>
+    <span class="hint" style="font-size:11px;color:var(--ink2)">Boolean logic, comparisons, timers, counters and scaled-integer word math · PID is not yet supported by this compiler/runtime.</span>
     <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">
       <span class="lbl">View</span>
       <span class="lvseg" id="logicViewSeg" title="How much room the ladder vs the program text gets"><button type="button" data-lv="split" class="on">Split</button><button type="button" data-lv="ladder">Ladder</button><button type="button" data-lv="text">Text</button></span>
@@ -1303,14 +1309,16 @@ function exportStructuredText(program, {scanMs} = {}) {
   }
   const emit=(text,id)=>{const start=body.join('').length;body.push(text+'\n');spans.push({id,start,end:start+text.length});};
   const variable=(io,idx,write=false)=>{
-    const count={IX:8,QX:4,MX:32,IW:8}[io];
-    if(!count || (write&&!['QX','MX'].includes(io)))throw new Error('Unsupported I/O class');
+    const count={IX:8,QX:4,MX:32,IW:8,MW:16,QW:4}[io];
+    if(count==null || (write&&!['QX','MX','QW','MW'].includes(io)))throw new Error('Unsupported I/O class');
     integer(idx,0,count-1,'I/O index');
     const name=io+idx;
-    if(!vars.has(name))vars.set(name,{name,io,idx,type:io==='IW'?'DINT':'BOOL',
+    const isWord=io==='IW'||io==='MW'||io==='QW';
+    if(!vars.has(name))vars.set(name,{name,io,idx,type:isWord?'DINT':'BOOL',
       address:['IX','QX'].includes(io)?`%${io}0.${idx}`:null});
     return name;
   };
+  const operandST=o=>o.t==='k'?String(o.k):variable(o.io,o.idx);
   const neg=v=>{if(typeof v!=='boolean')throw new Error('Invalid negation flag');return v;};
   function expression(n,depth=0) {
     if(!n)return 'FALSE';
@@ -1359,10 +1367,19 @@ function exportStructuredText(program, {scanMs} = {}) {
   for(const network of program.nets) {
     claim(network.id);claim(network.id+'coil');
     const start=body.join('').length;
-    const result=expression(network.expr);
     const coil=network.coil;
     if(!coil)throw new Error('Missing coil');
-    emit(`${variable(coil.io,coil.idx,true)} := ${neg(coil.neg)?'NOT ':''}${result};`,network.id+'coil');
+    if(coil.io==='MW'||coil.io==='QW') {
+      const m=network.expr;
+      if(!m||m.t!=='math')throw new Error('A word output requires a math expression');
+      claim(m.id);
+      const opsym={add:'+',sub:'-',mul:'*',div:'/'}[m.op];
+      const rhs=m.op==='move'?operandST(m.a):`${operandST(m.a)} ${opsym} ${operandST(m.b)}`;
+      emit(`${variable(coil.io,coil.idx,true)} := ${rhs};`,m.id);
+    } else {
+      const result=expression(network.expr);
+      emit(`${variable(coil.io,coil.idx,true)} := ${neg(coil.neg)?'NOT ':''}${result};`,network.id+'coil');
+    }
     spans.push({id:network.id,start,end:body.join('').length});
   }
   const declarations=[...vars.values()].map(v=>` ${v.name}${v.address?' AT '+v.address:''} : ${v.type};`);
@@ -1421,6 +1438,15 @@ function parseStructuredText(source) {
       if(m[4]!==undefined)pending.preset=Number(m[4]);
       continue;
     }
+    if((m=/^(MW\d+|QW\d+)\s*:=\s*(.+)$/.exec(line))) {
+      if(pending)fail('Uncaptured function block output');
+      const wop=tok=>{let mm;if((mm=/^(-?\d+)$/.exec(tok)))return {t:'k',k:Number(mm[1])};if((mm=/^(IW|MW|QW)(\d+)$/.exec(tok)))return {t:'wsrc',io:mm[1],idx:Number(mm[2])};fail('Unsupported word operand '+tok);};
+      const wrhs=m[2].trim();let mnode,bm;
+      if((bm=/^(\S+)\s*([-+*/])\s*(\S+)$/.exec(wrhs)))mnode={t:'math',op:({'+':'add','-':'sub','*':'mul','/':'div'})[bm[2]],a:wop(bm[1]),b:wop(bm[3]),id:id()};
+      else mnode={t:'math',op:'move',a:wop(wrhs),id:id()};
+      nets.push({id:`N${nets.length+1}`,label:'',expr:mnode,coil:{io:m[1].slice(0,2),idx:Number(m[1].slice(2))}});
+      continue;
+    }
     const assignment=/^(EXPR\d+|QX\d+|MX\d+)\s*:=\s*([\s\S]+)$/.exec(line);
     if(!assignment)fail('Unsupported statement; no ladder program was changed');
     const [,target,rhs]=assignment;
@@ -1457,7 +1483,7 @@ function parseStructuredText(source) {
   // Comparing lexical tokens rejects changed types/addresses, reordered evaluation,
   // missing declarations and latent semantic changes while accepting formatting.
   const tokens=text=>{
-    const pattern=/T#\d+MS|DINT#-?\d+|[A-Z_][A-Z_0-9]*|\d+|:=|>=|<=|[%.,;:()#=<>-]/gy;
+    const pattern=/T#\d+MS|DINT#-?\d+|[A-Z_][A-Z_0-9]*|\d+|:=|>=|<=|[%.,;:()#=<>+*\/-]/gy;
     const result=[];let pos=0;
     while(pos<text.length){if(/\s/.test(text[pos])){pos++;continue;}
       pattern.lastIndex=pos;const token=pattern.exec(text);
@@ -1871,8 +1897,11 @@ const PROJECT_SCHEMA='tbd.logic-project/v1';
 const MAX_PROJECT_BYTES=131072;
 const MAX_DEPLOY_BYTES=4096;
 const COUNTS={IX:8,QX:4,MX:32,IW:8};
+const WCOUNTS={MW:16,QW:4};                 // word classes (scratch + analog out); IW word source lives in COUNTS
+const wordClasses=['IW','MW','QW'];         // valid word operand sources
+const wordLimit=io=>io==='IW'?COUNTS.IW:WCOUNTS[io];
 const PROCESS_FIELDS=PROCESS_DRIVER_FIELDS;
-const OPS={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,TOF:21,FTRIG:22,CTUD:23};
+const OPS={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31};
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
 const clone=value=>JSON.parse(JSON.stringify(value));
 const integer=(value,min,max,label)=>need(Number.isInteger(value)&&value>=min&&value<=max,`${label} must be an integer from ${min} to ${max}.`);
@@ -1982,7 +2011,7 @@ function validateProject(project){
  need(Array.isArray(project.program.nets)&&project.program.nets.length<=64,'Program must have at most 64 networks.');
  const ids=new Set();let nodes=0;const blocks=new Map();
  const claim=id=>{need(typeof id==='string'&&/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(id)&&!ids.has(id),'Missing, invalid, or duplicate element ID.');ids.add(id);};
- const address=(io,idx,write=false)=>{need(Object.hasOwn(COUNTS,io)&&(!write||['QX','MX'].includes(io)),'Unsupported I/O class.');integer(idx,0,COUNTS[io]-1,'Operand index');};
+ const address=(io,idx,write=false)=>{const word=Object.hasOwn(WCOUNTS,io);need((Object.hasOwn(COUNTS,io)||word)&&(!write||['QX','MX','QW','MW'].includes(io)),'Unsupported I/O class.');integer(idx,0,(word?WCOUNTS[io]:COUNTS[io])-1,'Operand index');};
  const flag=value=>need(typeof value==='boolean','Negation must be true or false.');
  function node(n,depth=0){
   need(depth<=32&&++nodes<=512,'Program expression exceeds the depth/node limit.');
@@ -2000,13 +2029,26 @@ function validateProject(project){
    object(n,['t','id','inst','preset','cu','cd','r','ld'],[],'Counter');integer(n.inst,0,15,'Function block instance');
    need(!blocks.has(n.inst)||blocks.get(n.inst)===n.t,'A function block instance cannot have two types.');blocks.set(n.inst,n.t);
    integer(n.preset,0,2147483647,'Counter preset');node(n.cu,depth+1);node(n.cd,depth+1);node(n.r,depth+1);node(n.ld,depth+1);
+  }
+  else if(n.t==='math'){
+   object(n,['t','id','op','a',...(n.op==='move'?[]:['b'])],[],'Math');
+   need(['add','sub','mul','div','move'].includes(n.op),'Unsupported math operation.');
+   wordOperand(n.a);if(n.op!=='move')wordOperand(n.b);
   }else throw new Error('Unsupported expression type.');
  }
+ const wordOperand=o=>{
+  need(o!==null&&typeof o==='object'&&!Array.isArray(o),'Math operand must be an object.');
+  if(o.t==='k'){object(o,['t','k'],[],'Constant');integer(o.k,-2147483648,2147483647,'Constant');}
+  else if(o.t==='wsrc'){object(o,['t','io','idx'],[],'Word source');need(wordClasses.includes(o.io),'Unsupported word source.');integer(o.idx,0,wordLimit(o.io)-1,'Word index');}
+  else throw new Error('Unsupported math operand.');
+ };
  for(const net of project.program.nets){
   object(net,['id','label','expr','coil'],[],'Network');claim(net.id);claim(net.id+'coil');
   need(typeof net.label==='string'&&net.label.length<=120&&!/[\x00-\x1f]/.test(net.label),'Network label exceeds 120 characters or contains controls.');
-  if(net.expr!==null)node(net.expr);
-  object(net.coil,['io','idx','neg'],[],'Coil');address(net.coil.io,net.coil.idx,true);flag(net.coil.neg);
+  const wordNet=Object.hasOwn(WCOUNTS,net.coil.io);
+  if(net.expr!==null){node(net.expr);need(wordNet===(net.expr.t==='math'),wordNet?'A word output requires a math expression.':'A bit coil cannot be driven by a math expression.');}
+  if(wordNet){object(net.coil,['io','idx'],[],'Word coil');address(net.coil.io,net.coil.idx,true);}
+  else{object(net.coil,['io','idx','neg'],[],'Coil');address(net.coil.io,net.coil.idx,true);flag(net.coil.neg);}
  }
  object(project.symbols,[],Object.keys(project.symbols||{}),'Symbols');need(Object.keys(project.symbols).length<=24,'At most 24 named operands are supported.');
  const names=new Set();
@@ -2055,8 +2097,10 @@ function compileProgram(program){
   else if(n.t==='series'||n.t==='par'){emit(n.kids[0]);for(let i=1;i<n.kids.length;i++){emit(n.kids[i]);push([n.t==='series'?OPS.AND:OPS.OR],n.id);}}
   else if(n.t==='ton'||n.t==='tof'||n.t==='rtrig'||n.t==='ftrig'){emit(n.in);const edge=n.t==='rtrig'||n.t==='ftrig';push(edge?[n.t==='ftrig'?OPS.FTRIG:OPS.RTRIG,n.inst]:[n.t==='tof'?OPS.TOF:OPS.TON,n.inst,n.preset],n.id);}
   else if(n.t==='ctud'){emit(n.cu);emit(n.cd);emit(n.r);emit(n.ld);push([OPS.CTUD,n.inst,n.preset],n.id);}
+  else if(n.t==='math'){emitOperand(n.a,n.id);if(n.op!=='move'){emitOperand(n.b,n.id);push([{add:OPS.ADD,sub:OPS.SUB,mul:OPS.MUL,div:OPS.DIV}[n.op]],n.id);}}
   else throw new Error('Unsupported expression type.');
  }
+ function emitOperand(o,id){if(o.t==='k')push([OPS.PUSH_I,o.k],id);else push([OPS['LD_'+o.io],o.idx],id);}
  for(const net of program.nets){emit(net.expr);if(net.coil.neg)push([OPS.NOT],net.id+'coil');push([OPS['ST_'+net.coil.io],net.coil.idx],net.id+'coil');}
  push([OPS.HALT]);return {code,map};
 }
@@ -2270,7 +2314,7 @@ return {EXECUTION_SCHEMA,EXECUTION_MAX_AGE_MS,parseExecutionReadback,validateExe
 <!-- PROJECT-ADAPTER-END -->
 <script>
 /* ===== opcodes: match firmware/src/plc_engine.h ===== */
-const OP={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,XOR:10,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,FBQ:19,DROP:20,TOF:21,FTRIG:22,CTUD:23};
+const OP={HALT:0,PUSH_I:1,LD_IX:2,LD_QX:3,LD_MX:4,ST_QX:5,ST_MX:6,LD_IW:7,AND:8,OR:9,XOR:10,NOT:11,GT:12,LT:13,GE:14,LE:15,EQ:16,TON:17,RTRIG:18,FBQ:19,DROP:20,TOF:21,FTRIG:22,CTUD:23,LD_MW:24,LD_QW:25,ST_MW:26,ST_QW:27,ADD:28,SUB:29,MUL:30,DIV:31};
 const LD={IX:OP.LD_IX,QX:OP.LD_QX,MX:OP.LD_MX};
 const ST={QX:OP.ST_QX,MX:OP.ST_MX};
 const CMP={GT:OP.GT,LT:OP.LT,GE:OP.GE,LE:OP.LE,EQ:OP.EQ};
@@ -2281,6 +2325,8 @@ const IO={
   QX:{n:4,label:i=>`%QX${i}`,sub:i=>`Base relay ${i}`,force:true},
   IW:{n:8,label:i=>`%IW${i}`,sub:i=>`Word input ${i}`,force:false},
   MX:{n:32,label:i=>`%MX${i}`,sub:i=>`mem ${i}`,force:true},
+  MW:{n:16,label:i=>`%MW${i}`,sub:i=>`Memory word ${i}`,force:false},
+  QW:{n:4,label:i=>`%QW${i}`,sub:i=>`Analog out ${i}`,force:false},
 };
 /* ===== editable tag/symbol table (LS-06) ===== */
 let SYMBOLS={};
@@ -2336,7 +2382,16 @@ function renderSTL(){
         if(complex(k)){add(`${c}(`,node.id);rend(k,'LD');add(`)`,node.id);}else rend(k,c);}
     }
   }
-  PROG.nets.forEach((n,i)=>{if(i)add('');add(`// NET ${i+1}${n.label?'  — '+n.label:''}`);rend(n.expr,'LD');add(`${n.coil.neg?'STN':'ST '}  ${nodeName(n.coil.io,n.coil.idx)}`,n.id+'coil');});
+  PROG.nets.forEach((n,i)=>{if(i)add('');add(`// NET ${i+1}${n.label?'  — '+n.label:''}`);
+    if(n.coil&&(n.coil.io==='MW'||n.coil.io==='QW')&&n.expr&&n.expr.t==='math'){
+      const m=n.expr,opc={add:'ADD',sub:'SUB',mul:'MUL',div:'DIV'}[m.op];
+      const opTxt=o=>!o?'?':o.t==='k'?String(o.k):nodeName(o.io,o.idx);
+      add(`LD    ${opTxt(m.a)}`,m.id);
+      if(m.op!=='move')add(`${opc.padEnd(4)}  ${opTxt(m.b)}`,m.id);
+      add(`ST    ${nodeName(n.coil.io,n.coil.idx)}`,m.id);
+      return;
+    }
+    rend(n.expr,'LD');add(`${n.coil.neg?'STN':'ST '}  ${nodeName(n.coil.io,n.coil.idx)}`,n.id+'coil');});
   return lines;
 }
 const stlText=()=>renderSTL().map(l=>l.txt).join('\n');
@@ -2484,9 +2539,32 @@ function renderLadder(live){
   const host=document.getElementById('rungs');host.innerHTML='';
   renderStartupRung(host);
   PROG.nets.forEach((n,i)=>{
+    const wordNet=n.coil&&(n.coil.io==='MW'||n.coil.io==='QW');
+    let W,Ht,S;
+    if(wordNet){
+      const dest=`%${n.coil.io}${n.coil.idx}`;
+      const mexpr=(n.expr&&n.expr.t==='math')?n.expr:null;
+      const op=mexpr?mexpr.op:'move';
+      const opsym={add:'+',sub:'−',mul:'×',div:'÷'}[op]||'';
+      const opTxt=o=>!o?'?':o.t==='k'?String(o.k):`%${o.io}${o.idx}`;
+      const rhs=op==='move'?opTxt(mexpr&&mexpr.a):`${opTxt(mexpr&&mexpr.a)} ${opsym} ${opTxt(mexpr&&mexpr.b)}`;
+      const title=`${dest} := ${rhs}`;
+      const boxW=Math.max(240,labelWidth(title,false,12)+56);
+      Ht=H+16;W=PADX*2+boxW;S=mkSVG();
+      S.raw(`<path class="rail" d="M ${PADX} 8 L ${PADX} ${Ht-8}"/>`);
+      const ey=Ht/2,bx=PADX+16,bw=boxW-32;
+      S.wire(PADX,ey,bx,ey,'wire');
+      const cvLive=(live&&live[n.coil.io])?live[n.coil.io][n.coil.idx]:null;
+      S.el(mexpr?mexpr.id:n.id+'coil',
+        `<rect class="fbx" x="${bx}" y="${ey-20}" width="${bw}" height="40" rx="4"/>`+
+        `<text class="tag-lbl" x="${bx+bw/2}" y="${ey-2}" text-anchor="middle" style="font-size:12px">${escapeHtml(title)}</text>`+
+        `<text class="tag-sub" x="${bx+bw/2}" y="${ey+14}" text-anchor="middle">${op==='move'?'MOVE · assign word':'word math (scaled integer)'}${cvLive!=null?`  ·  = ${cvLive}`:''}</text>`);
+      S.wire(bx+bw,ey,PADX+boxW,ey,'wire');
+      S.raw(`<path class="rail" d="M ${PADX+boxW} 8 L ${PADX+boxW} ${Ht-8}"/>`);
+    } else {
     const m=measure(n.expr),cols=Math.max(m.w,1),rows=Math.max(m.h,1);
     const coilWidth=Math.max(128,labelWidth(symName(n.coil.io,n.coil.idx))+40,labelWidth(nodeName(n.coil.io,n.coil.idx),true,11)+64);
-    const W=PADX*2+cols*U+coilWidth,Ht=rows*H+16,S=mkSVG();
+    W=PADX*2+cols*U+coilWidth,Ht=rows*H+16,S=mkSVG();
     S.raw(`<path class="rail" d="M ${PADX} 8 L ${PADX} ${Ht-8}"/>`);
     const railR=PADX+cols*U+coilWidth,ey=8+rows*H/2,cx=railR-coilWidth/2;
     drawNode(n.expr,PADX,8,cols*U,rows*H,S,live);
@@ -2496,6 +2574,7 @@ function renderLadder(live){
     const cf=isForced(n.coil.io,n.coil.idx)?`<text class="forced-mark" x="${cx+Math.max(24,labelWidth(nodeName(n.coil.io,n.coil.idx),true,11)/2+8)}" y="${ey-13}">F</text>`:'';
     S.el(n.id+'coil',`<path class="${cc}" d="M ${cx-16} ${ey-13} A 16 13 0 0 0 ${cx-16} ${ey+13}"/><path class="${cc}" d="M ${cx+16} ${ey-13} A 16 13 0 0 1 ${cx+16} ${ey+13}"/>${cross}${cf}<text class="tag-lbl" x="${cx}" y="${ey-18}" text-anchor="middle">${nodeName(n.coil.io,n.coil.idx)}</text><text class="tag-sub" x="${cx}" y="${ey+24}" text-anchor="middle">${escapeHtml(symName(n.coil.io,n.coil.idx))}</text>`);
     S.wire(cx+32,ey,railR,ey,'wire');S.raw(`<path class="rail" d="M ${railR} 8 L ${railR} ${Ht-8}"/>`);
+    }
     const div=document.createElement('div');div.className='net'+(selNet===n.id?' sel':'');
     div.innerHTML=`<div class="net-head"><span class="ntag">NET ${i+1}</span><span class="nlabel">${escapeHtml(n.label||'(untitled)')}</span>
       <span class="nact"><button data-act="lbl">rename</button><button data-act="branch">+OR</button><button data-act="del">delete</button></span></div>
@@ -2625,6 +2704,13 @@ function stNode(node,calls){
 const stChild=(k,calls)=>{const e=stNode(k,calls);return (k.t==='series'||k.t==='par')?'('+e+')':e;};
 function genST(){const out=[];PROG.nets.forEach((n,i)=>{if(i)out.push('');
   out.push(`<span class="cmt">(* NET ${i+1}${n.label?' — '+escapeHtml(n.label):''} *)</span>`);
+  if(n.coil&&(n.coil.io==='MW'||n.coil.io==='QW')&&n.expr&&n.expr.t==='math'){
+    const m=n.expr,opsym={add:'+',sub:'−',mul:'×',div:'÷'}[m.op];
+    const opTxt=o=>!o?'?':o.t==='k'?String(o.k):stIdent(o.io,o.idx);
+    const rhs=m.op==='move'?opTxt(m.a):`${opTxt(m.a)} <span class="asg">${opsym}</span> ${opTxt(m.b)}`;
+    out.push(`${stIdent(n.coil.io,n.coil.idx)} <span class="asg">:=</span> ${rhs};`);
+    return;
+  }
   const calls=[];const ex=stNode(n.expr,calls);calls.forEach(c=>out.push(c));
   out.push(`${stIdent(n.coil.io,n.coil.idx)} <span class="asg">:=</span> ${n.coil.neg?'<span class="kw">NOT</span> ('+ex+')':ex};`);});
   return out.join('\n');}
@@ -2683,6 +2769,7 @@ function onElementClick(eid,n){
     setHL(eid);log('Monitor is read-only. Highlighted the corresponding logic; no controller command sent.','rx');
     return;
   }
+  if(n.expr&&n.expr.t==='math'){openMathEditor(n,rebuildFromModel);return;}
   if(eid.endsWith('coil')){openCoilEditor(n);return;}
   const f=findNode(n.expr,eid);if(!f)return;
   if(f.node.t==='c')openContactEditor(f.node,rebuildFromModel);
@@ -2725,6 +2812,18 @@ function insertElement(kind){
                  'XOR — output ON when exactly one input is ON');
     PROG.nets.push(nn); selNet=nn.id; rebuildFromModel();
     openContactEditor(a1, rebuildFromModel);          // pick input A first
+    return;
+  }
+  if(kind==='add'||kind==='sub'||kind==='mul'||kind==='div'||kind==='move'){
+    // Word-math network: writes a scaled-integer result into a memory/analog word.
+    // One operation per network; chain through %MW scratch for multi-step math.
+    let mwMax=-1;PROG.nets.forEach(x=>{if(x.coil&&x.coil.io==='MW')mwMax=Math.max(mwMax,x.coil.idx);});
+    const idx=Math.min(mwMax+1,15);   // NMW=16 memory words (0..15)
+    const expr={t:'math',op:kind,a:{t:'wsrc',io:'IW',idx:0},id:uid()};
+    if(kind!=='move')expr.b={t:'wsrc',io:'IW',idx:1};
+    const nn=net(expr,{io:'MW',idx},kind==='move'?'MOVE — copy a word':'word math');
+    PROG.nets.push(nn);selNet=nn.id;rebuildFromModel();
+    openMathEditor(nn,rebuildFromModel);
     return;
   }
   const n=PROG.nets.find(x=>x.id===selNet)||PROG.nets[PROG.nets.length-1];
@@ -2917,6 +3016,37 @@ function openCoilEditor(n){
   modalInner.querySelectorAll('#ct button').forEach(b=>b.onclick=()=>{neg=b.dataset.neg==='1';modalInner.querySelectorAll('#ct button').forEach(x=>x.classList.remove('on'));b.classList.add('on');});
   bindPicker(sel);
   modalInner.querySelector('#mOk').onclick=()=>{n.coil={io:sel.io,idx:sel.idx,neg};closeModal();rebuildFromModel();};
+}
+function openMathEditor(netObj,after){
+  const m=netObj.expr,coil=netObj.coil;
+  const wsel=(id,io)=>`<select id="${id}">${['IW','MW','QW'].map(c=>`<option value="${c}"${c===io?' selected':''}>%${c}</option>`).join('')}</select>`;
+  const operandHTML=(id,label,o)=>`
+    <div class="field"><label>${label}</label>
+      <select id="${id}t"><option value="wsrc"${o.t==='wsrc'?' selected':''}>word source</option><option value="k"${o.t==='k'?' selected':''}>constant</option></select></div>
+    <div class="field ${id}w"><label>&nbsp;· word</label>${wsel(id+'io',o.io||'IW')}<input id="${id}idx" type="number" min="0" value="${o.idx||0}" style="width:64px;margin-left:6px"></div>
+    <div class="field ${id}k"><label>&nbsp;· value</label><input id="${id}k" type="number" value="${o.k!=null?o.k:0}"></div>`;
+  const opSel=['add','sub','mul','div','move'].map(o=>`<option value="${o}"${o===m.op?' selected':''}>${({add:'+  ADD',sub:'−  SUB',mul:'×  MUL',div:'÷  DIV',move:'MOVE (copy)'})[o]}</option>`).join('');
+  showModal(`<h3>Edit word math</h3><div class="body">
+    <p class="hint" style="font-size:11px;color:var(--ink2);margin:0 0 6px">Scaled-integer math. The result writes to a memory word (%MW scratch) or an analog output (%QW). One operation per rung — chain through %MW for multi-step math. Division truncates toward zero; overflow saturates.</p>
+    <div class="field"><label>Write result to</label><select id="dio"><option value="MW"${coil.io==='MW'?' selected':''}>%MW (scratch)</option><option value="QW"${coil.io==='QW'?' selected':''}>%QW (analog out)</option></select><input id="didx" type="number" min="0" value="${coil.idx}" style="width:64px;margin-left:6px"></div>
+    <div class="field"><label>Operation</label><select id="op">${opSel}</select></div>
+    ${operandHTML('a','Operand A kind',m.a||{t:'wsrc',io:'IW',idx:0})}
+    <div id="bwrap">${operandHTML('b','Operand B kind',m.b||{t:'wsrc',io:'IW',idx:1})}</div>
+    <div class="row"><button class="btn" id="mDel">Delete</button><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" id="mOk">Apply</button></div></div>`);
+  const q=s=>modalInner.querySelector(s);
+  const refresh=()=>{
+    q('#bwrap').style.display=q('#op').value==='move'?'none':'';
+    for(const p of ['a','b']){const isK=q('#'+p+'t').value==='k';modalInner.querySelectorAll('.'+p+'w').forEach(e=>e.style.display=isK?'none':'');modalInner.querySelectorAll('.'+p+'k').forEach(e=>e.style.display=isK?'':'none');}
+  };
+  q('#op').onchange=refresh;q('#at').onchange=refresh;q('#bt').onchange=refresh;refresh();
+  const readOperand=p=>q('#'+p+'t').value==='k'?{t:'k',k:parseInt(q('#'+p+'k').value,10)||0}:{t:'wsrc',io:q('#'+p+'io').value,idx:parseInt(q('#'+p+'idx').value,10)||0};
+  q('#mOk').onclick=()=>{
+    netObj.coil={io:q('#dio').value,idx:parseInt(q('#didx').value,10)||0};
+    m.op=q('#op').value;m.a=readOperand('a');
+    if(m.op==='move')delete m.b;else m.b=readOperand('b');
+    closeModal();after&&after();
+  };
+  q('#mDel').onclick=()=>{const i=PROG.nets.indexOf(netObj);if(i>=0)PROG.nets.splice(i,1);closeModal();after&&after();};
 }
 function openPrompt(t,val,after){showModal(`<h3>${t}</h3><div class="body"><div class="field"><input id="pv" value="${(val||'').replace(/"/g,'&quot;')}"></div><div class="row"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn pri" id="mOk">OK</button></div></div>`);const inp=modalInner.querySelector('#pv');inp.focus();inp.select();const go=()=>{after(inp.value);closeModal();};modalInner.querySelector('#mOk').onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go();};}
 
