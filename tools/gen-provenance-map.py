@@ -126,9 +126,86 @@ def one_liners(cat, src_label, fmt, cwe):
         "cyber": "Context for the timeline; rarely attributable to a remote peer."
     }
 
-def addr_index(elf):
-    """Optional: map source file:line -> symbol via the ELF, if tools present."""
-    return {}   # addr2line enrichment is optional; left as a hook, see README.
+def find_tool(name_glob, explicit):
+    """Locate an xtensa cross tool: explicit path, PATH, or PlatformIO packages."""
+    if explicit and os.path.exists(explicit):
+        return explicit
+    from shutil import which
+    import glob
+    for cand in ("xtensa-esp32s3-elf-"+name_glob, "xtensa-esp-elf-"+name_glob,
+                 "xtensa-esp32s2-elf-"+name_glob):
+        p = which(cand)
+        if p: return p
+    home = os.path.expanduser("~/.platformio/packages")
+    hits = glob.glob(os.path.join(home, "**", "xtensa-esp*-"+name_glob), recursive=True)
+    return hits[0] if hits else None
+
+def enrich_from_elf(rows, elf, objdump=None, addr2line=None):
+    """Derive {func, addr} for each row's (file,line) from the ELF's DWARF.
+
+    No hardcoded values: the DWARF decoded-line table gives (file,line)->address
+    and addr2line gives the enclosing function, so this re-derives correctly for
+    EVERY build. Rows whose exact line was optimized away fall back to the nearest
+    later line in the same file (addr_exact=false). If the toolchain or ELF is
+    absent the rows are returned unchanged (address fields simply omitted)."""
+    od = find_tool("objdump", objdump)
+    a2l = find_tool("addr2line", addr2line)
+    if not (elf and os.path.exists(elf) and od and a2l):
+        return {"enriched": False, "reason": "elf or xtensa toolchain not found",
+                "objdump": od, "addr2line": a2l, "elf": elf}
+    # 1) build (basename,line) -> min address from the DWARF line table
+    out = subprocess.run([od, "--dwarf=decodedline", elf],
+                         capture_output=True, text=True, errors="replace").stdout
+    line_addr = {}          # (basename, line) -> address(int)
+    file_lines = {}         # basename -> sorted list of (line, addr)
+    for ln in out.splitlines():
+        # columns: <CU/File>  <Line>  <Address>  ... ; formats vary, so scan tokens
+        toks = ln.split()
+        if len(toks) < 3: continue
+        # find a hex address token and an int line token
+        addr = None
+        for t in reversed(toks):
+            if t.startswith("0x"):
+                try: addr = int(t, 16); break
+                except ValueError: pass
+        if addr is None: continue
+        # the filename is toks[0] (may be a basename or a path); line is toks[1]
+        try: line = int(toks[1])
+        except ValueError: continue
+        base = os.path.basename(toks[0])
+        key = (base, line)
+        if key not in line_addr or addr < line_addr[key]:
+            line_addr[key] = addr
+        file_lines.setdefault(base, []).append((line, addr))
+    for b in file_lines: file_lines[b].sort()
+    # 2) resolve each row
+    func_cache = {}
+    def func_of(addr):
+        if addr in func_cache: return func_cache[addr]
+        r = subprocess.run([a2l, "-f", "-C", "-e", elf, hex(addr)],
+                           capture_output=True, text=True, errors="replace").stdout.splitlines()
+        fn = r[0].strip() if r else "??"
+        func_cache[addr] = fn
+        return fn
+    n_exact = n_near = n_miss = 0
+    for row in rows:
+        base, line = row["file"], row["line"]
+        addr = line_addr.get((base, line)); exact = True
+        if addr is None:                      # nearest later line in same file
+            exact = False
+            cand = [a for (l, a) in file_lines.get(base, []) if l >= line]
+            addr = min(cand) if cand else None
+        if addr is None:
+            n_miss += 1; continue
+        row["addr"] = hex(addr)
+        row["func"] = func_of(addr)
+        row["addr_exact"] = exact
+        n_exact += exact; n_near += (not exact)
+    return {"enriched": True, "elf": os.path.abspath(elf),
+            "objdump": od, "addr2line": a2l,
+            "resolved_exact": n_exact, "resolved_nearest": n_near, "unresolved": n_miss,
+            "build_note": "func+addr re-derived from this ELF's DWARF; rebuild the firmware "
+                          "and re-run with --elf to keep them true."}
 
 def main():
     rows = []
@@ -164,9 +241,20 @@ def main():
                 "gloss": one_liners(cat, label, fmt, cwe),
             })
     rows.sort(key=lambda r: (r["file"], r["line"]))
+
+    # Optional DWARF enrichment: --elf <firmware.elf> adds {func, addr} per row.
+    import argparse
+    ap = argparse.ArgumentParser(add_help=False)
+    ap.add_argument("--elf"); ap.add_argument("--objdump"); ap.add_argument("--addr2line")
+    args, _ = ap.parse_known_args()
+    elf_meta = None
+    if args.elf:
+        elf_meta = enrich_from_elf(rows, args.elf, args.objdump, args.addr2line)
+
     meta = {
         "generated_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"),
         "source": "sbom/firmware/src/*.cpp plc_log() call sites",
+        "elf": elf_meta,
         "live_feed": "/api/log  (web_api_log_json) and serial 'log' / busstream",
         "note": "STATIC half of the Logic-Studio association. A live /api/log line is "
                 "matched to a row by its 'match' regex -> source file:line + CWE. "
