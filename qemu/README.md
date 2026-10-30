@@ -6,18 +6,13 @@ generic-runtime artifacts, use the separate lifecycle and plant gates described 
 `m5stamplc_secure` remain required; `ENABLE_CWE_DEMOS` remains the teaching switch.
 The loaded application and its plant model are independent of that build choice.
 
-The new [reservoir experiment](plants/reservoir.plant.json) has a separate
-[prepared application](plants/reservoir.csco), a deterministic source model and
-model-specific QMP qualification. Its host checks run with:
-
-```bash
-python3 qemu/test_plant_model.py
-```
-
-The exact-artifact `model_probe.py` and `plant_smoke.py` commands, evidence scopes,
-and offline `replay_plant.py` command are in the guide. The final plant gate also
-requires the current firmware's `execution json` endpoint. These checks use the
-pinned Linux x86_64 model; they do not qualify physical expansion modules.
+The [reservoir experiment](plants/reservoir.plant.json) ships with a
+[prepared application](plants/reservoir.csco) and a deterministic source model. Its
+host-side qualification checks (`test_plant_model.py`, `model_probe.py`, `plant_smoke.py`,
+and the offline `replay_plant.py`) run from the firmware-development repo, not this
+student checkout — see [the current QEMU guide](../docs/QEMU-Twin.md). The final plant
+gate also uses the firmware's `execution json` endpoint. These checks use the pinned
+Linux x86_64 model; they do not qualify physical expansion modules.
 
 ## Historical classroom quick start
 

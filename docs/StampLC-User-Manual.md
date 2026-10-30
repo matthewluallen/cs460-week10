@@ -79,13 +79,15 @@ Network and device settings are set from a short boot‑time menu.
 
 ```
   [1] WiFi OFF (contained, default)
-  [2] WiFi STA  (set SSID/pass)
-  [3] IP mode   (DHCP/static, default static 10.13.37.10)
+  [2] WiFi STA  (join a network: SSID/pass)
+  [9] WiFi AP   (setup mode: host a network + web config UI)
+  [3] WiFi IP   (DHCP/static for STA)
+  [0] ETH  IP   (W5500 DHCP/static, if present)
   [4] Read-only I/O self-test (sensors/DI/relay readback)
   [5] Show embedded CWEs & service ports
   [6] Save & boot
+  [8] Toggle open-AP fallback (VULNERABLE if STA fails)
   [7] Factory-reset config
-  [8] Toggle open-AP fallback
 Choose:
 ```
 
@@ -99,39 +101,48 @@ reboots. The menu idles out after 30 s and boots with the current configuration.
 
 ## 5. Network setup
 
-### 5.1 Join a Wi‑Fi network (station mode)
+The StampLC has **two independent network interfaces**, each with its own address:
 
-From the configuration menu (§4):
+- **WiFi** — always present (built into the ESP32-S3). Three modes: **Off** (contained), **STA** (join a network), **AP** (host a setup network).
+- **W5500 Ethernet** — the optional PoE module; configured only when it is fitted.
 
-1. Choose **[2] WiFi STA**.
-2. At `SSID (isolated only):` type your network name and Enter.
-3. At `PASS:` type the password and Enter.
-4. Choose **[3] IP mode**, then answer `static? (y/N):` with **N** for DHCP (recommended),
-   or **y** to enter a static IP, gateway, and mask.
-5. Choose **[6] Save & boot**.
+Configure them three ways, all equivalent: the boot **config menu** (§4), the **`netcfg`** console commands (below), or the **web UI** (the Logic Studio ⚙ Network panel, or the on-device page at `http://192.168.4.1:8080/setup` in AP mode). Addressing changes apply on the next reboot.
 
-On the next boot the device connects and prints its address, e.g.:
+> New to networking? Type **`explain <setting>`** at the `plc>` prompt (e.g. `explain gateway`, `explain dhcp`) for a plain-language description of any setting and what the firmware does with it, or **`learn`** for a guided walk (see §7).
+
+### 5.1 `netcfg` — the console way
 
 ```
-[CONFIG] saved. WiFi=STA ssid=YOUR-SSID ip=DHCP
-[WiFi] Connected! IP: 192.168.8.128
-[WiFi] Modbus TCP: 192.168.8.128:502
-[WiFi] Web HMI:   http://192.168.8.128:8080
-[Telnet] Debug shell: telnet 192.168.8.128 23
+netcfg                          # show both interfaces + current state
+netcfg json                     # the same, as JSON (what the web UI reads)
+netcfg eth static <ip> <gw> <mask>    # W5500: fixed address
+netcfg eth dhcp                       # W5500: automatic address
+netcfg wifi sta <ssid> <pass>   # join a WiFi network (station mode)
+netcfg wifi static <ip> <gw> <mask> | netcfg wifi dhcp   # WiFi addressing
+netcfg wifi ap [<ssid> <pass>]  # host a setup network (default pass: stamplc-setup)
+netcfg wifi off                 # no radio (contained)
+netcfg ntp <ip> [port]          # time source (blank = use the gateway)
+netcfg auth <user> <pass>       # change the web/API credentials (do this!)
+netcfg save                     # persist to flash (then reboot to apply addressing)
 ```
 
-Note the IP address — you will use it for the web and Modbus interfaces.
+### 5.2 Join a WiFi network (STA)
 
-### 5.2 Wired Ethernet (optional PoE)
+`netcfg wifi sta YOUR-SSID YOUR-PASS`, then `netcfg wifi dhcp` (recommended), `netcfg save`, and reboot. On boot the device connects and prints its address, e.g. `[WiFi] Connected! IP: 192.168.8.128` — note it for the web (`:8080`) and Modbus (`:502`) interfaces.
 
-If the W5500 PoE module is fitted, the device also serves its Web HMI and Modbus over
-Ethernet with no extra configuration (DHCP by default). If no W5500 is present you will see
-`[ETH] hardware=0 link=0` at boot — this is normal on a Wi‑Fi‑only unit.
+### 5.3 Setup / provisioning AP
 
-### 5.3 Default / contained mode
+To configure the device over WiFi with no cable and no terminal, put it in AP mode: `netcfg wifi ap` + `netcfg save` + reboot. It then hosts its own network — SSID **`StampLC-Setup-XXXX`** (XXXX = the device MAC), default password **`stamplc-setup`**. Connect a phone or laptop and open **`http://192.168.4.1:8080/setup`** to configure every setting in a browser.
 
-Choosing **[1] WiFi OFF** returns the device to contained mode (no network). Use this when
-you want the controller fully offline.
+> ⚠ The default AP password is a deliberate teaching weakness (**CWE-798/1392**, default credentials). Use AP mode only to provision, then switch to STA or Off — and change the password (`netcfg wifi ap <ssid> <newpass>`).
+
+### 5.4 Wired Ethernet (optional PoE)
+
+If the W5500 PoE module is fitted, configure it with `netcfg eth static …` or `netcfg eth dhcp`. If no module is present you will see `[ETH] hardware=0 link=0` at boot — normal on a WiFi-only unit, and the Ethernet settings are hidden in the web UI.
+
+### 5.5 Default / contained mode
+
+The device ships **WiFi OFF** (no network) — deliberate for a lab device. `netcfg wifi off` + `netcfg save` returns it to this fully-offline state.
 
 ---
 
@@ -177,6 +188,9 @@ Type `help` at the `plc>` prompt for the live list. The most useful:
 | `diag [json]` | health snapshot (chip, heap, PLC, sensors) |
 | `selftest` | quick hardware self‑test |
 | `proto [name on\|off]` | list / enable / disable protocol services |
+| `netcfg [json]` | per-interface network config: eth/wifi static\|dhcp, wifi sta\|ap, ntp, auth, save |
+| `explain <setting>` | plain-language help for a config setting + what the firmware does (`explain` lists them) |
+| `learn` | a guided walk through every config setting |
 | `cwe` | list the embedded teaching weaknesses & service ports |
 | `log` | the source‑attributed audit log |
 | `bustrace on\|off` | retain decoded bus diagnostics for later review |
