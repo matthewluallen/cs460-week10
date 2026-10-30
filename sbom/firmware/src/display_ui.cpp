@@ -7,6 +7,7 @@
 #include <M5StamPLC.h>
 #include "display_ui.h"
 #include "plc_core.h"
+#include "plc_point_map.h"
 #include "m5stamplc_io.h"
 #include "io_expansion.h"
 #include "modbus_tcp_server.h"
@@ -282,6 +283,8 @@ static void renderForces(){
     n++;
   };
   for(int i=0;i<7;i++) if(plc_coil_is_forced(i)) row(labels[i],plc_coil_live(i));
+  if(plc_coil_is_forced(pointmap::AUX_COIL0)) row("AUX COIL0",plc_coil_live(pointmap::AUX_COIL0));
+  if(plc_coil_is_forced(pointmap::AUX_COIL1)) row("AUX COIL1",plc_coil_live(pointmap::AUX_COIL1));
   for(int i=0;i<8;i++) if(plc_di_is_forced(i)){char label[16];snprintf(label,sizeof(label),"BASE DI%d",i);row(label,plc_di_live(i));}
   if(n>5){char more[24];snprintf(more,sizeof(more),"+%d more (console forces)",n-5);tL(more,10,y,1,MUTED);}
   if(!n) tL("none",10,32,1,MUTED);
