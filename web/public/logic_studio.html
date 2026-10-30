@@ -902,6 +902,30 @@ body.hero-collapsed #heroStrip{display:flex}
 })();
 </script>
 <script>
+// ===== Shared app-view controller + bridge helper (one owner of #appViewSeg) =====
+// One controller wires #appViewSeg once and keeps the button highlight; each
+// workspace registers a setView(view) callback instead of re-wiring the same
+// control. (Before: three workspaces each added listeners to every button, so
+// one click ran three handlers and toggled the buttons three times.)
+window.AppView = (function(){
+  const seg=document.getElementById('appViewSeg');
+  const subs=[]; let cur='logic';
+  function set(v){ cur=v;
+    if(seg)seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-appview')===v));
+    subs.forEach(fn=>{try{fn(v);}catch(e){}});
+  }
+  if(seg)seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>set(b.getAttribute('data-appview'))));
+  return { register(fn){ subs.push(fn); try{fn(cur);}catch(e){} }, set:set, get current(){return cur;} };
+})();
+// Shared Modbus-over-bridge fetch: a 4s timeout + an HTTP r.ok check so a hung
+// or non-2xx response rejects instead of parsing a non-JSON error body. (F3)
+window.mbFetch = async function(q){
+  const r=await fetch('/modbus?'+q,{cache:'no-store',signal:AbortSignal.timeout(4000)});
+  if(!r.ok) throw new Error('modbus http '+r.status);
+  return await r.json();
+};
+</script>
+<script>
 // ===== Flow workspace: field input → bus → logic → bus → output, live, pressable =====
 (function(){
   const seg=document.getElementById('appViewSeg'), app=document.querySelector('.app'), svg=document.getElementById('flowSvg');
@@ -1011,16 +1035,14 @@ body.hero-collapsed #heroStrip{display:flex}
   function setView(v){
     active=(v==='flow');
     app.classList.toggle('flow-active',active);
-    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-appview')===v));
     if(active){ registerIo(); startPoll(); if(window.__liveBus&&!window.__liveBus.wanted){try{window.toggleLiveBus();}catch(e){}} loop(); }
     else { stopPoll(); clearOurForces(); }
   }
-  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setView(b.getAttribute('data-appview'))));
   // press the field input — delegated on the stable <svg> (its innerHTML is replaced each frame)
   svg.addEventListener('click',e=>{ if(e.target.closest&&e.target.closest('#flowInput')){ const nets=NS(),n=nets[selNetIdx],ins=n?contacts(n.expr):[],p=ins[0]; if(p&&p.io==='IX')pressInput(p.idx); } });
   // rung selector (delegated)
   document.getElementById('flowRungSel').addEventListener('click',e=>{const b=e.target.closest('button[data-ni]');if(b){selNetIdx=+b.getAttribute('data-ni');render();}});
-  setView('logic');
+  AppView.register(setView);
 })();
 </script>
 <script>
@@ -1049,7 +1071,7 @@ body.hero-collapsed #heroStrip{display:flex}
   function setHint(t){const h=el('protoHint');if(h)h.textContent=t||'';}
   function netPulse(){window.__netPulse=performance.now();}
 
-  async function mb(q){ const r=await fetch('/modbus?'+q,{cache:'no-store'}); return await r.json(); }
+  async function mb(q){ return window.mbFetch(q); }
 
   function logFrame(r,kind,label){
     const host=el('protoFrames'); if(!host)return;
@@ -1121,12 +1143,11 @@ body.hero-collapsed #heroStrip{display:flex}
   function setView(v){
     active=(v==='protocol');
     app.classList.toggle('proto-active',active);
-    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-appview')===v));
     if(active){ renderWrites(); readAll(true);
       const chk=el('protoPoll'); if(chk&&chk.checked&&!pollTimer)pollTimer=setInterval(()=>readAll(false),1000);
     } else { if(pollTimer){clearInterval(pollTimer);pollTimer=null;} }
   }
-  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setView(b.getAttribute('data-appview'))));
+  AppView.register(setView);
   const chk=el('protoPoll'); if(chk)chk.addEventListener('change',()=>{ if(chk.checked){ if(!pollTimer)pollTimer=setInterval(()=>readAll(false),1000); } else if(pollTimer){clearInterval(pollTimer);pollTimer=null;} });
   const rnow=el('protoReadBtn'); if(rnow)rnow.addEventListener('click',()=>readAll(true));
 })();
@@ -1141,7 +1162,7 @@ body.hero-collapsed #heroStrip{display:flex}
   const DI_NAMES=['di0_start','di1_stop','di2_estop_in','di3','di4','di5','di6','di7'];
   const DI_LABEL=['Start','Stop','E-stop','DI3','DI4','DI5','DI6','DI7'];
   const st={di:[0,0,0,0,0,0,0,0],coil:[0,0,0,0,0,0,0],reg:{}, forced:{}};
-  async function mb(q){ const r=await fetch('/modbus?'+q,{cache:'no-store'}); return await r.json(); }
+  async function mb(q){ return window.mbFetch(q); }
   const connNow=()=>((typeof conn!=='undefined')&&conn);
 
   async function poll(){
@@ -1201,13 +1222,12 @@ body.hero-collapsed #heroStrip{display:flex}
   function setView(v){
     active=(v==='circuit');
     app.classList.toggle('circuit-active',active);
-    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.getAttribute('data-appview')===v));
     if(active){ render(); poll(); if(!pollTimer)pollTimer=setInterval(poll,1000); }
     else { if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
       // release any inputs we forced
       Object.keys(st.forced).forEach(n=>{ if(st.forced[n]&&connNow()){try{rawSend('force IX'+n+' 0');}catch(e){}} st.forced[n]=false; }); }
   }
-  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setView(b.getAttribute('data-appview'))));
+  AppView.register(setView);
 })();
 </script>
 <script src="operator/vendor/three-r180.js"></script>
