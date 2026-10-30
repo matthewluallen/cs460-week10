@@ -4446,39 +4446,60 @@ document.getElementById('bReadProject').onclick=()=>readProjectIdentity().catch(
 document.getElementById('bExportProjectReadback').onclick=()=>{if(lastProjectEvidence)downloadText((lastProjectEvidence.readback.project_id||'unconfigured')+'-readback.json',JSON.stringify(lastProjectEvidence,null,2),'application/json');};
 document.getElementById('bRegisters').onclick=openRegisterTable;
 function openNetConfig(){
-  showModal(`<h3>Network configuration</h3><div class="body">
-    <p style="font-size:12.5px;color:var(--ink2)">Per-interface addressing. The W5500 Ethernet is configurable only when present; WiFi is always available. Addressing changes apply on the next reboot.</p>
+  const F=(lbl,id,ck,extra='')=>`<div class="nc-lbl">${lbl} <span class="nc-i" data-ck="${ck}" title="What is this? (click)">i</span></div><div class="nc-teach" data-tk="${ck}"></div>`+extra;
+  showModal(`<style>
+    .nc-i{cursor:pointer;color:var(--violet);font-weight:700;font-size:10px;border:1px solid var(--line2);border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+    .nc-teach{display:none;margin:3px 0 6px;padding:8px 10px;border-left:2px solid var(--violet);background:var(--panel2);border-radius:0 6px 6px 0;font-size:12px;line-height:1.5;color:var(--ink2)}
+    .nc-teach.show{display:block}.nc-teach b{color:var(--ink)}.nc-teach code{background:var(--panel);padding:1px 5px;border-radius:4px;font-size:11px;color:var(--live)}
+    .nc-teach .sec{color:#e3b341}.nc-lbl{display:flex;align-items:center;gap:0;margin:8px 0 2px;color:var(--ink2);font-size:13px}
+    .nc-note{margin:8px 0;padding:8px 10px;border-radius:6px;background:var(--panel2);font-size:12px;color:var(--ink2);border:1px solid var(--line)}
+    .nc-learn{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);cursor:pointer;margin-left:auto}
+  </style><h3 style="display:flex;align-items:center;gap:12px">Network configuration <label class="nc-learn"><input type="checkbox" id="ncLearn"> Learn mode — explain every setting</label></h3><div class="body">
+    <p style="font-size:12.5px;color:var(--ink2)">Two interfaces, configured independently. Click the <span class="nc-i" style="display:inline-flex">i</span> on any setting to learn what it is, what the firmware does with it, and why it matters. Addressing changes apply on the next reboot.</p>
     <p id="ncStatus" style="font-size:12px;color:var(--ink2)">Reading current device config…</p>
+    <div id="ncNote" class="nc-note" style="display:none"></div>
     <fieldset id="ncEth" style="border:1px solid var(--line);border-radius:8px;margin:10px 0;padding:10px"><legend style="color:var(--violet);padding:0 6px">Ethernet (W5500) <span id="ncEthP" style="color:var(--muted);font-size:11px"></span></legend>
-      <label>Addressing</label><select id="ncEthMode" style="width:100%"><option value="dhcp">DHCP</option><option value="static">Static</option></select>
-      <div id="ncEthStatic"><div class="row" style="gap:8px"><div style="flex:1"><label>IP</label><input id="ncEthIp" style="width:100%"></div><div style="flex:1"><label>Gateway</label><input id="ncEthGw" style="width:100%"></div></div><label>Subnet mask</label><input id="ncEthMask" style="width:100%"></div>
+      ${F('Addressing','ncEthMode','eth_mode')}<select id="ncEthMode" style="width:100%"><option value="dhcp">DHCP — get an address automatically</option><option value="static">Static — fixed address you set</option></select>
+      <div id="ncEthStatic">${F('IP address','ncEthIp','eth_ip')}<input id="ncEthIp" style="width:100%">${F('Gateway (router)','ncEthGw','eth_gw')}<input id="ncEthGw" style="width:100%">${F('Subnet mask','ncEthMask','eth_mask')}<input id="ncEthMask" style="width:100%"></div>
     </fieldset>
     <fieldset style="border:1px solid var(--line);border-radius:8px;margin:10px 0;padding:10px"><legend style="color:var(--violet);padding:0 6px">WiFi</legend>
-      <label>Mode</label><select id="ncWMode" style="width:100%"><option value="off">Off (contained)</option><option value="sta">STA — join a network</option><option value="ap">AP — setup / provisioning</option></select>
-      <div id="ncSta"><label>SSID</label><input id="ncSsid" style="width:100%"><label>Password</label><input id="ncPass" type="password" placeholder="(leave blank to keep)" style="width:100%"><label>Addressing</label><select id="ncWAddr" style="width:100%"><option value="dhcp">DHCP</option><option value="static">Static</option></select><div id="ncWStatic"><div class="row" style="gap:8px"><div style="flex:1"><label>IP</label><input id="ncWIp" style="width:100%"></div><div style="flex:1"><label>Gateway</label><input id="ncWGw" style="width:100%"></div></div><label>Subnet mask</label><input id="ncWMask" style="width:100%"></div></div>
-      <div id="ncAp" style="font-size:12px;color:var(--ink2)">AP broadcasts <b id="ncApName"></b> (default pass <code>stamplc-setup</code>) — connect and browse <code>http://192.168.4.1:8080/setup</code>.</div>
+      ${F('Mode','ncWMode','wifi_mode')}<select id="ncWMode" style="width:100%"><option value="off">Off — no radio (contained)</option><option value="sta">STA — join a network</option><option value="ap">AP — host a setup network</option></select>
+      <div id="ncSta">${F('Network name (SSID)','ncSsid','ssid')}<input id="ncSsid" style="width:100%">${F('Password','ncPass','pass')}<input id="ncPass" type="password" placeholder="(leave blank to keep)" style="width:100%">${F('Addressing','ncWAddr','wifi_addr')}<select id="ncWAddr" style="width:100%"><option value="dhcp">DHCP</option><option value="static">Static</option></select><div id="ncWStatic">${F('IP address','ncWIp','wifi_ip')}<input id="ncWIp" style="width:100%">${F('Gateway','ncWGw','wifi_gw')}<input id="ncWGw" style="width:100%">${F('Subnet mask','ncWMask','wifi_mask')}<input id="ncWMask" style="width:100%"></div></div>
+      <div id="ncAp">${F('Setup-AP name','ncApName','ap_ssid')}<div style="font-size:12px;color:var(--ink2);margin-bottom:6px">Broadcasts <b id="ncApNameV"></b> (default pass <code>stamplc-setup</code>) — connect and browse <code>http://192.168.4.1:8080/setup</code>. ${F('','ncApPassI','ap_pass').replace('<div class="nc-lbl"> ','<span class="nc-i" ').replace('</div>','</span>')}</div></div>
     </fieldset>
     <p id="ncMsg" style="font-size:12px;color:var(--ink2)"></p>
-    <div class="row"><button class="btn pri" id="ncApply">Save to device</button><button class="btn" id="ncReload">Re-read</button><button class="btn" onclick="closeModal()">Close</button></div>
+    <div class="row"><button class="btn pri" id="ncApply">Save to device</button><button class="btn" id="ncReload">Re-read</button><button class="btn" id="ncAskAI" title="Copy this setting + its context as a prompt for any AI assistant">Ask AI</button><button class="btn" onclick="closeModal()">Close</button></div>
   </div>`);
-  const g=id=>document.getElementById(id); let ethPresent=false;
-  const tgl=()=>{ g('ncEthStatic').style.display=g('ncEthMode').value==='static'?'':'none'; g('ncSta').style.display=g('ncWMode').value==='sta'?'':'none'; g('ncAp').style.display=g('ncWMode').value==='ap'?'':'none'; g('ncWStatic').style.display=(g('ncWMode').value==='sta'&&g('ncWAddr').value==='static')?'':'none'; };
+  const g=id=>document.getElementById(id); let ethPresent=false; let CAT=window.__cfgCatalog||null;
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function teachHTML(key){ if(!CAT)return 'Loading…'; const P=(CAT.properties||{})[key]||(CAT.concepts||{})[key]; if(!P)return 'No description yet.'; const C=P.concept&&(CAT.concepts||{})[P.concept]; let h='<b>'+esc(P.plain||P.label)+'</b>'; if(P.why)h+='<br>'+esc(P.why); if(P.firmware)h+='<br><b>In the firmware:</b> '+esc(P.firmware); if(P.security)h+='<br><span class="sec"><b>Security:</b> '+esc(P.security)+'</span>'; if(P.console)h+='<br><b>Try on the console:</b> <code>'+esc(P.console)+'</code>'; if(P.explore)h+='<br><b>Explore:</b> '+esc(P.explore); if(C)h+='<br><br><b>Concept — '+esc(C.label)+':</b> '+esc(C.plain)+(C.why?' '+esc(C.why):''); return h; }
+  function paintTeach(){ document.querySelectorAll('#modalInner .nc-teach').forEach(d=>{ d.innerHTML=teachHTML(d.getAttribute('data-tk')); }); }
+  function wireInfo(){ document.querySelectorAll('#modalInner .nc-i[data-ck]').forEach(b=>{ b.onclick=()=>{ const t=document.querySelector('#modalInner .nc-teach[data-tk="'+b.getAttribute('data-ck')+'"]'); if(t)t.classList.toggle('show'); }; }); }
+  g('ncLearn').onchange=()=>{ const on=g('ncLearn').checked; document.querySelectorAll('#modalInner .nc-teach').forEach(t=>t.classList.toggle('show',on)); };
+  function note(){ const n=g('ncNote'); const msgs=[]; if(g('ncWMode').value==='ap')msgs.push('⚠ Setup-AP uses a <b>default password</b> (CWE-798/1392) — fine to provision briefly, but change it or switch to STA/Off for normal use.'); if((g('ncEthMode').value==='dhcp'&&ethPresent)||(g('ncWMode').value==='sta'&&g('ncWAddr').value==='dhcp'))msgs.push('ℹ DHCP trusts whatever answers first — a rogue DHCP server can become your gateway, DNS and time source (the NTP AiTM lab). Static addressing removes that.'); if(msgs.length){n.style.display='';n.innerHTML=msgs.join('<br><br>');}else n.style.display='none'; }
+  const tgl=()=>{ g('ncEthStatic').style.display=g('ncEthMode').value==='static'?'':'none'; g('ncSta').style.display=g('ncWMode').value==='sta'?'':'none'; g('ncAp').style.display=g('ncWMode').value==='ap'?'':'none'; g('ncWStatic').style.display=(g('ncWMode').value==='sta'&&g('ncWAddr').value==='static')?'':'none'; note(); };
   g('ncEthMode').onchange=tgl; g('ncWMode').onchange=tgl; g('ncWAddr').onchange=tgl;
+  async function ensureCatalog(){ if(CAT)return; try{ CAT=await fetch('config-catalog.json',{cache:'no-store'}).then(r=>r.json()); window.__cfgCatalog=CAT; }catch(e){ CAT={properties:{},concepts:{}}; } paintTeach(); }
   async function load(){
-    if(!conn){g('ncStatus').textContent='Not connected — press Connect USB (physical board) or Connect twin first, then Re-read.';return;}
+    await ensureCatalog();
+    if(!conn){g('ncStatus').textContent='Not connected — press Connect USB (physical board) or Connect twin, then Re-read. You can still click the ⓘ marks to learn each setting.';return;}
     try{
       const line=await busCommand('netcfg json',l=>{l=l.trim();return l.startsWith('{')&&l.includes('"eth"')&&l.includes('"wifi"');});
-      const c=JSON.parse(line.trim());
-      ethPresent=!!c.eth.present;
+      const c=JSON.parse(line.trim()); ethPresent=!!c.eth.present;
       g('ncEthP').textContent=ethPresent?('present · link '+c.eth.link):'not present (section disabled)';
       g('ncEth').style.opacity=ethPresent?'1':'.5'; g('ncEthMode').disabled=g('ncEthIp').disabled=g('ncEthGw').disabled=g('ncEthMask').disabled=!ethPresent;
       g('ncEthMode').value=c.eth.mode; g('ncEthIp').value=c.eth.ip; g('ncEthGw').value=c.eth.gw; g('ncEthMask').value=c.eth.mask;
       g('ncWMode').value=c.wifi.mode; g('ncSsid').value=c.wifi.ssid; g('ncWAddr').value=c.wifi.addr;
-      g('ncWIp').value=c.wifi.ip; g('ncWGw').value=c.wifi.gw; g('ncWMask').value=c.wifi.mask; g('ncApName').textContent=c.wifi.ap_ssid;
-      g('ncStatus').textContent='Live device config. Edit and Save to device, then reboot to apply.'; tgl();
+      g('ncWIp').value=c.wifi.ip; g('ncWGw').value=c.wifi.gw; g('ncWMask').value=c.wifi.mask; g('ncApNameV').textContent=c.wifi.ap_ssid;
+      g('ncStatus').textContent='Live device config. Edit, Save to device, then reboot to apply.'; tgl();
     }catch(e){ g('ncStatus').textContent='Read failed: '+e.message+' (is the device connected?)'; }
   }
   g('ncReload').onclick=load;
+  g('ncAskAI').onclick=()=>{
+    const vals={eth:{mode:g('ncEthMode').value,ip:g('ncEthIp').value,gw:g('ncEthGw').value,mask:g('ncEthMask').value,present:ethPresent},wifi:{mode:g('ncWMode').value,ssid:g('ncSsid').value,addr:g('ncWAddr').value,ip:g('ncWIp').value,gw:g('ncWGw').value,mask:g('ncWMask').value}};
+    const prompt='I am configuring an M5StampLC soft-PLC (ESP32-S3) network settings in the Logic Studio. Here is the current form state as JSON:\n'+JSON.stringify(vals,null,2)+'\n\nPlease explain, for someone new to networking and firmware: what each setting does, whether this configuration is sensible and safe, and any security implications (e.g. DHCP vs static, default AP credentials). Reference the per-interface model (W5500 Ethernet + WiFi, each static or DHCP; WiFi OFF/STA/setup-AP).';
+    (navigator.clipboard?navigator.clipboard.writeText(prompt):Promise.reject()).then(()=>{g('ncMsg').textContent='Ask-AI prompt copied — paste it into any AI assistant.';},()=>{g('ncMsg').textContent='Copy failed; prompt logged to the console.';console.log(prompt);});
+  };
   g('ncApply').onclick=async()=>{
     if(!conn){g('ncMsg').textContent='Not connected.';return;}
     const cmds=[];
@@ -4493,7 +4514,7 @@ function openNetConfig(){
     g('ncMsg').textContent='Saved to device ('+cmds.length+' commands). Reboot the StampLC to apply addressing changes.';
     log('Network config written to device; reboot to apply.','ok');
   };
-  load();
+  wireInfo(); paintTeach(); load();
 }
 document.getElementById('bNetCfg').onclick=openNetConfig;
 document.getElementById('bSensors').onclick=openSensors;
