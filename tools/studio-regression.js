@@ -8,7 +8,7 @@
 const {chromium}=require('playwright'), fs=require('fs'), path=require('path');
 const ROOT=fs.existsSync('logic_studio.html')?'.':'web/public';
 (async()=>{
- const srv=require('http').createServer((q,r)=>{let p=q.url.split('?')[0];if(p=='/')p='/logic_studio.html';try{const b=fs.readFileSync(require('path').join(ROOT,p));r.writeHead(200,{'content-type':p.endsWith('.csco')||p.endsWith('.json')?'application/json':'text/html'});r.end(b);}catch(e){r.writeHead(404);r.end('nf');}}).listen(0);
+ const srv=require('http').createServer((q,r)=>{let p=q.url.split('?')[0];if(p=='/')p='/logic_studio.html';try{const b=fs.readFileSync(require('path').join(ROOT,p));r.writeHead(200,{'content-type':p.endsWith('.js')?'application/javascript':(p.endsWith('.csco')||p.endsWith('.json')?'application/json':'text/html')});r.end(b);}catch(e){r.writeHead(404);r.end('nf');}}).listen(0);
  const port=srv.address().port;const b=await chromium.launch({args:['--no-sandbox']});const pg=await b.newPage({viewport:{width:1440,height:900}});
  await pg.goto('http://127.0.0.1:'+port+'/logic_studio.html',{waitUntil:'networkidle'});
  await pg.evaluate(()=>{ if(typeof closeModal==='function')closeModal(); });
