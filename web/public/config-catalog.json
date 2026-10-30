@@ -1,118 +1,221 @@
 {
-  "_about": "Teaching catalog for the StampLC configuration surface. One source of truth, rendered by four surfaces: the Logic Studio Network panel, the on-device /setup page, the plc> console 'explain' command, and AI tools. Writing rule (the lab's ethos): 'firmware' states what the code DOES (observed); 'why'/'security' state what it MEANS (inferred).",
-  "_schema": { "key": "stable id (matches the UI field + netcfg verb)", "label": "", "group": "", "type": "", "example": "", "plain": "zero-assumed-knowledge definition", "why": "consequence of getting it wrong", "firmware": "what the code does with it (file/function/register)", "security": "teaching / CWE angle", "console": "the plc> command", "explore": "how to read it live" },
+  "_about": "Teaching catalog for the StampLC configuration surface. One source of truth, rendered by four surfaces: the Logic Studio Network panel, the on-device /setup page, the plc> console 'explain'/'learn' commands, and AI tools. The firmware table (src/config_explain_table.inc) is GENERATED from this file by scripts/generate_config_explain.py; the public Studio reads a copy exported to web/public/config-catalog.json. Writing rule (the lab's ethos): 'firmware' states what the code DOES (observed); 'why'/'security' state what it MEANS (inferred).",
+  "_schema": {
+    "key": "stable id (matches the UI field + netcfg verb)",
+    "label": "",
+    "group": "",
+    "type": "",
+    "example": "",
+    "plain": "zero-assumed-knowledge definition",
+    "why": "consequence of getting it wrong",
+    "firmware": "what the code does with it (file/function/register)",
+    "security": "teaching / CWE angle",
+    "console": "the plc> command",
+    "explore": "how to read it live"
+  },
   "version": 1,
   "concepts": {
     "ip_address": {
+      "key": "ip",
       "label": "IP address",
       "plain": "A number that names one device on a network, like a street address. Written as four parts, e.g. 10.13.37.10.",
       "why": "Two devices on the same network must have different addresses; a clash means neither is reachable.",
-      "explore": "Run `netcfg json` — the 'link' field is the address the hardware is actually using right now, which can differ from what you configured until the next reboot."
+      "explore": "Run `netcfg json` - the 'link' field is the address the hardware is actually using right now, which can differ from what you configured until the next reboot."
     },
     "subnet_mask": {
+      "key": "mask",
       "label": "Subnet mask",
       "plain": "Decides which addresses count as 'my local network' versus 'somewhere else I reach through the gateway'. 255.255.255.0 means the first three parts must match to be local.",
       "why": "Too narrow and the device thinks neighbours are remote (sending everything to the gateway); too wide and it never uses the gateway at all.",
       "firmware": "Passed to the W5500 (eth_begin) or the WiFi stack (setup_wifi WiFi.config) as the netmask; the IP stack ANDs it with each destination to pick local-vs-routed."
     },
     "gateway": {
+      "key": "gateway",
       "label": "Gateway (router)",
-      "plain": "The address the device sends traffic to when the destination is NOT on its own local network — the door to everywhere else.",
+      "plain": "The address the device sends traffic to when the destination is NOT on its own local network - the door to everywhere else.",
       "why": "Wrong gateway = the device talks to its local neighbours fine but can't reach the internet, an NTP server, or an MQTT broker on another network.",
       "firmware": "Stored as eth_gw / wifi_gw and loaded at bring-up. Note: in DHCP mode the firmware ADOPTS the gateway the DHCP server hands out.",
-      "security": "Because the gateway is also the default NTP source, a rogue DHCP server that names itself the gateway becomes the device's time source — the AiTM path explored in the NTP lab (Part 8)."
+      "security": "Because the gateway is also the default NTP source, a rogue DHCP server that names itself the gateway becomes the device's time source - the AiTM path explored in the NTP lab (Part 8)."
     },
     "dhcp_vs_static": {
+      "key": "dhcp",
       "label": "DHCP vs. Static",
       "plain": "DHCP = the network hands the device an address automatically. Static = you pin a fixed address yourself.",
       "why": "DHCP is easy and avoids clashes; Static is predictable (you always know where the PLC is) and is what plant networks use so controllers never move.",
       "firmware": "use_static flips eth_begin/setup_wifi between Ethernet.begin(mac, ip, ...) (static) and a DHCP lease request; on DHCP the firmware also adopts the leased gateway/DNS.",
-      "security": "DHCP trusts whatever answers first. A rogue DHCP server can hand out its own address as gateway+DNS+NTP (option 42) and sit in the middle. Static addressing removes that attack surface — one reason ICS networks pin PLC addresses."
+      "security": "DHCP trusts whatever answers first. A rogue DHCP server can hand out its own address as gateway+DNS+NTP (option 42) and sit in the middle. Static addressing removes that attack surface - one reason ICS networks pin PLC addresses."
     },
     "sta_vs_ap": {
+      "key": "sta_ap",
       "label": "WiFi STA vs. AP",
       "plain": "STA (station) = the device JOINS a WiFi network you already have. AP (access point) = the device HOSTS its own little network that you connect to.",
       "why": "You use AP to set the device up when it has no network yet (connect your phone to it, open its web page). You use STA for normal operation on your real network.",
       "firmware": "wifi_mode selects WiFi.mode(WIFI_STA) + WiFi.begin(ssid,pass) vs WiFi.mode(WIFI_AP) + WiFi.softAP(ssid,pass) in setup_wifi.",
-      "security": "An AP that anyone can join, or that keeps a default password, is an open door to the controller — see the setup-AP credential note."
+      "security": "An AP that anyone can join, or that keeps a default password, is an open door to the controller - see the setup-AP credential note."
     }
   },
   "properties": {
     "eth_present": {
-      "label": "W5500 Ethernet present", "group": "ethernet", "type": "readonly",
+      "label": "W5500 Ethernet present",
+      "group": "ethernet",
+      "type": "readonly",
       "plain": "Whether the wired-Ethernet add-on (the W5500 PoE module) is physically fitted.",
       "why": "WiFi is always built in; wired Ethernet only exists if the module is installed, so its settings only matter when it's present.",
       "firmware": "eth_ok() returns true when Ethernet.hardwareStatus() detects the W5500 chip over SPI at boot; the config UI hides/greys the Ethernet section when it's false.",
       "explore": "Boot log prints `[ETH] hardware=<n> link=<n>`; hardware=0 means no module (normal on a WiFi-only unit)."
     },
     "eth_mode": {
-      "label": "Ethernet addressing", "group": "ethernet", "type": "enum:dhcp|static", "example": "static",
-      "plain": "Whether the wired interface gets its address automatically (DHCP) or uses a fixed one you set (Static).", "concept": "dhcp_vs_static",
+      "label": "Ethernet addressing",
+      "group": "ethernet",
+      "type": "enum:dhcp|static",
+      "example": "static",
+      "plain": "Whether the wired interface gets its address automatically (DHCP) or uses a fixed one you set (Static).",
+      "concept": "dhcp_vs_static",
       "firmware": "eth_use_static; eth_begin() branches on it.",
       "console": "netcfg eth static <ip> <gw> <mask>  |  netcfg eth dhcp",
       "explore": "netcfg json -> eth.mode (configured) and eth.link (what the hardware is using now)."
     },
-    "eth_ip":   { "label": "Ethernet IP address", "group": "ethernet", "type": "ipv4", "example": "10.13.37.10", "concept": "ip_address",
+    "eth_ip": {
+      "label": "Ethernet IP address",
+      "group": "ethernet",
+      "type": "ipv4",
+      "example": "10.13.37.10",
+      "concept": "ip_address",
       "plain": "The fixed address other machines use to reach this device over the wired network.",
       "why": "Must be unique on the wired segment and inside its subnet, or Ethernet clients can't connect.",
       "firmware": "eth_ip -> the W5500 source-IP register via eth_begin() before any socket opens.",
-      "console": "netcfg eth static <ip> <gw> <mask>" },
-    "eth_gw":   { "label": "Ethernet gateway", "group": "ethernet", "type": "ipv4", "example": "10.13.37.1", "concept": "gateway",
+      "console": "netcfg eth static <ip> <gw> <mask>"
+    },
+    "eth_gw": {
+      "label": "Ethernet gateway",
+      "group": "ethernet",
+      "type": "ipv4",
+      "example": "10.13.37.1",
+      "concept": "gateway",
       "plain": "The router address the wired interface uses to reach other networks.",
       "firmware": "eth_gw; also the default NTP source when no NTP server is set.",
-      "console": "netcfg eth static <ip> <gw> <mask>" },
-    "eth_mask": { "label": "Ethernet subnet mask", "group": "ethernet", "type": "ipv4", "example": "255.255.255.0", "concept": "subnet_mask",
+      "console": "netcfg eth static <ip> <gw> <mask>"
+    },
+    "eth_mask": {
+      "label": "Ethernet subnet mask",
+      "group": "ethernet",
+      "type": "ipv4",
+      "example": "255.255.255.0",
+      "concept": "subnet_mask",
       "plain": "Which wired addresses count as local vs. routed through the gateway.",
       "firmware": "eth_mask -> W5500 subnet register.",
-      "console": "netcfg eth static <ip> <gw> <mask>" },
+      "console": "netcfg eth static <ip> <gw> <mask>"
+    },
     "wifi_mode": {
-      "label": "WiFi mode", "group": "wifi", "type": "enum:off|sta|ap", "example": "sta", "concept": "sta_vs_ap",
+      "label": "WiFi mode",
+      "group": "wifi",
+      "type": "enum:off|sta|ap",
+      "example": "sta",
+      "concept": "sta_vs_ap",
       "plain": "Off = no WiFi radio (contained). STA = join your network. AP = host a setup network.",
       "why": "Default is Off so a lab device never joins a network by surprise. Use AP to provision, STA to run.",
       "firmware": "wifi_mode drives setup_wifi(): WIFI_OFF / WIFI_STA+begin / WIFI_AP+softAP.",
       "console": "netcfg wifi off | sta <ssid> <pass> | ap [<ssid> <pass>]",
-      "security": "Leaving WiFi Off is the contained default — enabling a radio widens the attack surface, so do it only on an isolated segment." },
-    "ssid": { "label": "WiFi network name (SSID)", "group": "wifi", "type": "string", "example": "PlantLab-IoT",
+      "security": "Leaving WiFi Off is the contained default - enabling a radio widens the attack surface, so do it only on an isolated segment."
+    },
+    "ssid": {
+      "label": "WiFi network name (SSID)",
+      "group": "wifi",
+      "type": "string",
+      "example": "PlantLab-IoT",
       "plain": "The name of the WiFi network you want the device to JOIN (station mode).",
       "why": "Must match an existing network exactly (case-sensitive) or the device can't connect.",
-      "firmware": "ssid -> WiFi.begin(ssid, pass).", "console": "netcfg wifi sta <ssid> <pass>" },
-    "pass": { "label": "WiFi password", "group": "wifi", "type": "secret",
+      "firmware": "ssid -> WiFi.begin(ssid, pass).",
+      "console": "netcfg wifi sta <ssid> <pass>"
+    },
+    "pass": {
+      "label": "WiFi password",
+      "group": "wifi",
+      "type": "secret",
       "plain": "The password for the WiFi network you're joining.",
       "firmware": "pass -> WiFi.begin(ssid, pass). Stored in NVS; the config JSON never returns it.",
       "security": "Treated as a secret: the device's /api/config and netcfg json never echo it back.",
-      "console": "netcfg wifi sta <ssid> <pass>" },
-    "wifi_addr": { "label": "WiFi addressing", "group": "wifi", "type": "enum:dhcp|static", "example": "dhcp", "concept": "dhcp_vs_static",
+      "console": "netcfg wifi sta <ssid> <pass>"
+    },
+    "wifi_addr": {
+      "label": "WiFi addressing",
+      "group": "wifi",
+      "type": "enum:dhcp|static",
+      "example": "dhcp",
+      "concept": "dhcp_vs_static",
       "plain": "Whether the WiFi interface gets its address automatically (DHCP, usual on a home/office LAN) or fixed (Static).",
       "firmware": "wifi_use_static; setup_wifi() calls WiFi.config(ip,gw,mask) only when static.",
-      "console": "netcfg wifi static <ip> <gw> <mask>  |  netcfg wifi dhcp" },
-    "wifi_ip":   { "label": "WiFi IP address", "group": "wifi", "type": "ipv4", "example": "192.168.1.50", "concept": "ip_address",
+      "console": "netcfg wifi static <ip> <gw> <mask>  |  netcfg wifi dhcp"
+    },
+    "wifi_ip": {
+      "label": "WiFi IP address",
+      "group": "wifi",
+      "type": "ipv4",
+      "example": "192.168.1.50",
+      "concept": "ip_address",
       "plain": "A fixed address for the device on your WiFi network (static mode only).",
-      "firmware": "wifi_ip -> WiFi.config().", "console": "netcfg wifi static <ip> <gw> <mask>" },
-    "wifi_gw":   { "label": "WiFi gateway", "group": "wifi", "type": "ipv4", "example": "192.168.1.1", "concept": "gateway",
+      "firmware": "wifi_ip -> WiFi.config().",
+      "console": "netcfg wifi static <ip> <gw> <mask>"
+    },
+    "wifi_gw": {
+      "label": "WiFi gateway",
+      "group": "wifi",
+      "type": "ipv4",
+      "example": "192.168.1.1",
+      "concept": "gateway",
       "plain": "The router on your WiFi network (static mode only).",
-      "firmware": "wifi_gw -> WiFi.config().", "console": "netcfg wifi static <ip> <gw> <mask>" },
-    "wifi_mask": { "label": "WiFi subnet mask", "group": "wifi", "type": "ipv4", "example": "255.255.255.0", "concept": "subnet_mask",
+      "firmware": "wifi_gw -> WiFi.config().",
+      "console": "netcfg wifi static <ip> <gw> <mask>"
+    },
+    "wifi_mask": {
+      "label": "WiFi subnet mask",
+      "group": "wifi",
+      "type": "ipv4",
+      "example": "255.255.255.0",
+      "concept": "subnet_mask",
       "plain": "Which WiFi addresses are local vs. routed (static mode only).",
-      "firmware": "wifi_mask -> WiFi.config().", "console": "netcfg wifi static <ip> <gw> <mask>" },
-    "ap_ssid": { "label": "Setup-AP name", "group": "wifi", "type": "string", "example": "StampLC-Setup-47BC",
+      "firmware": "wifi_mask -> WiFi.config().",
+      "console": "netcfg wifi static <ip> <gw> <mask>"
+    },
+    "ap_ssid": {
+      "label": "Setup-AP name",
+      "group": "wifi",
+      "type": "string",
+      "example": "StampLC-Setup-47BC",
       "plain": "The name of the temporary WiFi network the device hosts in AP mode so you can set it up.",
       "why": "You connect your phone/laptop to this, then open the device's web page to configure it.",
       "firmware": "ap_ssid, or a default built from the chip's MAC (setup_ap_ssid -> esp_read_mac) so two boards don't collide; WiFi.softAP(ssid,pass).",
-      "explore": "In AP mode the device serves its config page at http://192.168.4.1:8080/setup." },
-    "ap_pass": { "label": "Setup-AP password", "group": "wifi", "type": "secret", "example": "stamplc-setup",
+      "explore": "In AP mode the device serves its config page at http://192.168.4.1:8080/setup."
+    },
+    "ap_pass": {
+      "label": "Setup-AP password",
+      "group": "wifi",
+      "type": "secret",
+      "example": "stamplc-setup",
       "plain": "The password for the device's own setup network.",
       "security": "The DEFAULT password is a deliberate teaching weakness (CWE-798/1392, hard-coded/default credentials): a device left on its default AP password is trivially joined. Change it, or use AP only briefly to provision then switch to STA/Off.",
-      "firmware": "ap_pass or the documented default (setup_ap_pass); WiFi.softAP(ssid, pass) — WPA2, min 8 chars." },
-    "ntp": { "label": "NTP time source", "group": "shared", "type": "ipv4", "example": "10.13.37.1",
+      "firmware": "ap_pass or the documented default (setup_ap_pass); WiFi.softAP(ssid, pass) - WPA2, min 8 chars."
+    },
+    "ntp": {
+      "label": "NTP time source",
+      "group": "shared",
+      "type": "ipv4",
+      "example": "10.13.37.1",
       "plain": "The server the device asks for the current time. Blank means 'use the gateway'.",
       "why": "A correct clock matters for logs and certificates; a wrong one can push the device past the Year-2038 rollover.",
       "firmware": "ntp (empty -> eth_gw) passed to time_sync_set_server().",
-      "security": "If time comes from the gateway and the gateway came from DHCP, whoever controls DHCP controls the clock — the NTP AiTM / Y2038 lab (Part 8).",
-      "console": "netcfg ntp <ip> [port]" },
-    "cfg_cred": { "label": "Remote-config credentials", "group": "shared", "type": "credential", "example": "admin / openplc",
+      "security": "If time comes from the gateway and the gateway came from DHCP, whoever controls DHCP controls the clock - the NTP AiTM / Y2038 lab (Part 8).",
+      "console": "netcfg ntp <ip> [port]"
+    },
+    "cfg_cred": {
+      "label": "Remote-config credentials",
+      "group": "shared",
+      "type": "credential",
+      "example": "admin / openplc",
       "plain": "The username and password that protect the device's web/API configuration.",
-      "security": "Ships as admin/openplc — a default credential (CWE-798/1392). Anyone who can reach the web page can reconfigure the device until you change it.",
+      "security": "Ships as admin/openplc - a default credential (CWE-798/1392). Anyone who can reach the web page can reconfigure the device until you change it.",
       "firmware": "cfg_user/cfg_pass checked by the web server's basic-auth on /api/config.",
-      "console": "netcfg auth <user> <pass>" }
+      "console": "netcfg auth <user> <pass>"
+    }
   }
 }
