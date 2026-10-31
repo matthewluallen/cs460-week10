@@ -36,6 +36,53 @@ padded) and run it, use the twin wrapper:
 ./qemu/run.sh secure            # boot it in the twin
 ```
 
+## The factory default program (what the images boot with)
+
+The controller keeps its installed program as one NVS blob (namespace `plc`, key `project_v1`)
+holding the exact `TBD-PROJECT` JSON the Studio sends with `PLCLOAD` (`src/program_loader.cpp`).
+The factory image, the twin images and `./qemu/build-twin.sh` all seed that blob with
+[`factory/default-project.json`](factory/default-project.json) — the Studio's own compile of
+[`web/public/projects/motor-start-stop-estop.csco`](../../web/public/projects/motor-start-stop-estop.csco)
+(motor start/stop with a seal-in, N.C. E-stop `estop_ok` that latches a fault, `reset_pb`, no
+automatic restart). It boots in **PROGRAM**; `mode run` starts it. `project json` reports
+`project_id` `motor-start-stop-estop` and the payload sha256 printed by the tools below.
+
+```bash
+# after editing the .csco: recompile the payload (checked in CI by tools/studio-regression.js)
+node tools/compile-project.mjs web/public/projects/motor-start-stop-estop.csco \
+     --write sbom/firmware/factory/default-project.json
+# the NVS partition alone, and a self-check against Espressif's generator if installed
+python3 sbom/firmware/scripts/factory_image.py nvs --out /tmp/nvs.bin --crosscheck
+```
+
+`scripts/factory_image.py` writes the NVS partition itself (format version 2, one page; it is
+byte-identical to `esp-idf-nvs-partition-gen` 0.3.0 for this payload) and merges
+bootloader@0x0, partitions@0x8000, NVS@0x9000, boot_app0@0xe000 and the app@0x10000 in plain
+Python. A `pio run -t upload` writes only the app, so a board flashed that way keeps whatever
+program it already had.
+
+### Refreshing the prebuilt and the twin images (maintainers)
+
+```bash
+cd sbom/firmware
+pio run -e m5stamplc_secure          # build secure first: each build rewrites the provenance map,
+pio run -e m5stamplc                 # so the teaching build (the prebuilt) runs last
+B=.pio/build/m5stamplc
+cp $B/firmware.bin $B/bootloader.bin $B/partitions.bin prebuilt/
+python3 scripts/factory_image.py nvs   --out prebuilt/nvs-factory.bin
+python3 scripts/factory_image.py merge --build-dir $B --out prebuilt/stamplc-factory-8MB.bin
+(cd prebuilt && sha256sum boot_app0.bin bootloader.bin firmware.bin nvs-factory.bin \
+     partitions.bin stamplc-factory-8MB.bin > SHA256SUMS.txt)
+# twin release asset: the same factory image padded to 8 MB, then xz
+python3 scripts/factory_image.py merge --build-dir $B --out stamplc-flash-8MB.bin --pad-8mb
+xz -9 -k stamplc-flash-8MB.bin       # -> stamplc-flash-8MB.bin.xz (what qemu/fetch-qemu.sh downloads)
+```
+
+Host checks that need no twin: `python3 scripts/generate_point_map.py --check`, the unit test
+in [`test/default_project_test.cpp`](test/default_project_test.cpp) (decodes the factory payload
+with the firmware's own decoder and runs the firmware's VM through the Part 5 sequence; build
+line at the top of the file), and `node tools/studio-regression.js`.
+
 ## Existing prebuilt images
 
 The committed [`prebuilt/`](prebuilt/) images and the `qemu-twin-*` release are the classroom

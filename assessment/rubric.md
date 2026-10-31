@@ -43,7 +43,7 @@ Reasoning % = (sum / 12) × 60.
 | **2 SBOM** | `P2`: SPDX + CycloneDX both generate and differ | one chosen CVE's **reachability** — library-present vs. called-in-code — using the CWE bridge |
 | **3 HBOM** | `P3`: six internal I²C devices + 0x77 on the target | each live address reconciled to an HBOM line, and what a *missing* or *extra* address would imply |
 | **4 Ladder** | `P4`: edited/example project compiles to IR, pairing holds | the predicted I/O behavior of the change, and the CWE-306 point the rung embodies |
-| **5 Wire & run** | `P5`: `di0_start`→relay0&1; e-stop drops motor, latches relay3 | why the output (not the input or the HMI) is ground truth, and what the interlock protects against |
+| **5 Wire & run** | `P5`: `start_pb`→relay0&1 + seal-in; `estop_ok`=0 drops motor, latches relay3; no restart on restore; reset clears, motor stays off | why the output (not the input or the HMI) is ground truth, and what the interlock protects against |
 | **6 Unsigned OTA** | `P6`: OTA endpoint accepts an unsigned image | the exact integrity control that is missing (signature verification) and where a signer would sit |
 | **7 Supply-chain** | `P7` *(twin)*: armed image changes the relay | why a binary diff **cannot** isolate the payload, and what attestation (reproducible build / SLSA / in-toto) would |
 | **8 NTP / Y2038** | `P8`: benign sync clean; armed sync wraps to ~1902 | that unauthenticated time is attacker input, and why the **monotonic** audit clock is the right fix |

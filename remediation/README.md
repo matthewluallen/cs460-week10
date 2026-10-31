@@ -251,11 +251,13 @@ flash durability. Verify the persisted project identity after an actual restart;
 retain separate evidence for recovery from an interrupted write.
 
 The CI workflow (`.github/workflows/ci.yml`) runs `qemu/smoke-test.py` in its **twin-smoke**
-job, which asserts **nine lab invariant categories** — boot, i2cscan,
-di0→relay0/1 control, e-stop interlock, OTA :80, HMI :8080, sigrok bus decode, NTP/Y2038
-wrap, and the CWE-787 `/api/tag` overflow. Counted individually those are **16 `check()`
-assertions** in CI (where `sigrok-cli` is installed and the bus leg contributes three),
-dropping to 14 if the bus-decode leg cannot run. Invariant #9 is the overflow: on the
+job, which asserts **nine lab invariant categories** — boot, i2cscan, the factory motor
+program's control (`start_pb` → relay0/relay1 with seal-in), its fail-safe E-stop interlock
+(`estop_ok` = 0 drops the motor and latches relay3; restoring it neither restarts the motor nor
+clears the fault; `reset_pb` clears it with the motor off), OTA :80, HMI :8080, sigrok bus
+decode, NTP/Y2038 wrap, and the CWE-787 `/api/tag` overflow. Counted individually those are
+**21 `check()` assertions** in CI (where `sigrok-cli` is installed and the bus leg contributes
+three), dropping to 19 if the bus-decode leg cannot run. Invariant #9 is the overflow: on the
 *teaching* image the unauthenticated overlong `/api/tag` write energizes relay0 by memory
 corruption, and the secure build's bounds-checked copy stops it — the same effect
 `verify-secure.sh` re-checks, so "the overflow no longer moves a relay" is a runnable step,
