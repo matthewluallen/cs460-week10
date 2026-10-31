@@ -386,18 +386,78 @@ function xrayPath(inIdx,relayN,opts){opts=opts||{};const lane=206,rx=59+118*(rel
   return s;
 }
 
-/* ---------------------------------------------------------------- IO expansion module (functional depiction, docked on the controller's side) */
-const EXP_PINS=[['CH1.IN+','IN+',1],['CH1.IN-','IN−',1],['CH1.ISO','ISO GND',1],['CH2.IN+','IN+',2],['CH2.IN-','IN−',2],['CH2.ISO','ISO GND',2]];
-function expTerms(o){const t={};EXP_PINS.forEach(([id],i)=>{const y=o.y+50+i*40+(i>=3?40:0);t[id]={x:o.x+o.w-16,y,wire:[o.x+o.w+22,y],side:'right'};});return t;}
-function expansion(o,vm,T){const w=o.w,h=o.h,used=o.used||{};let s=`<g transform="translate(${o.x},${o.y})">`;
-  s+=txt(4,-26,'X1 · IO EXPANSION',{size:13.5,weight:800,fill:T.ink})+txt(4,-9,'analog 0–10 V · I²C @0x20',{size:12.5,fill:T.sub});
-  s+=`<g filter="url(#skSh)"><rect x="0" y="0" width="${w}" height="${h}" rx="12" fill="url(#skPlc)" stroke="${T.plcStroke}" stroke-width="1.4"/></g>`;
-  s+=`<rect x="-7" y="18" width="10" height="${h-36}" rx="3" fill="#8a939e"/>`;            // docking connector to the controller
-  s+=`<rect x="${w-31}" y="12" width="28" height="${h-24}" rx="6" fill="url(#skTstrip)" stroke="#b2bac4"/>`;
-  EXP_PINS.forEach(([id,lbl,ch],i)=>{const y=50+i*40+(i>=3?40:0),u=used[id];
-    s+=`<g opacity="${u?1:.45}"><use href="#skScrewS" x="${w-16}" y="${y}"/><rect x="${w+2}" y="${y-8}" width="11" height="16" rx="2.5" fill="#22272e"/>`+txt(w-34,y+4.5,lbl,{anchor:'end',size:12.5,weight:800,fill:'#262b33'})+`</g>`;});
-  s+=txt(10,30,'CH1',{size:13,weight:900,fill:'#262b33'})+txt(10,190,'CH2',{size:13,weight:900,fill:'#262b33',op:.5});
-  s+=`<line x1="8" y1="168" x2="${w-36}" y2="168" stroke="#b2bac4"/>`;
+/* ---------------------------------------------------------------- IO expansion module X1 (docked on the controller's right side)
+ * Drawn after the real module's front face (vendor product photos, model-size drawing and schematic), in the
+ * same snap-kit style as the controller; no logo, wordmark or label art is copied:
+ *   - white DIN-rail housing, portrait (46.5 × 77 mm body), as tall as the controller and docked flush to its
+ *     right side: a 2×8 bus header on the module's left side plugs into the controller's side socket; the
+ *     module's right side has the same socket, so further modules can chain (each at its own I²C address);
+ *   - top end, one 6-way input block, printed  ISO GND · IN− · IN+ | ISO GND · IN− · IN+  (CH1 = left triad);
+ *     voltage sensors use IN+ and ISO GND, 4–20 mA sensors IN+ and IN−;
+ *   - raised centre panel with three status-LED windows (relay; SSR 2, SSR 1);
+ *   - printed relay and SSR panels; bottom end, two 3-way output blocks  N.O · COM · N.C | MOS2 · MOS1 · COM;
+ *   - the 4-way I²C address switch is on the BACK (all OFF = 0x20, range 0x20–0x2F): drawn as a dashed inset,
+ *     the drawing's convention for "not visible hardware".
+ * Geometry is fixed (like the controller's); only x, y and `used` come from the circuit. Terminal ids are stable:
+ * leads name them, tools/circuit-catalog-check.js reads them through expTerms(). */
+const EXP_W=224,EXP_H=372,EXP_BUS=[96,184];  // body size; bus header span (local y) — level with the controller's x-ray entry at y 121
+const EXP_PINS=[['CH1.ISO','ISO GND',1],['CH1.IN-','IN−',1],['CH1.IN+','IN+',1],['CH2.ISO','ISO GND',2],['CH2.IN-','IN−',2],['CH2.IN+','IN+',2]]; // left → right, top end
+const EXP_OUT=[['RELAY.NO','N.O','#8f4325',20],['RELAY.COM','COM','#262b33',52],['RELAY.NC','N.C','#c8233f',84],
+               ['MOS2','MOS2','#16884c',140],['MOS1','MOS1','#23786a',172],['MOS.COM','COM','#262b33',204]];  // left → right, bottom end
+const EXP_INX=k=>32+32*k, EXP_INY=48, EXP_OUTY=322;
+function expTerms(o){const t={};
+  EXP_PINS.forEach(([id],k)=>{const x=o.x+EXP_INX(k);t[id]={x,y:o.y+EXP_INY,wire:[x,o.y-20],side:'top'};});
+  EXP_OUT.forEach(([id,,,x])=>{t[id]={x:o.x+x,y:o.y+EXP_OUTY,wire:[o.x+x,o.y+EXP_H+22],side:'bottom'};});
+  return t;}
+function expansion(o,vm,T){const W=EXP_W,H=EXP_H,used=o.used||{},ink='#262b33',sub='#4f5865',dim=.42;
+  const well=(x,y,u)=>`<g opacity="${u?1:dim}"><circle cx="${x}" cy="${y}" r="13.6" fill="#b7bfc8" stroke="#9aa3ad"/><use href="#skScrewS" x="${x}" y="${y}"/></g>`;
+  const anyUsed=ids=>ids.some(id=>used[id]);
+  let s=`<g transform="translate(${o.x},${o.y})" data-hop-target="x1"><title>X1 · IO expansion — I²C 0x20 (address switch on the back, 1–4 OFF)</title>`;
+  // bus header, mated: its shell shows in the seam between controller and module
+  s+=`<rect x="-9" y="${EXP_BUS[0]}" width="14" height="${EXP_BUS[1]-EXP_BUS[0]}" rx="2" fill="#22272e"/>`;
+  for(let i=0;i<8;i++)s+=`<rect x="-8" y="${EXP_BUS[0]+6+i*10.5}" width="6" height="2.4" fill="#c9a227"/>`;
+  // housing
+  s+=`<g filter="url(#skSh)"><rect x="0" y="0" width="${W}" height="${H}" rx="16" fill="url(#skPlc)" stroke="${T.plcStroke}" stroke-width="1.5"/></g>`;
+  s+=`<rect x="${W-3}" y="${EXP_BUS[0]+6}" width="5" height="${EXP_BUS[1]-EXP_BUS[0]-12}" rx="1.5" fill="#22272e" opacity=".85"/>`;  // pass-through socket (right side)
+  // terminal blocks seen at both ends (green), wire entries over each screw
+  s+=`<rect x="12" y="-5" width="${W-24}" height="10" rx="2" fill="#36a46b" stroke="#1f6b45"/>`;
+  s+=`<rect x="4" y="${H-5}" width="96" height="10" rx="2" fill="#36a46b" stroke="#1f6b45"/><rect x="124" y="${H-5}" width="96" height="10" rx="2" fill="#36a46b" stroke="#1f6b45"/>`;
+  EXP_PINS.forEach((_,k)=>s+=`<rect x="${EXP_INX(k)-6}" y="-3.5" width="12" height="7" rx="1.5" fill="#123826"/>`);
+  EXP_OUT.forEach(([, , ,x])=>s+=`<rect x="${x-6}" y="${H-3.5}" width="12" height="7" rx="1.5" fill="#123826"/>`);
+  // top end: printed input labels on a grey line, screws below
+  s+=`<rect x="10" y="12" width="${W-20}" height="12" rx="2" fill="#e1e5ea"/>`;
+  EXP_PINS.forEach(([id,lbl],k)=>{const x=EXP_INX(k);
+    if(lbl==='ISO GND')s+=`<rect x="${x-15}" y="4" width="30" height="14" rx="1.5" fill="#7a2596"/><rect x="${x-15}" y="18" width="30" height="14" rx="1.5" fill="#1d2127"/>`+
+      txt(x,15.2,'ISO',{anchor:'middle',size:12.5,weight:800,fill:'#ffffff',mono:1})+txt(x,29.2,'GND',{anchor:'middle',size:12.5,weight:800,fill:'#ffffff',mono:1});
+    else s+=txt(x,23,lbl,{anchor:'middle',size:12.5,weight:800,fill:ink,mono:1});
+    s+=well(x,EXP_INY,used[id]);});
+  // channel brackets (course annotation, like di0 under IN1 on the controller)
+  [1,2].forEach(ch=>{const x0=EXP_INX(3*(ch-1))-14,x1=EXP_INX(3*(ch-1)+2)+14,u=anyUsed(['IN+','IN-','ISO'].map(p=>`CH${ch}.${p}`));
+    s+=`<path d="M${x0},66 v5 H${x1} v-5" fill="none" stroke="${u?sub:'#9aa3ad'}" stroke-width="1.4"/>`+txt((x0+x1)/2,86,`CH${ch}`,{anchor:'middle',size:12.5,weight:800,fill:u?ink:sub,mono:1});});
+  // raised centre panel: name, address-switch inset (rear), status-LED windows
+  s+=`<rect x="5" y="94" width="${W-10}" height="112" rx="9" fill="#ffffff" fill-opacity=".5" stroke="#c3cad3"/><line x1="10" y1="205.5" x2="${W-10}" y2="205.5" stroke="#aab2bc" stroke-width="1.2"/>`;
+  s+=txt(16,121,'X1',{size:22,weight:900,fill:ink})+txt(48,121,'IO expansion',{size:13.5,weight:800,fill:ink})+txt(16,140,'2 analog in · 2 SSR · 1 relay',{size:12.5,weight:600,fill:sub});
+  s+=`<text x="17" y="190" font-size="34" letter-spacing="1" fill="#e7ebef" stroke="#c2c9d1" stroke-width=".9">I/O</text>`;   // moulded mark (plain text, low contrast)
+  { const ix=96,iy=150;   // the address switch is on the back of the module: dashed = not visible from the front
+    s+=`<rect x="${ix}" y="${iy}" width="${W-ix-12}" height="50" rx="6" fill="#ffffff" fill-opacity=".85" stroke="#56708a" stroke-width="1.3" stroke-dasharray="4 3"/>`;
+    s+=txt(ix+7,iy+16,'ADDR SW',{size:12.5,weight:800,fill:ink})+txt(W-18,iy+16,'back',{anchor:'end',size:12.5,fill:sub});
+    s+=`<rect x="${ix+7}" y="${iy+23}" width="58" height="22" rx="2" fill="#1d2127"/>`;
+    for(let i=0;i<4;i++)s+=`<rect x="${ix+12+i*13}" y="${iy+25.5}" width="9" height="17" rx="1" fill="#454c57"/><rect x="${ix+12+i*13}" y="${iy+34.5}" width="9" height="8" rx="1" fill="#f1f4f8"/>`;  // knobs down = OFF
+    s+=txt(W-18,iy+41,'0x20',{anchor:'end',size:14,weight:800,fill:ink,mono:1}); }
+  // status-LED windows: relay (over its COM), SSR 2 and SSR 1 (over MOS2, MOS1); unlit: the drawing never claims an output state
+  const relayUsed=anyUsed(['RELAY.NO','RELAY.COM','RELAY.NC']),ssrUsed=anyUsed(['MOS1','MOS2','MOS.COM']);
+  [[52,relayUsed],[140,ssrUsed],[172,ssrUsed]].forEach(([x,u])=>s+=`<g opacity="${u?1:.6}"><circle cx="${x}" cy="214" r="4.6" fill="#2b3038" stroke="#8d96a1"/><circle cx="${x-1.4}" cy="212.6" r="1.3" fill="#ffffff" opacity=".5"/></g>`);
+  // printed relay panel (changeover contact, shown de-energised: COM–N.C closed)
+  s+=`<rect x="6" y="224" width="94" height="80" rx="6" fill="#f2dde6"/>`+txt(12,240,'RELAY',{size:12.5,weight:800,fill:ink})+txt(12,256,'5 A · 250 V~',{size:12.5,fill:sub});
+  s+=`<g opacity="${relayUsed?1:.55}" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M20,290 V270 H28 M84,290 V266 H74 M52,290 V280 L78,266"/>`+
+     [20,52,84].map(x=>`<circle cx="${x}" cy="294" r="3.2" fill="#ffffff"/>`).join('')+`</g>`;
+  // printed SSR panel (two MOSFET switches, common COM; DC only)
+  s+=`<rect x="124" y="224" width="${W-130}" height="80" rx="6" fill="#f6eecb"/>`+txt(130,240,'SSR · DC only',{size:12.5,weight:800,fill:ink})+txt(130,256,'60 V · 2.5 A',{size:12.5,fill:sub});
+  s+=`<g opacity="${ssrUsed?1:.55}" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M204,290 V266 H140 M140,266 V270 M172,266 V270 M140,290 V284 L132,272 M172,290 V284 L164,272"/>`+
+     [140,172,204].map(x=>`<circle cx="${x}" cy="294" r="3.2" fill="#ffffff"/>`).join('')+`</g>`;
+  // bottom end: screws, then the printed colour badges (always legible: they are print, not state)
+  EXP_OUT.forEach(([id,lbl,col,x])=>{s+=well(x,EXP_OUTY,used[id]);
+    s+=`<rect x="${x-15.5}" y="339" width="31" height="16" rx="2" fill="${col}"/>`+txt(x,351.4,lbl,{anchor:'middle',size:12.5,weight:800,fill:'#ffffff',mono:1,ls:lbl.length>3?'-.5':null});});
   s+=`</g>`;return s;
 }
 
@@ -468,6 +528,6 @@ SCH.coil=(x,y,c,on)=>`<rect x="${x-20}" y="${y-11}" width="40" height="22" fill=
 
 /* ---------------------------------------------------------------- export */
 const api={P,THEMES,TAGS,CAT,LED_HUE,MONO,esc,txt,tag,tagWidth,stud,roundPath,along,polyLen,flowDur,flowWidth,wireColours,defs,partPins,PARTS,strip,stripFlow,stripStuds,
-  stampTerms,stamplc,wifiBadge,xrayPath,expTerms,expansion,EXP_PINS,leadPoints,leadBody,leadFlow,sleeve,clip,screwEnd,netLink,netJack,card,noteCard,legend,SCH};
+  stampTerms,stamplc,wifiBadge,xrayPath,expTerms,expansion,EXP_PINS,EXP_OUT,EXP_W,EXP_H,leadPoints,leadBody,leadFlow,sleeve,clip,screwEnd,netLink,netJack,card,noteCard,legend,SCH};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.SnapKit=api;
 })(typeof window!=='undefined'?window:globalThis);
