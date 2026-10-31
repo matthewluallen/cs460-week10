@@ -56,16 +56,12 @@ def bridge_holds_console():
         return False
 
 def twin_already_running():
-    """Same rule as qemu/twin-status.sh: a live qemu process on THIS socket AND the socket answers."""
-    if not _pgrep(f"qemu-system-xtensa.*unix:{SERIAL},server"):
-        return False
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(1.5)
-    try:
-        s.connect(SERIAL); return True
-    except OSError:
-        return False
-    finally:
-        s.close()
+    """The same rule as qemu/twin-status.sh (it runs that script): a live qemu process serving
+    THIS console socket whose QMP control socket reports it running. The console itself is never
+    probed — it takes one client, and when the Studio bridge holds it a probe would sit unanswered."""
+    r = subprocess.run(["bash", os.path.join(ROOT, "qemu", "twin-status.sh")],
+                       env=dict(os.environ, SERIAL_SOCK=SERIAL), capture_output=True, text=True)
+    return r.returncode == 0 and "RUNNING" in r.stdout
 
 # ------------------------------------------------------------------ transport
 class Console:

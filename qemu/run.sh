@@ -61,8 +61,9 @@ fi
 SERIAL_SOCK="${SERIAL_SOCK:-/tmp/plc-serial}"; QMP_SOCK="${QMP_SOCK:-/tmp/plc-qmp}"
 
 # ── already running? then there is nothing to boot ──────────────────────────
-# A twin counts as running only if its qemu process is alive AND its console socket
-# answers (a leftover socket file from a crashed twin does not count). See twin-status.sh.
+# A twin counts as running only if its qemu process is alive on this console socket AND
+# its QMP control socket reports "running" (a leftover socket file from a crashed twin
+# does not count). See twin-status.sh.
 #   no profile given           → reuse whatever twin is running
 #   profile/FLASH_IMG given    → reuse it if it is that build; otherwise say how to switch
 #   RESTART=1                  → stop the running twin and boot fresh
@@ -86,7 +87,7 @@ if twin_detect "$SERIAL_SOCK" 15; then
     exit 3
   fi
 elif [ "$TWIN_STATE" = "starting" ]; then
-  echo "A twin (pid $TWIN_PID) is still booting and its console has not answered yet."
+  echo "A twin (pid $TWIN_PID) is still starting and has not reported running yet."
   echo "Wait a few seconds and re-run, or check it with ./qemu/twin-status.sh (stop: ./qemu/twin-status.sh stop)."
   exit 3
 fi

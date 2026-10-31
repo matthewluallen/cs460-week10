@@ -40,7 +40,7 @@ if twin_detect "$SERIAL_SOCK" 15; then
     echo "twin already running — reusing it, not booting ($TWIN_WHICH, pid $TWIN_PID)."
   fi
 elif [ "$TWIN_STATE" = "starting" ]; then
-  echo "A twin (pid $TWIN_PID) is still booting; its console has not answered in 15 s."
+  echo "A twin (pid $TWIN_PID) is still starting; it has not reported running in 15 s."
   echo "Re-run in a moment, or check: ./qemu/twin-status.sh   (stop: ./qemu/twin-status.sh stop)"
   exit 3
 fi
