@@ -73,7 +73,7 @@ const CIRCUITS=[
     run:'Hold S1. Watch the path strip, then the console (io). Repeat with a forced input on a USB board and compare the hop tags.',
     reconcile:'Compare the read → write gap with the scan time. With force, which hops turned BYPASSED, and where did the force act?',
     mustNot:['that the button is electrically connected to the LED','that act = 1 proves the contact closed (it is the expander pin readback)','that a forced input exercised the input wiring'],
-    consequence:'2015 Ukraine distribution grid: breakers opened by commands sent through the operators’ own software. The controller obeys whatever reaches its command path (T0855, T0835).'}
+    consequence:'2015 Ukraine distribution grid: breakers opened by commands sent through the operators’ own software. The controller obeys whatever reaches its command path (T1692.001, T0835).'}
 },
 /* ------------------------------------------------------------------ b */
 {id:'b',key:'no-vs-nc',name:'NO vs NC · two LEDs',
@@ -244,7 +244,7 @@ const CIRCUITS=[
     run:'Scan the QR code on your phone, pick a sensor here (tilt works on every phone), then: real reading → spoof → Transmit OFF → back on.',
     reconcile:'List what the controller observed (a message on a topic, when it arrived) and what you inferred (that a phone measured it). Compare with circuit d.',
     mustNot:['that the value is a measurement (it is a claim)','that the QR session key authenticates the data','that “no alarm” means “safe” (it may mean “no data”)'],
-    consequence:'Stuxnet (discovered 2010): machines were driven while operators saw normal-looking values. Your spoof slider does the same to a PLC input; Transmit OFF is the denial-of-view version (T0856, T0832, T0815).'}
+    consequence:'Stuxnet (discovered 2010): machines were driven while operators saw normal-looking values. Your spoof slider does the same to a PLC input; Transmit OFF is the denial-of-view version (T1692.002, T0832, T0815).'}
 }
 ];
 
