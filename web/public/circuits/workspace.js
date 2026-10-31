@@ -317,7 +317,7 @@ function renderSchematic(c,v,T){
     const bx=580,by=(top+60+bot)/2;s+=W([[bx,top+60],[bp,top+60]],'#e4572e')+W([[bx,top+60],[bx,by-30]],'#e4572e')+SK.SCH.battery(bx,by,ink)+txt(bx-14,by+4,'B1',{anchor:'end',size:12.5,weight:800,fill:ink})+txt(bx-14,by+20,'3 V',{anchor:'end',size:12.5,fill:T.sub})+
       W([[bx,by+30],[bx,bot+8],[bm,bot+8],[bm,bot]],T.minusCasing);
     s+=body;y=bot+50;}
-  const H=Math.max(700,y+30);
+  const H=Math.max(560,y+20);
   let out=`<svg class="cw-svg" viewBox="0 0 ${VBW} ${H}" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="${esc(c.title)} — schematic view"><title>${esc(c.title)} — schematic view</title>`+SK.defs(T)+
     `<rect width="${VBW}" height="${H}" fill="${T.schBg}"/><pattern id="skSchGrid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20,0 V20 H0" fill="none" stroke="${T.schGrid}" stroke-width="1"/></pattern><rect y="84" width="${VBW}" height="${H-84}" fill="url(#skSchGrid)"/>`+header(c,v,T,'schematic');
   if(ST.trace&&traceNets.size)out+=`<style>.cw-svg [data-hop-target="sch-in${c.path.in}"],.cw-svg [data-hop-target="sch-out${c.path.relay}${c.path.contact}"]{filter:drop-shadow(0 0 5px ${T.accent})}</style>`;
@@ -337,7 +337,7 @@ function renderGallery(T){const v={live:false,sw:{},held:{},on:{}};const H=980;l
     [{id:'S5',type:'reed',at:[380,340],span:4},'Reed switch','NO · magnet · never motor current'],
     [{id:'H1',type:'led',at:[700,340],span:3,hue:'green',glyph:'▶'},'LED green','needs a series resistor'],
     [{id:'H2',type:'led',at:[940,340],span:3,hue:'red',glyph:'!'},'LED red',''],
-    [{id:'H3',type:'led',at:[1180,340],span:3,hue:'amber',glyph:'0'},'LED amber',''],
+    [{id:'H3',type:'led',at:[1180,340],span:3,hue:'amber',glyph:'0',builtinR:1},'LED amber · built-in R','variant: resistor printed on it'],
     [{id:'L1',type:'lamp',at:[1420,340],span:3},'Lamp','battery domain only'],
     [{id:'M1',type:'motor',at:[100,520],span:4},'Motor + fan','3 V · own supply + freewheel diode'],
     [{id:'BZ1',type:'buzzer',at:[380,520],span:3},'Buzzer (active)','10–40 mA'],
@@ -410,6 +410,7 @@ function guideText(c,v){
   if(!v.live)return['wait','Connected — waiting for the first readback (field / io).'];
   if(v.conn==='usb')return['force','Physical board over USB: the drawn switches send force IXn (a software override of the input image). Your real snap switches still work — an input that reads 1 without “F” came through the wire. Leaving this view releases every force it set.'];
   if(v.fieldErr)return['force','Twin without the chip endpoint (/field: '+v.fieldErr+'). Falling back to force: hops 1–4 are bypassed.'];
+  if(c.analogPending&&v.conn==='twin')return['mode','Analog input on the twin: coming with the twin update — use the phone version (circuit e) now. The relay outputs below are live; the twin’s CH1 is its built-in tank model, not this photoresistor, so it is not shown as one.'];
   if(v.mode&&v.mode!=='RUN'&&v.mode!=='REMOTE')return['mode','Twin live. The controller is in '+v.mode+': outputs stay off until you load the paired program and select RUN.'];
   return['live','Twin live: switches set the AW9523 input bit at the chip; the firmware reads it over I²C on its next scan.'];}
 function render(force){const c=circuit();ST.conn=connKind();const v=buildVm(c);const T=SK.THEMES[themeName()];

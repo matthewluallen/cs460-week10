@@ -224,7 +224,7 @@ PARTS.led=function(p,vm){const S=p.span||3,L=S*P,c=CAT.light,ink=c[4],hue=p.hue|
   s+=`<circle cx="${cx}" cy="0" r="15" fill="url(#skLens${on?'On':'Off'}_${hue})"/>`;
   if(!on)s+=`<path d="M${cx-8},-7 A9,9 0 0 1 ${cx+2},-10" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".45"/>`;
   if(p.glyph)s+=ptxt(p,cx,5.5,p.glyph,{anchor:'middle',size:13,weight:900,fill:on?LED_HUE[hue][3]:'#f3e8e4',op:on?.85:.75});
-  if(p.builtinR)s+=ptxt(p,L*0.8,18,'R inside',{anchor:'middle',size:12.5,weight:700,fill:ink});
+  if(p.builtinR)s+=`<path d="M${L*0.66},16 h3 l2,-4 l3,8 l3,-8 l3,8 l2,-4 h3" fill="none" stroke="${ink}" stroke-width="1.3"/>`+ptxt(p,L*0.82,22,'R',{anchor:'middle',size:12.5,weight:800,fill:ink});
   s+=stud(0,0)+stud(L,0);
   return `<g transform="${frame(p)}">${s}</g>`;
 };
