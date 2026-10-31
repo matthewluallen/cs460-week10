@@ -55,6 +55,10 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run Studio regression harness
         run: node tools/studio-regression.js
+      - name: Circuit catalog check (drawing == netlist, wiring rules)
+        run: node tools/circuit-catalog-check.js
+      - name: Circuit tab live-path self-test (fake bridge, no twin)
+        run: node tools/circuit-live-selftest.js
 
   twin-smoke:
     # Boots the committed prebuilt firmware in the QEMU twin and asserts the Week-10

@@ -265,6 +265,58 @@ textarea#stl{flex:1;border:0;resize:none;padding:12px 14px 40px;font-family:var(
 .app.circuit-active #viewFlow,.app.circuit-active #viewProtocol{display:none!important}
 .app.circuit-active #viewCircuit{display:flex}
 .circ-body{flex:1;min-height:0;display:grid;grid-template-columns:1.25fr .9fr .9fr;gap:0;overflow:auto}
+.circ-body[hidden],.cw-wire[hidden],.cw-parts[hidden]{display:none!important}
+/* ----- Part 5 wire & run: predesigned snap-kit circuits (circuits/workspace.js) ----- */
+.cw-wire{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
+#cwSub button,#cwView button{white-space:nowrap}
+.cw-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.cw-pick{display:flex;gap:6px;flex-wrap:wrap}
+.cw-pick button{display:inline-flex;align-items:center;gap:7px;font:600 12.5px/1.2 var(--sans);color:var(--ink2);background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:6px 11px 6px 7px;cursor:pointer}
+.cw-pick button b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;background:var(--panel2);border:1px solid var(--line2);font:800 12px/1 var(--mono);color:var(--ink)}
+.cw-pick button:hover{border-color:var(--accent);color:var(--ink)}
+.cw-pick button.on{border-color:var(--accent);color:var(--ink);background:var(--accent-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%,transparent)}
+.cw-pick button.on b{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.cw-pick button:focus-visible,.cw-hop:focus-visible,.cw-trace:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cw-trace[aria-pressed="true"]{border-color:#4dd8ff;color:var(--ink);box-shadow:inset 0 0 0 1px rgba(77,216,255,.35)}
+.cw-trace[aria-pressed="true"]::before{content:"";width:8px;height:8px;border-radius:50%;background:#4dd8ff;box-shadow:0 0 8px #4dd8ff}
+.cw-conn{display:inline-flex;align-items:center;gap:7px;font:700 12px/1 var(--sans);padding:6px 11px;border-radius:999px;border:1px dashed var(--line2);color:var(--muted)}
+.cw-conn .dot{width:8px;height:8px;border-radius:50%;border:2px solid currentColor}
+.cw-conn.on{border-style:solid;border-color:color-mix(in srgb,var(--live) 50%,transparent);color:var(--live);background:var(--live-soft)}
+.cw-conn.on .dot{background:currentColor}
+.cw-guide{font:500 12.5px/1.45 var(--sans);color:var(--ink2);padding:8px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.cw-guide.g-live{color:var(--ink)}.cw-guide.g-force,.cw-guide.g-mode{background:var(--warn-soft);color:var(--ink)}.cw-guide.g-idle,.cw-guide.g-wait{color:var(--ink2)}
+.cw-stage{padding:8px 6px 4px;background:var(--bg)}   /* keep the 1600-unit drawing ≥ 0.88 scale at 1440 px: SVG text ≥ 12.5 units → ≥ 11 px */
+.cw-stage svg.cw-svg{display:block;width:100%;height:auto;max-width:1880px;margin:0 auto;border-radius:12px;box-shadow:0 1px 0 var(--line2),0 18px 40px -26px rgba(0,0,0,.6)}
+.cw-parts{flex:1;overflow:auto}
+.cw-fade svg.cw-svg{animation:cwfade .2s ease-out}@keyframes cwfade{from{opacity:.25}to{opacity:1}}@media (prefers-reduced-motion:reduce){.cw-fade svg.cw-svg{animation:none}}
+.cw-path{padding:8px 16px 4px;max-width:1880px;margin:0 auto;width:100%;box-sizing:border-box}
+.cw-path-h{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin-bottom:7px}
+.cw-path-t{font:800 12px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#4dd8ff}
+:root[data-theme="light"] .cw-path-t{color:#0a86ad}
+.cw-path-n{font:500 12px/1.45 var(--sans);color:var(--ink2)}
+.cw-hops{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px}
+.cw-hops li{position:relative}
+.cw-hops li:not(:last-child)::after{content:"▸";position:absolute;right:-7px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:11px;pointer-events:none}
+.cw-hop{width:100%;height:100%;text-align:left;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto auto;column-gap:7px;row-gap:3px;padding:8px 9px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);color:var(--ink);cursor:pointer;font:inherit}
+.cw-hop-n{grid-row:1/4;font:800 13px/1 var(--mono);color:var(--muted);padding-top:1px}
+.cw-hop-t{font:700 12.5px/1.25 var(--sans);color:var(--ink)}
+.cw-hop-v{font:500 11.5px/1.3 var(--mono);color:var(--ink2);overflow-wrap:anywhere}
+.cw-hop-tag{justify-self:start;font:800 11px/1 var(--mono);padding:3px 7px;border-radius:999px;border:1px solid var(--line2);color:var(--muted)}
+.cw-hop.t-observed{border-color:color-mix(in srgb,#5ff0b0 45%,var(--line2))}.cw-hop.t-observed .cw-hop-tag{background:#0f2e26;color:#5ff0b0;border-color:#5ff0b0}
+.cw-hop.t-inferred .cw-hop-tag{background:#241433;color:#d9b0f5;border-color:#c98bf0}
+.cw-hop.t-modelled .cw-hop-tag{background:#332511;color:#ffd28a;border-color:#f3a53a}
+.cw-hop.t-bypassed{opacity:.72;border-style:dashed}.cw-hop.t-bypassed .cw-hop-t{text-decoration:line-through}.cw-hop.t-bypassed .cw-hop-tag{color:#a3acba;border-style:dashed;text-decoration:line-through}
+.cw-hop.t-pending .cw-hop-tag,.cw-hop.t-nominal .cw-hop-tag{border-style:dashed;color:var(--ink2)}
+.cw-hop.t-idle{border-style:dashed}.cw-hop-idle{justify-self:start;font:600 11px/1 var(--mono);color:var(--muted)}
+:root[data-theme="light"] .cw-hop.t-observed .cw-hop-tag{background:#d9f6ee;color:#065c43;border-color:#0c8a63}
+:root[data-theme="light"] .cw-hop.t-inferred .cw-hop-tag{background:#efe6fb;color:#5b2aa6;border-color:#8b55d6}
+:root[data-theme="light"] .cw-hop.t-modelled .cw-hop-tag{background:#fbeed9;color:#734400;border-color:#c77a12}
+:root[data-theme="light"] .cw-hop.t-bypassed .cw-hop-tag{color:#4a5568}
+.cw-notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;padding:10px 16px 18px;max-width:1880px;margin:0 auto;width:100%;box-sizing:border-box}
+.cw-note{border:1px solid var(--line);border-radius:11px;background:var(--panel);padding:11px 13px;font:500 12.5px/1.5 var(--sans);color:var(--ink2)}
+.cw-note h4{margin:0 0 6px;font:800 11.5px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cw-note h4:not(:first-child){margin-top:10px}.cw-note p{margin:0 0 6px}.cw-note b{color:var(--ink)}.cw-note ul{margin:0;padding-left:18px}.cw-note code{font-size:11.5px}
+.cw-note .btn{margin-top:4px}.cw-small{font-size:12px;color:var(--ink2)}
 .circ-col{min-height:0;overflow:auto;padding:14px 16px;border-right:1px solid var(--line)}
 .circ-col.circ-out{border-right:0}
 .circ-card{border:1px solid var(--line);border-radius:11px;background:var(--panel);padding:12px 13px;margin-bottom:12px}
@@ -599,7 +651,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
           <button class="btn" id="bReadStatus" disabled>Read controller status</button>
           <button class="btn" id="bReadProject" disabled>Read installed application</button>
           <button class="btn" id="bExportProjectReadback" disabled>Export readback evidence</button>
-          <button class="btn" id="bBench" title="Pick a simple test circuit and drive it on the running firmware">⚡ Test bench</button>
+          <button class="btn" id="bBench" title="Open the predesigned Part 5 circuits (Circuit tab · Wire &amp; run) and drive them on the twin or a board">⚡ Test bench</button>
           <button class="btn" id="bNetCfg" title="Configure the device network (WiFi STA/setup-AP, and W5500 Ethernet if fitted), static or DHCP">⚙ Network</button>
           <button class="btn" id="bSensors">Grove devices</button>
           <div class="menu-sep"></div>
@@ -811,13 +863,28 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
     </div>
   </section>
 
-  <section id="viewCircuit" aria-label="Circuit Studio — sensor wiring">
+  <section id="viewCircuit" aria-label="Circuit Studio — wire and run predesigned circuits">
     <div class="proto-head">
-      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">how the physical world wires into the controller — three input paths → point map → outputs</span></div>
+      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">Part 5 · wire &amp; run · snap-kit parts on the StampLC</span></div>
+      <span class="seg" id="cwSub" role="tablist" aria-label="Circuit Studio views"><button type="button" role="tab" data-sub="wire" class="on">Wire &amp; run</button><button type="button" role="tab" data-sub="paths">Input paths</button><button type="button" role="tab" data-sub="parts">Parts</button></span>
       <span class="spacer" style="flex:1"></span>
       <span class="flow-hint" id="circuitHint"></span>
     </div>
-    <div class="circ-body">
+    <div id="cwWire" class="cw-wire">
+      <div class="cw-bar">
+        <div class="cw-pick" id="cwPick" role="radiogroup" aria-label="Predesigned circuit"></div>
+        <span class="spacer" style="flex:1"></span>
+        <span class="seg" id="cwView" aria-label="Drawing"><button type="button" data-view="bench" class="on">Bench</button><button type="button" data-view="schematic">Schematic</button></span>
+        <button type="button" class="btn cw-trace" id="cwTrace" aria-pressed="true" title="Highlight the signal path in the drawing">Trace path</button>
+        <span class="cw-conn off" id="cwConn" role="status"><span class="dot"></span>Not connected</span>
+      </div>
+      <div class="cw-guide g-idle" id="cwGuide" role="status" aria-live="polite"></div>
+      <div class="cw-stage" id="cwStage"></div>
+      <div class="cw-path" id="cwPath" aria-label="Signal path"></div>
+      <div class="cw-notes" id="cwNotes"></div>
+    </div>
+    <div id="cwParts" class="cw-stage cw-parts" hidden></div>
+    <div class="circ-body" id="cwPaths" hidden>
       <div class="circ-col circ-in">
         <div class="proto-sect">Inputs — three ways a signal enters</div>
         <div id="circDI" class="circ-card"></div>
@@ -1332,7 +1399,7 @@ window.mbFetch = async function(q){
   function driveDI(n){
     if(!connNow()){ el('circuitHint').textContent='Connect twin (or USB) to drive the inputs.'; return; }
     st.forced[n]=!st.forced[n];
-    try{rawSend('force IX'+n+' '+(st.forced[n]?1:0));}catch(e){}
+    try{rawSend(st.forced[n]?'force IX'+n+' 1':'unforce IX'+n);}catch(e){}
     st.di[n]=st.forced[n]?1:st.di[n];   // optimistic until the next poll
     render();
   }
@@ -1374,14 +1441,19 @@ window.mbFetch = async function(q){
     el('circNote').innerHTML='<b>Three paths, one map.</b> Digital inputs are immediate and binary; the analog module needs scaling; a Grove sensor needs a validated binding — a connector shape never proves compatibility. Drive a digital input (left) and, if your ladder wires it, watch the relay energize (right).';
   }
 
+  // The Circuit tab's home is now "Wire & run" (circuits/workspace.js); this three-input-paths panel is
+  // its secondary "Input paths" view and only polls while that view is visible.
+  let view='logic';
   function setView(v){
-    active=(v==='circuit');
-    app.classList.toggle('circuit-active',active);
+    view=v;
+    app.classList.toggle('circuit-active',v==='circuit');
+    const was=active; active=(v==='circuit')&&window.__circSub==='paths';
     if(active){ render(); poll(); if(!pollTimer)pollTimer=setInterval(poll,1000); }
-    else { if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
-      // release any inputs we forced
-      Object.keys(st.forced).forEach(n=>{ if(st.forced[n]&&connNow()){try{rawSend('force IX'+n+' 0');}catch(e){}} st.forced[n]=false; }); }
+    else if(was||pollTimer){ if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+      // release any inputs we forced (unforce: the real wire takes over again)
+      Object.keys(st.forced).forEach(n=>{ if(st.forced[n]&&connNow()){try{rawSend('unforce IX'+n);}catch(e){}} st.forced[n]=false; }); }
   }
+  window.addEventListener('circsub',()=>setView(view));
   AppView.register(setView);
 })();
 </script>
@@ -3775,144 +3847,16 @@ function renderSensors(){
  }
  const button=document.getElementById('readSensors');if(button)button.disabled=!conn||busBusy;
 }
-/* ===== Test bench: pick a simple circuit and drive it on the running firmware =====
- * A modal (toolbar ⚡ Test bench). No change to the main layout. Each circuit is a
- * data entry with an input the virtual control asserts over USB (force diN) and an
- * output read back live (QX relay). Styles render the SAME wiring two ways: 'snap'
- * (beginner, snap-together blocks) and 'dinrail' (professional DIN-rail terminals,
- * added next). The LED only lights if the loaded ladder connects the input to the
- * output — so the bench exercises the Part-4 logic, it is not a hard-wired shortcut. */
-const BENCH_HUES={green:['#2ee86a','#163a22','#214a2c','#8fe0a6'],amber:['#ffb52e','#3a2f16','#4a3c21','#e8c98f'],red:['#ff5a4a','#3a1616','#4a2121','#e89f8f']};
-const BENCH_CIRCUITS=[{
-  id:'pushbutton-led',
-  name:'Pushbutton → Green LED  (DI1 → Relay 1)',
-  input:{di:1},
-  outputs:[{qx:1, coil:'Relay 1', hue:'green', label:'green LED'}],
-  blurb:'Hold the button to assert DI1. If your ladder drives Relay 1 from DI1 (the Part-4 '
-       +'pass-through), Relay 1 closes and the green LED lights.'
-},{
-  id:'two-led-no-nc',
-  name:'Two LEDs — NO / NC  (DI1 → Relay 1 + Relay 2)',
-  input:{di:1},
-  outputs:[{qx:1, coil:'Relay 1', hue:'green', label:'green LED (NO)'},
-           {qx:2, coil:'Relay 2', hue:'amber', label:'amber LED (NC)'}],
-  blurb:'Add a second rung. Drive Relay 1 from a normally-open (NO) contact of DI1 and Relay 2 '
-       +'from a normally-closed (NC) contact: press the button and the green LED turns on while '
-       +'the amber LED turns off. Flip NO↔NC in your ladder and predict which LED follows the button.'
-}];
-let benchStyle='snap', benchCircuitId='pushbutton-led', benchPressed=false, benchTimer=null;
-let benchRelay=[0,0,0,0];   // relay act state, parsed by the bench from its own `io` polls
-function benchCircuit(){return BENCH_CIRCUITS.find(c=>c.id===benchCircuitId)||BENCH_CIRCUITS[0];}
-// Force the input via the raw transport (bypasses the read-only monitor guard), so the
-// bench drives the controller whether it's a USB board or the twin over the bridge.
-function benchForce(v){ if((typeof conn!=='undefined')&&conn) rawSend('force IX'+benchCircuit().input.di+' '+(v?1:0)); }
-function benchOutputStates(c){ return c.outputs.map(o=>benchRelay[o.qx]===1); }
-// Parse relay act state from the bench's own `io` replies, independent of monitor mode.
-function benchIoLine(line){ const m=/relay([0-3])\s+cmd=\d+\s+act=([01])/.exec(line); if(m) benchRelay[+m[1]]=+m[2]; }
-// Snap-style SVG: StampLC terminal strip (left) wired to snap blocks (right), with
-// a +V rail and a GND(−) rail so the loops actually close — relay COM fed from +V,
-// DI-common (C) and every LED return tied to −. Electrically complete, N LEDs.
-function benchSvgSnap(c,states,pressed){
-  const outs=c.outputs;
-  const dot=(x,y,f)=>`<circle cx="${x}" cy="${y}" r="3.6" fill="${f||'#0b0d11'}" stroke="#e8edf5" stroke-width="1.4"/>`;
-  const T=(x,y,lbl,col)=>`<rect x="${x}" y="${y-11}" width="66" height="22" rx="3" fill="${col||'#1f7a3d'}" stroke="#0c3"/>`
-    +`<text x="${x+33}" y="${y+4}" text-anchor="middle" font-size="11" fill="#fff" font-family="ui-monospace,monospace">${lbl}</text>`;
-  const wire=(d,col,w)=>`<path d="${d}" fill="none" stroke="${col}" stroke-width="${w||3.5}" stroke-linecap="round" stroke-linejoin="round"/>`;
-  const RED='#d7483f', BLK='#9aa6b4', BLU='#3aa0d8';   // BLK = negative/ground (light on dark theme)
-  const tx=118, dx=188;                         // terminal label x / terminal dot x
-  const yPlus=50,yGnd=78,yC=106,yDi=152;
-  // per-output terminal rows: COM then NO
-  const comY=i=>202+i*88, noY=i=>228+i*88, ledY=i=>220+i*88, byc=96;
-  const lastCom=comY(outs.length-1), lastNo=noY(outs.length-1), lastLed=ledY(outs.length-1);
-  const Vx=214, Gx=566;                          // +V rail x (left), GND rail x (far right)
-  const Vtop=yPlus, Vbot=lastCom, Gtop=24, Gbot=lastLed;
-  const H=Math.max(lastNo,lastLed)+54;
-  // terminals
-  let strip=T(tx,yPlus,'+V','#8a1f1f')+T(tx,yGnd,'GND −','#111')+T(tx,yC,'C (−)','#333')+T(tx,yDi,'DI1','#1f5f7a');
-  let dots=dot(dx,yPlus)+dot(dx,yGnd)+dot(dx,yC)+dot(dx,yDi);
-  // power rails
-  let rails=wire(`M${Vx},${Vtop} V${Vbot}`,RED,2.5)+wire(`M${Gx},${Gtop} V${Gbot}`,BLK,2.5)
-    +`<text x="${Vx-3}" y="${Vtop-6}" text-anchor="middle" font-size="9" fill="#e09a94">+V</text>`
-    +`<text x="${Gx}" y="${Gtop-6}" text-anchor="middle" font-size="9" fill="#9fb0c4">−</text>`;
-  // +V terminal -> +V rail ; GND− terminal -> up and across to GND rail ; C -> tie to GND−
-  let wires=wire(`M${dx},${yPlus} H${Vx}`,RED)
-    +wire(`M${dx},${yGnd} H160 V${Gtop} H${Gx}`,BLK)
-    +wire(`M${dx},${yC} H168 V${yGnd}`,BLK)        // C (DI common) tied to the − rail
-    +dot(Vx,yPlus,RED)+dot(Gx,Gtop,BLK);
-  // internal opto hint between DI1 and C (the input returns through the DI common)
-  let body=`<rect x="20" y="36" width="150" height="${H-52}" rx="10" fill="#2b2f36" stroke="#4a515c"/>`
-    +`<text x="95" y="30" text-anchor="middle" font-size="12" fill="#cfd6e0" font-weight="700">M5StampLC</text>`
-    +wire(`M${dx-4},${yDi} H40 V${yC} H${dx-4}`,'#5b6675',1.6)
-    +`<text x="44" y="${(yDi+yC)/2+4}" font-size="8" fill="#6b7686">opto</text>`;
-  // button (snap block): left post fed from +V rail, right post -> DI1
-  const btnFill=pressed?'#1b3bbf':'#2e5cff';
-  const button=`<g><rect x="392" y="${byc-34}" width="150" height="68" rx="12" fill="${btnFill}" stroke="#16308f" stroke-width="2"/>`
-    +`<circle cx="467" cy="${byc}" r="21" fill="${pressed?'#13267a':'#4a73ff'}" stroke="#eaf0ff" stroke-width="3"/>`
-    +`<text x="467" y="${byc+4}" text-anchor="middle" font-size="12" fill="#fff" font-weight="700">PUSH</text>`
-    +`<text x="467" y="${byc-44}" text-anchor="middle" font-size="11" fill="#9fb3e8">pushbutton</text>`
-    +dot(392,byc)+dot(542,byc)+`</g>`;
-  wires+=wire(`M${Vx},${byc} H392`,RED)+dot(Vx,byc,RED)               // +V rail -> button left
-       +wire(`M542,${byc} H556 V${yDi} H${dx}`,BLU);                  // button right -> DI1
-  // one relay (COM+NO) and one LED per output
-  let leds='';
-  outs.forEach((o,i)=>{
-    const cY=comY(i), nY=noY(i), lY=ledY(i), on=states[i], hue=BENCH_HUES[o.hue]||BENCH_HUES.green;
-    strip+=T(tx,cY,'R'+o.qx+'·COM','#555')+T(tx,nY,'R'+o.qx+'·NO','#555');
-    dots+=dot(dx,cY)+dot(dx,nY);
-    wires+=wire(`M${dx},${cY} H${Vx}`,RED)+dot(Vx,cY,RED);            // +V rail -> relay COM
-    const glow=on?`<circle cx="467" cy="${lY}" r="29" fill="${hue[0]}" opacity="0.28"/>`:'';
-    leds+=`<g>${glow}<rect x="392" y="${lY-34}" width="150" height="68" rx="12" fill="${hue[1]}" stroke="${hue[0]}" stroke-width="2"/>`
-      +`<circle cx="467" cy="${lY}" r="19" fill="${on?hue[0]:hue[2]}" stroke="${hue[0]}" stroke-width="3"/>`
-      +`<text x="402" y="${lY-20}" font-size="9" fill="${hue[3]}">+</text><text x="528" y="${lY-20}" font-size="9" fill="#9fb0c4">−</text>`
-      +`<text x="467" y="${lY+52}" text-anchor="middle" font-size="11" fill="${hue[3]}">${o.label}</text>`
-      +dot(392,lY)+dot(542,lY)+`</g>`;
-    wires+=wire(`M${dx},${nY} H360 V${lY} H392`,hue[0])               // relay NO -> LED +
-         + wire(`M542,${lY} H${Gx}`,BLK)+dot(Gx,lY,BLK);              // LED − -> GND rail
-  });
-  return `<svg viewBox="0 0 600 ${H}" width="100%" style="max-height:62vh;background:#11141a;border-radius:8px">`
-    +`${body}${rails}${strip}${wires}${dots}<g id="benchBtnHit" style="cursor:pointer">${button}</g>${leds}</svg>`;
-}
-function benchSvg(c,states,pressed){ return benchStyle==='snap'?benchSvgSnap(c,states,pressed)
-  : `<div style="padding:28px;text-align:center;color:var(--ink2)">DIN-rail terminal-block layout — coming next. Use Snap blocks for now.</div>`; }
-function benchStatusLine(){
-  if(typeof conn==='undefined'||!conn) return ['Connect USB (a board) or Connect twin (the QEMU twin) to drive it.','er'];
-  const mode=(typeof controllerStatus!=='undefined'&&controllerStatus)?controllerStatus.mode:null;
-  if(mode&&String(mode).toUpperCase()!=='RUN') return ['Load your program and set the controller to RUN so your ladder runs (now: '+mode+').','rx'];
-  return ['Hold the button to assert DI1; the relay readback lights the LEDs.','ok'];
-}
-function benchRefresh(){
-  const host=document.getElementById('benchSvg'); if(!host){ if(benchTimer){clearInterval(benchTimer);benchTimer=null;} return; }
-  const c=benchCircuit();
-  host.innerHTML=benchSvg(c,benchOutputStates(c),benchPressed);
-  const hit=document.getElementById('benchBtnHit');
-  if(hit){
-    const down=e=>{e.preventDefault();benchPressed=true;benchForce(1);benchRefresh();};
-    const up=e=>{if(benchPressed){benchPressed=false;benchForce(0);benchRefresh();}};
-    hit.onpointerdown=down; hit.onpointerup=up; hit.onpointerleave=up; hit.oncontextmenu=e=>e.preventDefault();
-  }
-  const s=document.getElementById('benchStatus'); if(s){const[t,cls]=benchStatusLine();s.textContent=t;s.style.color=cls==='er'?'var(--bad,#f0463c)':cls==='ok'?'var(--ok,#39d353)':'var(--ink2)';}
-}
-function openTestBench(){
-  const c=benchCircuit(), coils=c.outputs.map(o=>o.coil).join(' + ');
-  showModal(`<h3>⚡ Test bench</h3><div class="body">
-    <p>Pick a simple circuit and drive it on the running firmware. The components mirror a real rig; the control is virtual (it sends <code>force IX${c.input.di} 1</code> on the running controller) and the ${coils} readback lights the LED${c.outputs.length>1?'s':''}.</p>
-    <div class="row" style="justify-content:flex-start;gap:10px;flex-wrap:wrap">
-      <label>Circuit <select id="benchSel">${BENCH_CIRCUITS.map(x=>`<option value="${x.id}" ${x.id===benchCircuitId?'selected':''}>${x.name}</option>`).join('')}</select></label>
-      <span class="mseg" id="benchStyleSeg"><button data-s="snap" class="${benchStyle==='snap'?'on':''}">Snap blocks</button><button data-s="dinrail" class="${benchStyle==='dinrail'?'on':''}">DIN-rail</button></span>
-    </div>
-    <div id="benchSvg" style="margin:10px 0"></div>
-    <p id="benchStatus" role="status" style="font-size:12px;margin:4px 0"></p>
-    <p style="font-size:12px;color:var(--ink2)">${c.blurb} An LED only lights if your ladder drives its relay — so this tests your logic, not a hard-wired path.</p>
-    <div class="row"><button class="btn pri" onclick="closeModal()">Close</button></div></div>`);
-  modalInner.querySelector('#benchSel').onchange=e=>{benchCircuitId=e.target.value;benchPressed&&benchForce(0);benchPressed=false;openTestBench();};
-  modalInner.querySelectorAll('#benchStyleSeg button').forEach(b=>b.onclick=()=>{benchStyle=b.dataset.s;benchRefresh();modalInner.querySelectorAll('#benchStyleSeg button').forEach(x=>x.classList.toggle('on',x.dataset.s===benchStyle));});
-  if(!lineListeners.includes(benchIoLine))lineListeners.push(benchIoLine);
-  benchRefresh();
-  if(benchTimer)clearInterval(benchTimer);
-  benchTimer=setInterval(()=>{ const host=document.getElementById('benchSvg');
-    if(!host){clearInterval(benchTimer);benchTimer=null; if(benchPressed){benchPressed=false;benchForce(0);} return;}
-    if((typeof conn!=='undefined')&&conn) rawSend('io');   // bench polls relay state itself
-    benchRefresh(); },500);
+/* ===== Test bench → the Circuit tab ("Wire & run") =====
+ * The old ⚡ Test bench modal (flat SVG, 0-based labels, no N.C screw, no LED resistor) is replaced by
+ * the full-width predesigned circuits in the Circuit tab (circuits/catalog.js + circuits/workspace.js):
+ * faithful StampLC terminals labelled "IN1 (di0)" / "RELAY 1 (relay0)", snap-kit parts, bench and
+ * schematic views, and chip-level input driving on the twin (POST /field) instead of force. */
+function openTestBench(id){
+  id=(typeof id==='string')?id:null;   // the toolbar passes a click event
+  try{ if(typeof closeModal==='function')closeModal(); }catch(e){}
+  if(window.CircuitWorkspace){ window.CircuitWorkspace.open(id); return; }
+  if(window.AppView)window.AppView.set('circuit');
 }
 function openSensors(){openProjectModules();}
 /* Explicit assignment; refresh never writes or changes controller mode. */
@@ -5142,6 +5086,11 @@ initTheme();modeChips();setMode('edit');rebuildFromModel();openProject();
 log('Open a project, validate its settings, then load and read back the application. RUN is a separate controller command.','ok');
 if(inFrame)log('Embedded preview: authoring works here. For USB access, open student/logic_studio.html standalone in Chrome/Edge.','rx');
 </script>
+<!-- Part 5 "Wire & run": snap-kit circuit views (Circuit tab). Loaded after the main script so the
+     console transport (rawSend, lineListeners, wsSock/port) and AppView already exist. -->
+<script src="circuits/snapkit.js"></script>
+<script src="circuits/catalog.js"></script>
+<script src="circuits/workspace.js"></script>
 <!-- TBD SHARED HELP START -->
 <script src="help-topics.js"></script>
 <script>/* Shared, offline contextual help. Content lives in help-topics.js (window.TBD_TOPICS); no network or learner identity required. */
