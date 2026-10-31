@@ -105,10 +105,15 @@ static uint32_t s_sock_rxmark[8] = {0};   // last RX byte count seen (activity m
 static uint8_t  s_sock_state[8]  = {0};   // last SnSR seen (0x00 = CLOSED at boot)
 static uint32_t s_sock_timeout_ms = 30000;   // default 30 s; 0 disables; set from NVS at boot
 static uint32_t s_reaped = 0;
+// The MQTT client's socket (an outbound connection with its own keepalive). Its receive
+// pump empties the RX buffer within a pass, so RX_RSR never looks like activity here and
+// the reaper would otherwise close a healthy broker link every age-out. -1 = none.
+static int8_t   s_reap_exempt = -1;
 
 void     eth_set_sock_timeout_ms(uint32_t ms) { s_sock_timeout_ms = ms; }
 uint32_t eth_get_sock_timeout_ms() { return s_sock_timeout_ms; }
 uint32_t eth_reaped_count() { return s_reaped; }
+void     eth_reap_exempt(int sock) { s_reap_exempt = (sock >= 0 && sock < 8) ? int8_t(sock) : -1; }
 
 void eth_reap_sockets() {
     if (s_sock_timeout_ms == 0) return;                 // reaper disabled
@@ -130,6 +135,7 @@ void eth_reap_sockets() {
                          || st[s] == 0x18 || st[s] == 0x1A         // FIN_WAIT / CLOSING
                          || st[s] == 0x1B || st[s] == 0x1D;        // TIME_WAIT / LAST_ACK
         if (!tcp_conn) continue;
+        if (s == s_reap_exempt) { s_sock_since[s] = now; continue; }   // owned by the MQTT client
         if (half_open && rx[s] > 0) continue;           // still has buffered data to be read
         // Half-open sockets are dead weight - reap them quickly (a fraction of the
         // age-out). Everything else (idle ESTABLISHED, stuck SYN_RECV/FIN/TIME_WAIT)
@@ -158,4 +164,5 @@ void     eth_reap_sockets() {}
 void     eth_set_sock_timeout_ms(uint32_t) {}
 uint32_t eth_get_sock_timeout_ms() { return 0; }
 uint32_t eth_reaped_count() { return 0; }
+void     eth_reap_exempt(int) {}
 #endif

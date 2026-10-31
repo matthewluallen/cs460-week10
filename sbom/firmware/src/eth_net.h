@@ -16,3 +16,4 @@ void     eth_reap_sockets();               // call periodically from the comms l
 void     eth_set_sock_timeout_ms(uint32_t ms);  // idle age-out; 0 disables the reaper
 uint32_t eth_get_sock_timeout_ms();
 uint32_t eth_reaped_count();               // sockets force-closed by the reaper since boot
+void     eth_reap_exempt(int sock);        // an outbound client socket with its own keepalive (-1: none)

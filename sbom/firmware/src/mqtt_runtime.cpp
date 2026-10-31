@@ -31,6 +31,11 @@ std::atomic<int> last_id{-1};
 // ESP-MQTT serializes callbacks on its own task. Its event memory is transient. Two
 // MQTT tasks never coexist (see the lifecycle above), so this scratch is single-owner.
 Message assembling{};size_t used=0,expected=0;bool valid=false;
+// When a burst outruns the loop task the queue is full: discard the OLDEST queued message
+// and keep the new one. For phone points and setpoints the newest value is the one that
+// matters (dropping the newest left a burst's older value standing as "fresh" while the
+// latest was lost). `received` counts messages queued, `dropped` everything discarded.
+Message discard{};
 void event(void* arg,esp_event_base_t,int32_t id,void* data){
     auto e=static_cast<esp_mqtt_event_handle_t>(data);
     // A client that is being retired may still report a late event; ignore it so its
@@ -52,7 +57,14 @@ void event(void* arg,esp_event_base_t,int32_t id,void* data){
         if(e->current_data_offset<0||size_t(e->current_data_offset)!=used||e->data_len<0||size_t(e->data_len)>expected-used){valid=false;dropped++;return;}
         if(e->data_len)memcpy(assembling.data+used,e->data,e->data_len);
         used+=size_t(e->data_len);
-        if(used==expected){assembling.length=used;if(xQueueSend(queue,&assembling,0)!=pdTRUE)dropped++;else received++;valid=false;}
+        if(used==expected){
+            assembling.length=used;
+            if(xQueueSend(queue,&assembling,0)!=pdTRUE){
+                if(xQueueReceive(queue,&discard,0)==pdTRUE)dropped++;
+                if(xQueueSend(queue,&assembling,0)==pdTRUE)received++;else dropped++;
+            }else received++;
+            valid=false;
+        }
     }
 }
 void destroy_retiring(){
