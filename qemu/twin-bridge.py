@@ -930,6 +930,8 @@ def _bus_list():
             out.append({"id": m.get("id"), "captured": m.get("captured", {}).get("start_local"),
                         "seconds": m.get("seconds"), "frames": m.get("summary", {}).get("frames"),
                         "relay_write_changes": m.get("summary", {}).get("relay_write_changes"),
+                        "by_address": m.get("summary", {}).get("by_address"), "bus": m.get("bus"),
+                        "firmware_elf_sha256": (m.get("firmware") or {}).get("elf_sha256"),
                         "download": {k: "/bus/files/" + v for k, v in m.get("files", {}).items()}})
         except Exception:                         # noqa: BLE001
             continue

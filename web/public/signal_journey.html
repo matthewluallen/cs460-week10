@@ -119,16 +119,40 @@ pre.src .ln.hit b{color:var(--code)}
 .takeaway p{margin:5px 0;font-size:13.5px;color:var(--ink2);line-height:1.5}
 .takeaway .cie{margin-top:10px;font-size:12.5px;color:var(--good);border-left:3px solid var(--good);padding-left:11px}
 .foot{max-width:1280px;margin:18px auto 0;padding:0 26px;color:var(--muted);font-size:11.5px}
+.sect{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:26px 0 4px;font-size:18px;font-weight:700}
+.illus{font:700 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 9px;border-radius:6px;background:#3a2a0e;color:#ffce7a;border:1px solid #7a5c17}
+.livetag{font:700 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 9px;border-radius:6px;background:#123a24;color:#6ee89f;border:1px solid #1c6b36}
+.mapnote{color:var(--ink2);font-size:13px;max-width:900px;margin:2px 0 4px}
+.pipewrap{position:relative}
+.pipewrap .wm{display:inline-block;margin:8px 0 0 7px}
+/* capstone */
+.cap-table{width:100%;border-collapse:separate;border-spacing:0 6px;margin-top:10px}
+.cap-table th{font:600 11px/1.2 var(--sans);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:4px 8px}
+.cap-table td{background:var(--panel);border-top:1px solid var(--edge);border-bottom:1px solid var(--edge);padding:9px 8px;vertical-align:top;font-size:13px}
+.cap-table td:first-child{border-left:1px solid var(--edge);border-radius:10px 0 0 10px;white-space:nowrap}
+.cap-table td:last-child{border-right:1px solid var(--edge);border-radius:0 10px 10px 0}
+.cap-table textarea{width:100%;min-height:46px;background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:7px;font:12.5px/1.4 var(--mono);padding:6px 7px;resize:vertical}
+.cap-table .q{color:var(--ink2);font-size:12.5px;max-width:260px}
+.cap-table td:nth-child(3){width:40%} .cap-table td:nth-child(4){width:28%}
+.cap-table td:nth-child(4) textarea{min-height:64px;font-size:11.5px}
+.cap-table .lensn{font:700 10.5px/1 var(--mono);letter-spacing:.06em;color:var(--muted);margin-top:4px}
+.prov{font:11px/1.4 var(--mono);color:var(--muted);margin-top:4px}
+.prov.live{color:#6ee89f} .prov.you{color:#9ecbff} .prov.err{color:#ff9aa6}
+.btn.sm{font-size:11.5px;padding:5px 9px;margin:0 4px 4px 0}
+.capbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}
 </style>
 </head>
 <body>
 <div class="hdr">
  <p class="kick">Follow the byte &middot; one value, five lenses</p>
  <h1>Signal Journey</h1>
+ <p class="lede" style="margin-bottom:6px"><b>Two parts.</b> The <b>opening map</b> below is a drawing of the chain (illustrative, not live). The <b>capstone</b> at the bottom is yours: one row per Part, filled from <b>your running twin</b> or from <b>your own evidence</b>, answering <i>&ldquo;what made RELAY 1 (relay0) change, and how do you know?&rdquo;</i></p>
  <p class="lede">Watch a single command travel from the <b>network wire</b> &rarr; the <b>firmware code</b> &rarr; the <b>control logic</b> &rarr; the <b>hardware bus</b> &rarr; the <b>physical relay</b>. The same value lights up in each lens as it changes form. Then switch to an attack and watch <b>which lenses still see it</b> &mdash; and which go dark.</p>
 </div>
 
 <div class="wrap">
+ <h2 class="sect">Opening map &mdash; a map of the chain <span class="illus">illustrative, not live</span></h2>
+ <p class="mapnote">These three scenarios are drawn from the twin&rsquo;s register map to show <b>what each lens can see</b>. Nothing in this map is read from your twin, and none of it is evidence. Your evidence goes in the <a href="#capstone" style="color:var(--accent)">capstone</a>.</p>
  <div class="scen" id="scen"></div>
 
  <div class="bar">
@@ -145,10 +169,21 @@ pre.src .ln.hit b{color:var(--code)}
   </span>
  </div>
 
+ <div class="pipewrap"><span class="illus wm" title="A drawing of the chain, not data from your twin">illustrative &middot; not live</span>
  <div class="pipe" id="pipe"></div>
- <div id="token">Q2</div>
+ <div id="token">R1</div></div>
 
  <div class="takeaway" id="takeaway"></div>
+
+ <h2 class="sect" id="capstone">Capstone &mdash; your evidence chain <span class="livetag">live &middot; your twin + your evidence</span></h2>
+ <p class="mapnote">One row per Part. Answer <b>&ldquo;what made RELAY 1 (relay0) change, and how do you know?&rdquo;</b> for that Part&rsquo;s lens. A <b>Read</b> button fills the row from <b>your running twin</b> and stamps where and when it came from; anything you type is marked as <b>entered by you</b>. Nothing here is pre-filled or made up: an empty row means you have not collected that evidence yet.</p>
+ <div class="capbar"><span class="hint" id="capTwin">Checking for your twin&hellip;</span>
+  <span style="margin-left:auto"></span>
+  <button class="btn sm" id="capMd">Copy as Markdown</button><button class="btn sm" id="capJson">Download JSON</button><button class="btn sm" id="capClear">Clear my chain</button></div>
+ <table class="cap-table" aria-label="Your evidence chain">
+  <thead><tr><th>Part &middot; lens</th><th>Question</th><th>Your evidence (value)</th><th>How you know (tool, file, line, time)</th></tr></thead>
+  <tbody id="capBody"></tbody>
+ </table>
 
  <p class="foot" id="foot"></p>
 </div>
@@ -180,32 +215,33 @@ const LENS = [
   icon:'<path d="M12 2v8M7 6a7 7 0 1010 0"/>'},
 ];
 
-// I2C write that sets relay 2 ON: AW9523B @ 0x59, reg 0x02, low nibble=relays, bit2=0x04
+// I2C write that sets RELAY 1 (relay0) ON: AW9523B @ 0x59, reg 0x02, bits 0-3 = RELAY 1-4, bit 0 = 0x01
+// (point_map.json: Modbus coil address 1 = relay0 = RELAY 1)
 const I2C_RELAY2 = [
  {hex:'S',label:'start',st:1},
  {hex:'B2',label:'0x59 + W'},
  {hex:'02',label:'reg: outputs'},
- {hex:'04',label:'bit 2 = ON',hot:1},
+ {hex:'01',label:'bit 0 = RELAY 1',hot:1},
  {hex:'P',label:'stop',st:1},
 ];
 
 const SCEN = {
  legit:{
-  tag:'t-ok', tagtext:'NORMAL', title:'Operator writes coil 2 over Modbus',
+  tag:'t-ok', tagtext:'NORMAL', title:'Operator writes coil 1 (RELAY 1) over Modbus',
   blurb:'A supervised write in REMOTE mode. The honest baseline.',
-  verdict:'<span style="color:var(--good)">All five lenses agree.</span>', token:'Q2',
+  verdict:'<span style="color:var(--good)">All five lenses agree.</span>', token:'R1',
   wire:{bytes:[
     {hex:'00 01',label:'txn id'},{hex:'00 00',label:'proto=modbus'},{hex:'00 06',label:'length'},
-    {hex:'01',label:'unit'},{hex:'05',label:'fn: write coil',hot:1},{hex:'00 02',label:'coil 2',hot:1},{hex:'FF 00',label:'= ON',hot:1}],
-   cap:'<b>Wireshark</b> shows 12 bytes arrive on port 502. Three matter: <b>05</b> = “write one coil”, <b>00 02</b> = coil #2, <b>FF 00</b> = ON.'},
+    {hex:'01',label:'unit'},{hex:'05',label:'fn: write coil',hot:1},{hex:'00 01',label:'coil 1',hot:1},{hex:'FF 00',label:'= ON',hot:1}],
+   cap:'<b>Wireshark</b> shows 12 bytes arrive on port 502. Three matter: <b>05</b> = “write one coil”, <b>00 01</b> = coil #1 (relay0), <b>FF 00</b> = ON.'},
   code:{src:'modbus_tcp_server.cpp:311', hit:311,
-   reads:['coil_addr = (req[1]&lt;&lt;8)|req[2]  &rarr; <b>2</b>','value = (req[3]&lt;&lt;8)|req[4]  &rarr; <b>0xFF00</b> (ON)'],
-   cap:'The firmware reads the <b>same bytes</b> off the wire into variables, checks mode + arbiter, flips the coil bit, and records it: <code>plc_log(… "WRITE coil 2 = 1")</code>.'},
-  logic:{point:'coil 2  (%QX0.2)', val:'ON', body:'Coil 2 is now <b>1</b> in the process image. On the next scan the logic copies it to physical output 2 &mdash; <code>io.relay_set(2, true)</code>.',
-   cap:'The <b>control logic</b> sees coil 2 high and drives output 2 at the scan boundary.'},
+   reads:['coil_addr = (req[1]&lt;&lt;8)|req[2]  &rarr; <b>1</b>','value = (req[3]&lt;&lt;8)|req[4]  &rarr; <b>0xFF00</b> (ON)'],
+   cap:'The firmware reads the <b>same bytes</b> off the wire into variables, checks mode + arbiter, flips the coil bit, and records it: <code>plc_log(… "WRITE coil 1 (relay0) = 1")</code>.'},
+  logic:{point:'relay0  (%QX0.0 · RELAY 1)', val:'ON', body:'relay0 is now <b>1</b> in the process image. On the next scan the logic copies it to RELAY 1 &mdash; <code>io.relay_set(0, true)</code>.',
+   cap:'The <b>control logic</b> sees relay0 high and drives RELAY 1 at the scan boundary.'},
   bus:{i2c:I2C_RELAY2, chip:'AW9523B @ 0x59',
-   cap:'<b>PulseView</b> on the internal I²C bus decodes the write: to chip <b>0x59</b>, register <b>0x02</b>, data <b>0x04</b> &mdash; bit 2 is relay 2.'},
-  phys:{icon:'on', what:'Relay 2 closes', effect:'the pump energizes',
+   cap:'<b>PulseView</b> on the internal I²C bus decodes the write: to chip <b>0x59</b>, register <b>0x02</b>, data <b>0x01</b> &mdash; bit 0 is RELAY 1 (relay0).'},
+  phys:{icon:'on', what:'RELAY 1 closes', effect:'the motor runs',
    cap:'The contact clicks shut. <b>The physical world changed</b> &mdash; and every lens behind it told the same story.'},
   hit:{wire:1,code:1,logic:1,bus:1,phys:1},
   takeaway:{title:'The honest path: every lens agrees',
@@ -220,11 +256,11 @@ const SCEN = {
    cap:'<b>Wireshark sees nothing.</b> No Modbus frame was ever sent — the attacker corrupted memory through an already-open channel, so there is no network byte to catch.'},
   code:{absent:'gap', src:'plc_core.cpp:38', hit:38, big:'⌀', line:'No plc_log entry.',
    cap:'<b>No audit record.</b> The overflow writes the force masks directly and <b>never calls the audited <code>plc_force_coil()</code></b>, so the code that normally logs a write is bypassed. The firmware’s own comment says so.'},
-  logic:{point:'coil 2 force mask', val:'forced ON', body:'The overflow sets coil 2’s <b>force mask</b> in memory. The logic program was never changed — the scan simply treats coil 2 as ON because the mask overrides it.',
+  logic:{point:'relay0 force mask', val:'forced ON', body:'The overflow sets relay0’s <b>force mask</b> in memory. The logic program was never changed — the scan simply treats relay0 as ON because the mask overrides it.',
    cap:'The logic looks normal; the forced value is injected underneath it.'},
   bus:{i2c:I2C_RELAY2, chip:'AW9523B @ 0x59', flag:'catch',
-   cap:'But the I²C write <b>still happens</b> — <b>PulseView shows relay 2 going ON</b>, byte-for-byte identical to the legitimate case. The bus cannot be bypassed.'},
-  phys:{icon:'on', what:'Relay 2 closes', effect:'the pump energizes', flag:'catch',
+   cap:'But the I²C write <b>still happens</b> — <b>PulseView shows RELAY 1 going ON</b>, byte-for-byte identical to the legitimate case. The bus cannot be bypassed.'},
+  phys:{icon:'on', what:'RELAY 1 closes', effect:'the motor runs', flag:'catch',
    cap:'The relay clicks shut — <b>identical physical effect</b>, with zero network trace and zero audit log.'},
   hit:{wire:0,code:0,logic:'partial',bus:1,phys:1},
   takeaway:{title:'An attack that HIDES: watch which lenses go dark',
@@ -345,7 +381,7 @@ function positionToken(i){
  if(i<0){token.style.opacity=0;return;}
  // skip dark lenses for the token but still advance
  const lensEl=pipe.children[i];
- const pr=pipe.getBoundingClientRect(), lr=lensEl.getBoundingClientRect();
+ const pr=(token.offsetParent||pipe).getBoundingClientRect(), lr=lensEl.getBoundingClientRect();
  const dark = s.hit[LENS[i].key]===0;
  token.style.opacity = dark?0.0:1;
  token.style.left=(lr.left-pr.left+lr.width/2-20)+'px';
@@ -371,9 +407,109 @@ document.getElementById('play').onclick=play;
 document.getElementById('stepBtn').onclick=()=>{if(step<LENS.length-1)doStep();};
 document.getElementById('resetBtn').onclick=reset;
 window.addEventListener('resize',()=>{if(step>=0)positionToken(step);});
-document.getElementById('foot').textContent='Byte values are hardware-accurate to the M5StampLC twin: Modbus/TCP FC5 on :502, AW9523B I²C expander @ 0x59 reg 0x02, source map generated '+INLINE.prov_meta.generated_utc+'. Standalone demo — pairs with the live Provenance Studio tap on /api/log.';
+document.getElementById('foot').textContent='Opening map: illustrative, not live. Byte layout follows the twin’s register map (Modbus/TCP FC5 on :502; point_map.json coil 1 = relay0 = RELAY 1; AW9523B I²C expander @ 0x59 reg 0x02 bit 0). Source map generated '+INLINE.prov_meta.generated_utc+'. Your live evidence: the capstone above, the Studio’s Bus monitor, and Provenance Studio.';
 
 renderCards();
+
+// ===================== CAPSTONE: live, row by row =====================
+// Each Read button calls the Studio server (same origin) and fills the row with what YOUR twin
+// reports right now, plus where it came from. No value is invented: on error the row stays empty.
+const CAP_KEY='signal-journey-capstone-v1';
+const hx=(n,w=2)=>'0x'+Number(n).toString(16).padStart(w,'0');
+const bit=(v,b)=>(v>>b)&1;
+async function getJSON(url,opt){
+  let r,j; try{ r=await fetch(url,Object.assign({cache:'no-store'},opt||{})); j=await r.json(); }
+  catch(_){ throw new Error('the Studio server did not answer '+url.split('?')[0]+' — open this page from ./qemu/studio.sh (port 8080)'); }
+  if(j && j.ok===false) throw new Error(j.error||(j.exception!=null?'Modbus exception '+j.exception+' from the controller':'HTTP '+r.status));
+  return j; }
+const READERS={
+ field: async()=>{ const j=await getJSON('/field');
+   return {value:`IN1 (di0)=${bit(j.di,0)} · IN2 (di1)=${bit(j.di,1)} · IN3 (di2)=${bit(j.di,2)} · IN4 (di3)=${bit(j.di,3)} · RELAY 1 (relay0)=${bit(j.relays,0)} · RELAY 2 (relay1)=${bit(j.relays,1)} · RELAY 3 (relay2)=${bit(j.relays,2)} · RELAY 4 (relay3)=${bit(j.relays,3)}  [di=${hx(j.di)} relays=${hx(j.relays)}]`,
+           how:'live: GET /field — QMP read of the twin’s AW9523 expander (chip level, outside the firmware)'}; },
+ coils: async()=>{ const j=await getJSON('/modbus?fc=1&addr=1&count=4');
+   return {value:`controller coils: relay0=${j.values[0]} relay1=${j.values[1]} relay2=${j.values[2]} relay3=${j.values[3]} (Modbus coils 1–4)`,
+           how:`live: Modbus/TCP FC1 via the Studio server · request ${j.req_hex} · response ${j.resp_hex} (the controller’s own answer)`}; },
+ frame: async()=>{ const j=await getJSON('/modbus?fc=1&addr=1&count=1');
+   return {value:`FC1 read coil 1 (relay0) → ${j.values[0]} · request ${j.req_hex} · response ${j.resp_hex}`,
+           how:`live: a real Modbus/TCP exchange with ${j.target} (capture it: tshark -i lo -f "tcp port 502" -Y modbus)`}; },
+ capture: async()=>{ const j=await getJSON('/bus/captures'); const c=(j.captures||[])[0];
+   if(!c) throw new Error('no bus capture yet — use “Record bus now” or ./bus-analysis/tap.sh 6');
+   const ch=(c.relay_write_changes||[]).map(x=>`[0x02, ${x.value}] @${x.t_ms} ms`).join(' → ')||'no 0x59 reg 0x02 writes';
+   return {value:`0x59 ← ${ch}`, how:`live capture of your twin ${c.id} (${c.captured}, ${c.seconds} s) · files: ${Object.values(c.download||{}).filter(u=>/\.(sr|decode\.txt)$/.test(u)).join(' ')}`}; },
+ record: async()=>{ const j=await getJSON('/bus/capture?seconds=6',{method:'POST'});
+   const ch=(j.summary.relay_write_changes||[]).map(x=>`[0x02, ${x.value}] @${x.t_ms} ms`).join(' → ')||'no 0x59 reg 0x02 writes';
+   return {value:`0x59 ← ${ch}`, how:`live capture of your twin ${j.id} (${j.captured.start_local}, ${j.seconds} s) · ${j.download.sr||j.download.vcd}`}; },
+ addresses: async()=>{ const j=await getJSON('/bus/captures'); const c=(j.captures||[])[0];
+   if(!c) throw new Error('no bus capture yet — record one in Part 3 first');
+   const ads=[...new Set(Object.keys(c.by_address||{}).map(k=>k.split(' ')[0]))].sort();
+   return {value:`addresses on ${c.bus||'i2c0'}: ${ads.join(', ')}`, how:`live capture of your twin ${c.id} (${c.captured}); compare with your HBOM (0x59 AW9523B reg 0x02 bit 0 = RELAY 1)`}; },
+ identity: async()=>{ const j=await getJSON('/twin/identity'); const a=j.app||{};
+   return {value:`${j.profile} profile · image ${j.image} · boot slot ${j.selected_slot} · app ELF SHA-256 ${a.elf_sha256||'?'} · ESP-IDF ${a.idf_version||'?'} · built ${a.date||'?'} ${a.time||''}`,
+           how:'live: read from the twin’s flash image (partition table, otadata, app descriptor) by the Studio server; compare plc> diag json'}; },
+ phone: async()=>{ let j; try{ j=await getJSON('/modbus?fc=3&addr=140&count=26'); }
+   catch(e){ throw new Error(/exception/.test(e.message)?'the running firmware refused registers 140–165 ('+e.message+'); this firmware may not have the phone points':e.message); }
+   return {value:j.values.map((v,i)=>`r${140+i}=${v}`).join(' '), how:`live: Modbus/TCP FC3 registers 140–165 via the Studio server · response ${j.resp_hex}`}; },
+};
+const CAP_ROWS=[
+ {id:'p1',part:'Part 1 · Wire & run',lens:'physical',q:'Is RELAY 1 (relay0) energised now, and which inputs are on?',read:[['Read chip I/O','field']]},
+ {id:'p2',part:'Part 2 · Ladder logic',lens:'logic',q:'Which rung/tag commands RELAY 1, and what does the controller say the coil is?',read:[['Read coils (FC1)','coils']],ph:'e.g. motor := (start_pb OR motor) AND stop_pb AND estop_ok'},
+ {id:'p3',part:'Part 3 · Bus & network',lens:'bus + wire',q:'Which I²C bytes moved RELAY 1, and what crossed the network?',read:[['Use my latest bus capture','capture'],['Record bus now (6 s)','record'],['Modbus frame for coil 1','frame']]},
+ {id:'p4',part:'Part 4 · HBOM',lens:'hardware',q:'Which chip and register bit drive RELAY 1? Which addresses did your capture show (incl. 0x32 RTC)?',read:[['Addresses in my latest capture','addresses']]},
+ {id:'p5',part:'Part 5 · SBOM + firmware',lens:'code',q:'Which firmware image is running, and which source line wrote the coil?',read:[['Read running image','identity']],ph:'paste the Provenance Studio event and its file:line'},
+ {id:'p6',part:'Part 6 · Unsigned update',lens:'code',q:'After the update, is a different image running? What proves it?',read:[['Read running image','identity']]},
+ {id:'p7',part:'Part 7 · Supply chain',lens:'all lenses',q:'With the malicious image, did RELAY 1 move with no command? Which lens saw it?',read:[['Read chip I/O','field'],['Use my latest bus capture','capture']]},
+ {id:'p8',part:'Part 8 · Untrusted inputs',lens:'wire + logic',q:'Which network value (phone sensor or time) did the logic act on, and was it true?',read:[['Read phone registers 140–165','phone']]},
+ {id:'p9',part:'Part 9 · Harden',lens:'all lenses',q:'Which control stops an unexplained RELAY 1 change, and what evidence shows it worked?',read:[]},
+];
+let CAP={}; try{ CAP=JSON.parse(localStorage.getItem(CAP_KEY)||'{}')||{}; }catch(_){ CAP={}; }
+const saveCap=()=>{ try{ localStorage.setItem(CAP_KEY,JSON.stringify(CAP)); }catch(_){} };
+function provHtml(r){
+  if(!r) return '';
+  if(r.err) return `<div class="prov err">✖ ${esc(r.err)}</div>`;
+  if(r.src==='live') return `<div class="prov live">● live from your twin · ${esc(r.when)}</div>`;
+  if(r.src==='edited') return `<div class="prov you">✎ edited by you · ${esc(r.when)} (was live from your twin)</div>`;
+  if(r.src==='you') return `<div class="prov you">✎ entered by you · ${esc(r.when)}</div>`;
+  return '';
+}
+function renderCap(){
+  const body=document.getElementById('capBody');
+  body.innerHTML=CAP_ROWS.map(row=>{ const r=CAP[row.id]||{};
+    return `<tr data-id="${row.id}"><td><b>${esc(row.part)}</b><div class="lensn">${esc(row.lens)}</div></td>
+      <td class="q">${esc(row.q)}</td>
+      <td>${row.read.map(([l,k])=>`<button class="btn sm" data-read="${k}">${esc(l)}</button>`).join('')}
+        <textarea data-k="value" aria-label="${esc(row.part)} evidence" placeholder="${esc(row.ph||'your value — or use a Read button')}">${esc(r.value||'')}</textarea>
+        <div data-prov>${provHtml(r)}</div></td>
+      <td><textarea data-k="how" aria-label="${esc(row.part)} how you know" placeholder="tool + file + line/time, e.g. tshark frame 42, bus-….sr at 0.502 s">${esc(r.how||'')}</textarea></td></tr>`; }).join('');
+  body.querySelectorAll('tr').forEach(tr=>{
+    const id=tr.dataset.id;
+    tr.querySelectorAll('textarea').forEach(ta=>ta.oninput=()=>{ const r=CAP[id]=CAP[id]||{}; r[ta.dataset.k]=ta.value;
+      r.src = r.src==='live'||r.src==='edited' ? 'edited' : 'you'; r.when=new Date().toLocaleString(); delete r.err; saveCap();
+      tr.querySelector('[data-prov]').innerHTML=provHtml(r); });
+    tr.querySelectorAll('[data-read]').forEach(b=>b.onclick=async()=>{
+      const k=b.dataset.read, label=b.textContent; b.disabled=true; b.textContent=k==='record'?'recording 6 s…':'reading…';
+      const prov=tr.querySelector('[data-prov]');
+      try{ const got=await READERS[k](); CAP[id]={value:got.value,how:got.how,src:'live',when:new Date().toLocaleString(),reader:k}; saveCap(); renderCap(); }
+      catch(e){ prov.innerHTML=provHtml({err:(e&&e.message||String(e))+' — nothing was filled in'}); }
+      finally{ b.disabled=false; b.textContent=label; }
+    });
+  });
+}
+function capMarkdown(){
+  const lines=['# Signal Journey capstone — what made RELAY 1 (relay0) change, and how do you know?','',
+    '| Part | Lens | Evidence | How I know | Source |','|---|---|---|---|---|'];
+  for(const row of CAP_ROWS){ const r=CAP[row.id]||{}; const c=t=>String(t||'').replace(/\|/g,'\\|').replace(/\n/g,' ');
+    const src=r.src==='live'?'live from my twin '+r.when:r.src==='edited'?'edited after a live read '+r.when:r.src==='you'?'entered by me '+r.when:'(empty)';
+    lines.push(`| ${row.part} | ${row.lens} | ${c(r.value)} | ${c(r.how)} | ${src} |`); }
+  return lines.join('\n');
+}
+document.getElementById('capMd').onclick=async()=>{ const t=capMarkdown(); try{ await navigator.clipboard.writeText(t); document.getElementById('capMd').textContent='Copied ✓'; }catch(_){ prompt('Copy your chain:',t); } setTimeout(()=>document.getElementById('capMd').textContent='Copy as Markdown',1500); };
+document.getElementById('capJson').onclick=()=>{ const blob=new Blob([JSON.stringify({schema:'signal-journey-capstone/v1',exported:new Date().toISOString(),rows:CAP_ROWS.map(r=>({part:r.part,lens:r.lens,question:r.q,...(CAP[r.id]||{})}))},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='signal-journey-capstone.json'; a.click(); };
+document.getElementById('capClear').onclick=()=>{ if(confirm('Clear every row of your evidence chain in this browser?')){ CAP={}; saveCap(); renderCap(); } };
+(async()=>{ const el=document.getElementById('capTwin');
+  try{ const j=await getJSON('/twin/identity'); el.innerHTML=`<span style="color:var(--good)">● your twin is reachable</span> · ${esc(j.profile)} profile · ${esc(j.image||'')}`; }
+  catch(e){ el.innerHTML='<span style="color:var(--warn)">● twin not reachable</span> — start <code>./qemu/studio.sh</code> and open this page from it (port 8080). You can still type evidence you collected yourself.'; } })();
+renderCap();
 </script>
 </body>
 </html>
