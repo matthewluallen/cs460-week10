@@ -63,6 +63,13 @@ let fails=0;const ok=(c,m)=>{console.log((c?'  ✓ ':'  ✗ ')+m);if(!c)fails++;
   ok(await pg.evaluate(()=>/%IW2 = 981/.test(document.getElementById('cwStage').textContent)),'phone block: %IW2 read from Modbus reg 51');
   const ptags=await pg.evaluate(()=>[...document.querySelectorAll('#cwPath .cw-hop-tag')].map(e=>e.textContent));
   ok(ptags[3]==='BYPASSED','phone path: opto · 0x59 in · I²C read BYPASSED');
+  // race: reconnect and press at once — the press must land AFTER the circuit's rest byte, never be undone by it
+  await pg.evaluate(()=>{AppView.set('logic');disconnect();});await pg.waitForTimeout(400);log.length=0;
+  await pg.evaluate(()=>{connectTwin(twinDefaultUrl());});await pg.waitForFunction(()=>conn===true);
+  await pg.evaluate(()=>{AppView.set('circuit');CircuitWorkspace.select('b');CircuitWorkspace.press('S1');});await pg.waitForTimeout(900);
+  const posts=log.filter(l=>l.startsWith('POST'));
+  ok(posts.indexOf('POST ?di=0')>=0&&posts.indexOf('POST ?bit=1&v=1')>posts.indexOf('POST ?di=0')&&((field.di>>1)&1)===1,'press right after connect lands after the rest byte ('+posts.join(' · ')+')');
+  await pg.evaluate(()=>CircuitWorkspace.release('S1'));await pg.waitForTimeout(300);
   await pg.evaluate(()=>AppView.set('logic'));await pg.evaluate(()=>disconnect());await pg.waitForTimeout(300);
   console.log('USB (faked Web Serial session)');
   const sent=await pg.evaluate(async()=>{const out=[];window.__usbOut=out;writer={write:async b=>{out.push(new TextDecoder().decode(b).trim());}};port={};conn=true;

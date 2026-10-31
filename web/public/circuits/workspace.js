@@ -177,7 +177,7 @@ function phoneBench(c,v,T,terms){const ph=c.phone,b=ph.broker,sel=CC.PHONE_MAP.f
   const rgb=v.live&&v.relay[0]!=null?[v.relay[0],v.relay[1],v.relay[2]]:null;
   const col=rgb?`rgb(${rgb[0]*255},${rgb[1]*255},${rgb[2]*255})`:'none';
   s+=`<rect x="${W-76}" y="${sy+10}" width="60" height="34" rx="8" fill="${col}" stroke="${T.cardStroke}"${rgb?'':' stroke-dasharray="4 3"'}/>`+txt(W-46,sy+32,rgb?rgb.join(' '):'—',{anchor:'middle',size:12.5,weight:800,fill:rgb&&(rgb[1]||(rgb[0]&&rgb[2]))?'#10141a':T.sub,mono:1});
-  s+=txt(16,sy+42,rgb?'command image, retained — not contact proof':'idle — no command image',{size:12.5,fill:T.sub});
+  s+=txt(16,sy+42,rgb?'command image · retained':'idle — no command image',{size:12.5,fill:T.sub});
   s+=`</g>`;
   s+=SK.netJack(jackX,jackY,T,!live||!mapped);
   return s;}
@@ -202,7 +202,7 @@ function readoutRows(c,v){const rows=[];const L=v.live;
     rows.push({l:`${p.in} (di${n-1}) · ${name.split(' ').slice(1).join(' ')||name}`,val,tag:L&&b!=null?'OBSERVED':null});}
   for(let n=1;n<=4;n++)if(c.used['RELAY'+n]){let val='—';
     if(L){const chip=v.relSrc==='chip'?v.relay[n-1]:null,cm=v.cmd?v.cmd[n-1]:null,ac=v.act?v.act[n-1]:null;
-      val=(chip!=null?'chip '+chip:'')+(cm!=null?(chip!=null?' · ':'')+'cmd '+cm+' act '+ac:'')||'—';}
+      val=cm!=null?`cmd ${cm}·act ${ac}`:(chip!=null?'chip '+chip:'—');}   // cmd/act from io; else the 0x59 output register
     rows.push({l:`RELAY ${n} (relay${n-1})`,val,tag:L&&val!=='—'?'OBSERVED':null});}
   if(c.analogPending){let val='—',tag=null;
     if(v.conn==='twin'){val='twin update pending';tag='PENDING';}
@@ -485,7 +485,7 @@ function init(){const stage=$('cwStage');if(!stage)return;
   const pick=$('cwPick');pick.innerHTML=CC.CIRCUITS.map(c=>`<button type="button" role="radio" data-cid="${c.id}" aria-checked="false"><b>${c.id}</b>${esc(c.name)}</button>`).join('');
   pick.addEventListener('click',e=>{const b=e.target.closest('button[data-cid]');if(b)selectCircuit(b.dataset.cid);});
   pick.addEventListener('keydown',e=>{const ids=CC.CIRCUITS.map(c=>c.id),i=ids.indexOf(ST.cur);if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();selectCircuit(ids[(i+1)%ids.length]);pick.querySelector(`[data-cid="${ST.cur}"]`).focus();}if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();selectCircuit(ids[(i+ids.length-1)%ids.length]);pick.querySelector(`[data-cid="${ST.cur}"]`).focus();}});
-  $('cwView').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(b){ST.view=b.dataset.view;save();render(true);}});
+  $('cwView').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(b&&b.dataset.view!==ST.view){ST.view=b.dataset.view;save();stage.classList.add('cw-fade');render(true);setTimeout(()=>stage.classList.remove('cw-fade'),260);}});
   $('cwTrace').addEventListener('click',()=>{ST.trace=!ST.trace;save();render(true);});
   $('cwSub').addEventListener('click',e=>{const b=e.target.closest('button[data-sub]');if(b)setSub(b.dataset.sub);});
   // switches: pointer + keyboard (Space/Enter hold a momentary switch; toggle a maintained one)

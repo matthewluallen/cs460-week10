@@ -288,6 +288,7 @@ textarea#stl{flex:1;border:0;resize:none;padding:12px 14px 40px;font-family:var(
 .cw-stage{padding:8px 6px 4px;background:var(--bg)}   /* keep the 1600-unit drawing ≥ 0.88 scale at 1440 px: SVG text ≥ 12.5 units → ≥ 11 px */
 .cw-stage svg.cw-svg{display:block;width:100%;height:auto;max-width:1880px;margin:0 auto;border-radius:12px;box-shadow:0 1px 0 var(--line2),0 18px 40px -26px rgba(0,0,0,.6)}
 .cw-parts{flex:1;overflow:auto}
+.cw-fade svg.cw-svg{animation:cwfade .2s ease-out}@keyframes cwfade{from{opacity:.25}to{opacity:1}}@media (prefers-reduced-motion:reduce){.cw-fade svg.cw-svg{animation:none}}
 .cw-path{padding:8px 16px 4px;max-width:1880px;margin:0 auto;width:100%;box-sizing:border-box}
 .cw-path-h{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin-bottom:7px}
 .cw-path-t{font:800 12px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#4dd8ff}
