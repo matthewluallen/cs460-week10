@@ -77,6 +77,33 @@
  .consent b{color:var(--fg)}
  .swatch{height:42px;border-radius:10px;margin-top:12px;border:1px solid var(--brd);
          display:flex;align-items:center;justify-content:center;font:12px ui-monospace,monospace;color:var(--fg)}
+ /* send rate (connect card) */
+ .rateline{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:12px}
+ .seg.sm button{padding:6px 11px;font-size:12.5px}
+ button.sm{padding:6px 11px;font-size:12.5px;border-radius:9px}
+ /* trend chart: last 60 s of one sensor value, phone reading vs what was sent */
+ .trend{display:flex;flex-direction:column;gap:6px}
+ .trend[hidden]{display:none}
+ .trhead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+ .trtitle{font:12px ui-monospace,monospace;color:var(--dim)}
+ .trend canvas{display:block;width:100%;height:150px;background:var(--field);border:1px solid var(--brd);
+               border-radius:9px;touch-action:pan-y;-webkit-user-select:none;user-select:none}
+ .trread{font:12px/1.45 ui-monospace,monospace;color:var(--fg);min-height:2.9em;white-space:pre-line;
+         font-variant-numeric:tabular-nums}
+ .trlegend{display:flex;flex-wrap:wrap;gap:3px 12px;font:11px/1.5 ui-monospace,monospace;color:var(--dim)}
+ .trlegend span{white-space:nowrap}
+ .trlegend i{display:inline-block;vertical-align:middle;margin-right:5px}
+ .trlegend i.ln{width:14px;border-top:2px solid}
+ .trlegend i.bx{width:11px;height:11px;border-radius:2px}
+ .k-real{border-color:var(--fg)!important;opacity:.55}
+ .k-sent{border-color:var(--tr-live,var(--live))!important}
+ .k-spoof{border-color:var(--tr-spoof,var(--spoof))!important}
+ .k-off{background:var(--tr-danger,var(--danger));opacity:.3}
+ .k-stale{border-left:1.5px dashed var(--tr-danger,var(--danger));background:transparent}
+ .k-line{border-top:1.5px dashed var(--tr-accent,var(--accent))!important}
+ .trlines{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:12px ui-monospace,monospace;color:var(--dim)}
+ .trlines input{width:130px;background:var(--field);border:1px solid var(--brd);color:var(--fg);border-radius:8px;
+                padding:6px 9px;font:13px ui-monospace,monospace}
 </style>
 </head>
 <body>
@@ -98,6 +125,9 @@
   Then use its two controls: <b>Transmit</b> (turn it off and the PLC loses the reading &mdash;
   an <b>availability</b> attack) and <b>Override</b> (send any value you choose while the plant
   believes it &mdash; an <b>integrity</b> / false-data-injection attack). Watch what the logic does.
+  Each shared sensor gets a <b>60&nbsp;s trend</b>: what the phone reads, what was actually sent, and where the
+  point goes stale (8&nbsp;s after its last message, timed by this phone; the twin's clock can run slower than
+  real time, so the twin may flag it later).
 </div>
 
 <div class="card">
@@ -105,7 +135,15 @@
     <span>While this page is shared, <b>anyone with this link can open it and see the sensors you choose to Share</b>
     (including coarse location if you share it). I'm using a device and account I'm OK with that on.</span></label>
   <button id="go" class="bigbtn" disabled>Connect to broker</button>
-  <div class="status"><span class="dot" id="bdot"></span><span id="bstat">broker: not connected</span> · <span id="cnt">0 msgs</span></div>
+  <div class="status"><span class="dot" id="bdot"></span><span id="bstat">broker: not connected</span></div>
+  <div class="rateline"><span class="lab">Send rate</span>
+    <span class="seg sm" id="rateseg" role="group" aria-label="Send rate, messages per second for each sensor"></span>
+    <span class="ovhint">/s each</span></div>
+  <div class="status" style="margin-top:8px"><span id="cnt">sent 0 msgs · 0.0/s</span></div>
+  <div class="note">How often each shared sensor sends its newest reading (Motion sends <code>accel</code> and
+  <code>gyro</code>, each at this rate). The page reads the sensor much faster; the trend graph shows both.
+  BTN presses and Transmit ON/OFF act at once. The PLC marks a point stale 8&nbsp;s after its last message,
+  so a rate slower than one message every 8&nbsp;s would make points go stale.</div>
   <div class="note">Phone id <code id="cid">—</code> (kept on this phone so it survives a reload). To make the
   PLC accept only this phone, type <code>mqtt pin <span id="cidpin">—</span></code> at the <code>plc&gt;</code> console.
   That is identity by <b>claim</b>: any client that publishes this id is still accepted
@@ -225,14 +263,36 @@ function initTheme(){
 }
 initTheme();
 
+const sentAt = [];   // send times in the last 5 s, for the live "sent N msgs · X/s" readout
+let firstSent = 0;
 function pub(topic, obj){
-  if(!client || !client.connected) return;
+  if(!client || !client.connected) return false;
   client.publish(base + '/' + topic, JSON.stringify(obj), {qos:0});
-  count++; el('cnt').textContent = count + ' msgs';
+  const now = Date.now(); count++; sentAt.push(now); if(!firstSent) firstSent = now;
+  return true;
 }
-let lastPub = {};
-const lastObj = {};  // topic -> {sid, obj}: last real payload, re-sent by the keep-alive
-function throttled(topic, fn, hz=8){ const now=Date.now(); if(now-(lastPub[topic]||0) > 1000/hz){ lastPub[topic]=now; fn(); } }
+setInterval(()=>{
+  const now = Date.now(); while(sentAt.length && now - sentAt[0] > 5000) sentAt.shift();
+  const secs = firstSent ? Math.min(5, Math.max(1, (now - firstSent)/1000)) : 5;
+  const t = `sent ${count} msgs · ${(sentAt.length/secs).toFixed(1)}/s`;
+  if(el('cnt').textContent !== t) el('cnt').textContent = t;
+}, 500);
+
+// ---- send rate: one timer sends each shared sensor's newest reading ----
+// A sensor fires at its own speed (orientation and motion up to ~60 readings a second). The page
+// keeps only the newest reading per topic and a timer sends it at the chosen rate. That timer is
+// also what keeps a point fresh: even at 0.5/s a transmitting topic goes out every 2 s, well inside
+// the controller's 8 s window (freshness is about arrival, not truth: a repeated or spoofed value is
+// just as "fresh"). Discrete events skip the timer: BTN1/BTN2 presses and Transmit ON go out at
+// once, and Transmit OFF silences the topic at once. At most two messages leave per 20 ms tick, so
+// the controller (which queues only a few MQTT messages between scans) never gets a burst.
+const RATES = [0.5, 1, 2, 5, 10];
+let rate = 1;                                            // default: 1 message per second per sensor
+try{ const r = parseFloat(localStorage.getItem('cs460-send-rate')); if(RATES.includes(r)) rate = r; }catch(e){}
+const latest = {};   // topic -> {sid, obj}: the newest real reading (what the timer sends)
+const due = {};      // topic -> when the timer next sends it (ms)
+const lastSend = {}; // topic -> when it last went out (ms)
+const painted = {};  // sid -> last spoof-readout repaint (ms)
 
 // ---- per-sensor control state: transmit on/off + override ----
 const tx = {};      // sid -> transmitting?
@@ -240,20 +300,317 @@ const ov = {};      // sid -> override active?
 const ovv = {};     // sid -> override value (number)
 const liveReal = {};// sid -> last real primary value (for the "real vs spoofed" readout)
 
-// gpub: the gate every sensor publish passes through.
+// sample: every sensor reading lands here, at the sensor's own rate. Nothing is published here.
+function sample(sid, topic, obj){
+  const S = SMAP[sid];
+  latest[topic] = {sid, obj};
+  if(S && topic===S.prim && obj && S.key in obj){ liveReal[sid] = obj[S.key];
+    if(ov[sid] && tx[sid]){ const n=Date.now(); if(n-(painted[sid]||0) > 125){ painted[sid]=n; paintState(sid,true); } } }
+  if(!(topic in due)) due[topic] = Date.now();          // the first reading goes out on the next tick
+  trend.real(topic, obj);
+}
+// send: the gate every sensor publish passes through.
 //   transmit OFF  -> nothing leaves the phone (the PLC ages the point out: availability attack)
 //   override ON   -> the primary field is replaced with the chosen value (integrity / FDI);
 //                    every OTHER byte on the wire looks completely normal.
-function gpub(sid, topic, obj){
-  const S = SMAP[sid];
-  lastObj[topic] = {sid, obj};                           // remembered for the keep-alive below
-  if(S && topic===S.prim && obj && S.key in obj) liveReal[sid] = obj[S.key];
+function send(topic){
+  const {sid, obj} = latest[topic], S = SMAP[sid];
   if(!tx[sid]) return;                                   // transmission off
   let out = obj, spoof=false;
   if(ov[sid] && S && topic===S.prim){ out = Object.assign({}, obj, {[S.key]: ovv[sid]}); spoof=true; }
-  pub(topic, out);
+  lastSend[topic] = Date.now();
+  if(pub(topic, out)) trend.sent(topic, out, spoof);
   if(topic===(S&&S.prim)) paintState(sid, spoof);
 }
+function sendNow(sid){                                   // Transmit ON: send at once, then resume the cadence
+  const now = Date.now();
+  for(const t in latest) if(latest[t].sid===sid){ send(t); due[t] = now + 1000/rate; }
+}
+setInterval(()=>{
+  const now = Date.now(), period = 1000/rate;
+  const ready = Object.keys(latest).filter(t => tx[latest[t].sid] && now >= due[t]).sort((a,b)=>due[a]-due[b]);
+  for(const t of ready.slice(0,2)){ send(t); due[t] = due[t] + period > now ? due[t] + period : now + period; }
+}, 20);
+function setRate(r){
+  rate = r; try{ localStorage.setItem('cs460-send-rate', String(r)); }catch(e){}
+  const now = Date.now(); for(const t in due) due[t] = (lastSend[t] || now) + 1000/r;
+  paintRate();
+}
+function paintRate(){
+  for(const b of el('rateseg').children){ const on = +b.dataset.r === rate; b.className = on?'sel':''; b.setAttribute('aria-pressed', on); }
+}
+for(const r of RATES){ const b=document.createElement('button'); b.dataset.r=r; b.textContent=r; b.onclick=()=>setRate(r); el('rateseg').appendChild(b); }
+paintRate();
+
+/* ---------- trend charts: the last 60 s of a shared sensor, drawn on this phone ----------
+   Display only: it reads what sample() and send() already handle and publishes nothing.
+     phone reads  = every local reading, at the sensor's own rate (thin neutral line)
+     sent -> PLC  = each message as it left, held until the next one, the way the controller
+                    holds the last value it got (green steps; amber while Override is spoofing)
+   Bands mark Transmit OFF, a spoofed stretch, and the point going stale 8 s after its last
+   message. Readings go into fixed-size ring buffers; drawing runs at most ~11 times a second,
+   only for charts that are shared and on screen, and never while the page is hidden. */
+const trend = (()=>{
+  const WIN = 60000, STALE = 8000, H = 150, L = 36, RM = 8, TOP = 15, BOT = 17;
+  const FIELDS = {
+    motion:[{t:'accel',k:'mag',l:'|a|',u:' m/s²',span:2,nn:1,ph:'e.g. 15'},
+            {t:'gyro',k:'alpha',l:'gyro α',u:' °/s',span:20,ph:'e.g. 90'},
+            {t:'gyro',k:'beta',l:'gyro β',u:' °/s',span:20,ph:'e.g. 90'},
+            {t:'gyro',k:'gamma',l:'gyro γ',u:' °/s',span:20,ph:'e.g. 90'}],
+    orient:[{t:'orient',k:'beta',l:'tilt β',u:'°',span:10,ph:'e.g. 30, 25'},
+            {t:'orient',k:'gamma',l:'tilt γ',u:'°',span:10,ph:'e.g. 30, 25'},
+            {t:'orient',k:'alpha',l:'heading α',u:'°',span:20,ph:'e.g. 90'}],
+    light:[{t:'light',k:'lux',l:'light',u:' lux',span:20,nn:1,ph:'e.g. 500'}],
+    sound:[{t:'sound',k:'level',l:'level',u:'/100',span:10,nn:1,ph:'e.g. 60'}],
+    geo:[{t:'geo',k:'spd',l:'speed',u:' m/s',span:1,nn:1,step:1,ph:'e.g. 1.5'},
+         {t:'geo',k:'hdg',l:'course',u:'°',span:20,step:1,ph:'e.g. 180'}],
+    battery:[{t:'battery',k:'level',l:'charge',u:'%',span:10,nn:1,step:1,ph:'e.g. 20'}],
+  };
+  // ring buffer: time + one Float32 column per plotted key (+ a spoof flag for sends)
+  const ring = (cap, keys, flags) => { const r={cap, n:0, head:0, t:new Float64Array(cap), v:{}, f:flags?new Uint8Array(cap):null};
+    for(const k of keys) r.v[k]=new Float32Array(cap); return r; };
+  const at = (r, j) => (r.head - r.n + j + r.cap) % r.cap;           // slot of the j-th oldest entry
+  function put(r, t, gap){                                            // a reading closer than `gap` ms
+    const last = (r.head - 1 + r.cap) % r.cap;                        // to the last one overwrites it
+    if(r.n && gap && t - r.t[last] < gap) return last;
+    const i = r.head; r.t[i] = t; r.head = (i + 1) % r.cap; if(r.n < r.cap) r.n++; return i;
+  }
+  function first(r, t){ let a=0, b=r.n; while(a<b){ const m=(a+b)>>1; if(r.t[at(r,m)] < t) a=m+1; else b=m; } return a; }
+  function last(r, t){ const j = first(r, t + 1e-6) - 1; return j >= 0 ? at(r, j) : -1; }
+  const num = x => (typeof x==='number' && isFinite(x)) ? x : NaN;
+  const topics = {};                                                  // topic -> {keys, real, sent}
+  for(const sid in FIELDS) for(const f of FIELDS[sid]){ const T = topics[f.t] || (topics[f.t] = {keys:[]}); if(!T.keys.includes(f.k)) T.keys.push(f.k); }
+  for(const t in topics){ topics[t].real = ring(4096, topics[t].keys); topics[t].sent = ring(1024, topics[t].keys, true); }
+  const txLog = {}, charts = {};
+  let store = {sel:{}, lines:{}};                                     // chosen value + threshold lines, per phone
+  try{ const j = JSON.parse(localStorage.getItem('cs460-trend') || '{}');
+       if(j && typeof j==='object'){ if(j.sel && typeof j.sel==='object') store.sel=j.sel; if(j.lines && typeof j.lines==='object') store.lines=j.lines; } }catch(e){}
+  const save = () => { try{ localStorage.setItem('cs460-trend', JSON.stringify(store)); }catch(e){} };
+
+  // colors come from the page's theme, so the chart follows Dark / Light / the PLC's color. Lines and
+  // bands are marks, not text: they need 3:1 against the plot (not the 4.5:1 the page fits its status
+  // text to), so they are fitted here from the raw hues and keep apart on a mid-tone PLC color.
+  let C = null;
+  const rgbOf = s => { const m = s.match(/\d+/g); return s[0]==='#' ? hexToRgb(s) : {r:+m[0], g:+m[1], b:+m[2]}; };
+  const colors = () => C || (C = (cs => { const g = n => cs.getPropertyValue(n).trim();
+    const out = {fg:g('--fg'), dim:g('--dim'), brd:g('--brd'), field:g('--field')};
+    try{ const bg = rgbOf(out.field), dark = cr(NEARW,bg) >= cr(NEARB,bg), SEM = dark ? SEM_DARK : SEM_LIGHT, fg = dark ? NEARW : NEARB;
+      for(const k of ['live','spoof','danger','accent']){ const base = hexToRgb(SEM['--'+k]); let col = fg;
+        for(let t=0; t<1; t+=0.05){ const c = mix(base, fg, t); if(cr(c, bg) >= 3){ col = c; break; } } out[k] = rgbs(col); } }
+    catch(e){ for(const k of ['live','spoof','danger','accent']) out[k] = g('--'+k); }
+    for(const k of ['live','spoof','danger','accent']) document.body.style.setProperty('--tr-'+k, out[k]);  // legend keys match
+    return out; })(getComputedStyle(document.documentElement)));
+  new MutationObserver(()=>{ C = null; }).observe(document.documentElement, {attributes:true, attributeFilter:['style']});
+
+  function markup(sid){
+    const fs = FIELDS[sid]; if(!fs) return '';
+    const head = fs.length > 1
+      ? `<span class="seg sm" role="group" aria-label="Value to plot">${fs.map((f,i)=>`<button id="trf-${sid}-${i}">${f.l}</button>`).join('')}</span>`
+      : `<span class="trtitle">${fs[0].l} (${fs[0].u.trim()}) · last 60 s</span>`;
+    return `<div class="trend" id="tr-${sid}" hidden>
+      <div class="trhead">${head}<button class="ghost sm" id="trp-${sid}" aria-pressed="false">Pause</button></div>
+      <canvas id="trc-${sid}" role="img" aria-label="Last 60 seconds: the phone's reading and the value sent to the PLC"></canvas>
+      <div class="trread" id="trr-${sid}"></div>
+      <div class="trlegend"><span><i class="ln k-real"></i>phone reads</span><span><i class="ln k-sent"></i>sent &rarr; PLC</span><span><i class="ln k-spoof"></i>spoofed</span><span><i class="bx k-off"></i>transmit off</span><span><i class="bx k-stale"></i>stale (no msg for 8&nbsp;s)</span><span><i class="ln k-line"></i>your lines</span></div>
+      <label class="trlines">Lines at <input type="text" id="trl-${sid}" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Threshold lines: numbers separated by commas"></label>
+    </div>`;
+  }
+  const lines = c => { const v = store.lines[c.sid+'.'+c.fs[c.fi].k]; return Array.isArray(v) ? v.filter(x=>typeof x==='number' && isFinite(x)).slice(0,4) : []; };
+  const parseLines = s => s.split(/[,;\s]+/).filter(x=>x!=='' && x!=='-' && x!=='.').map(Number).filter(isFinite).slice(0,4);
+  function paintHead(c){
+    c.fs.forEach((f,i)=>{ const b=el(`trf-${c.sid}-${i}`); if(b){ b.className = i===c.fi?'sel':''; b.setAttribute('aria-pressed', i===c.fi); } });
+    c.li.value = lines(c).join(', '); c.li.placeholder = c.fs[c.fi].ph;
+  }
+  function size(c){
+    const w = c.cv.clientWidth, d = Math.min(2, window.devicePixelRatio || 1); if(!w) return;   // 2x is crisp enough and half the pixels of 3x
+    if(w !== c.w || d !== c.dpr){ c.w = w; c.dpr = d; c.cv.width = Math.round(w*d); c.cv.height = Math.round(H*d); if(c.shown) draw(c, Date.now()); }
+  }
+  const copy = r => { const o = {cap:r.cap, n:r.n, head:r.head, t:r.t.slice(), v:{}, f:r.f && r.f.slice()}; for(const k in r.v) o.v[k] = r.v[k].slice(); return o; };
+  function snap(c){                                                   // Pause freezes a copy of the window
+    const s = {now:Date.now(), log:(txLog[c.sid]||[]).slice(), topics:{}};
+    for(const f of c.fs) if(!s.topics[f.t]) s.topics[f.t] = {real:copy(topics[f.t].real), sent:copy(topics[f.t].sent)};
+    return s;
+  }
+  function init(sid){
+    const fs = FIELDS[sid]; if(!fs) return;
+    const c = charts[sid] = {sid, fs, fi:0, cv:el('trc-'+sid), rd:el('trr-'+sid), li:el('trl-'+sid), pb:el('trp-'+sid),
+                             wrap:el('tr-'+sid), w:0, dpr:1, shown:false, vis:true, hx:null, dom:null, paused:null, txt:''};
+    const si = Number(store.sel[sid]); if(Number.isInteger(si) && si >= 0 && si < fs.length) c.fi = si;
+    c.ctx = c.cv.getContext('2d');
+    fs.forEach((f,i)=>{ const b = el(`trf-${sid}-${i}`); if(b) b.onclick = ()=>{ c.fi=i; c.dom=null; store.sel[sid]=i; save(); paintHead(c); }; });
+    c.pb.onclick = ()=>{ c.paused = c.paused ? null : snap(c); c.pb.textContent = c.paused ? 'Live' : 'Pause';
+                         c.pb.className = (c.paused ? 'on' : 'ghost') + ' sm'; c.pb.setAttribute('aria-pressed', !!c.paused); };
+    c.li.addEventListener('input', ()=>{ const v = parseLines(c.li.value), key = sid+'.'+c.fs[c.fi].k;
+      if(v.length) store.lines[key] = v; else delete store.lines[key]; c.dom = null; save(); });
+    // touch or mouse: a crosshair reads any moment of the window (a vertical swipe still scrolls)
+    const aim = e => { c.hx = e.clientX - c.cv.getBoundingClientRect().left; };
+    c.cv.addEventListener('pointerdown', aim);
+    c.cv.addEventListener('pointermove', e => { if(e.pointerType==='mouse' || e.buttons) aim(e); });
+    for(const ev of ['pointerup','pointercancel','pointerleave'])
+      c.cv.addEventListener(ev, e => { if(ev!=='pointerup' || e.pointerType!=='mouse') c.hx = null; });
+    paintHead(c);
+    if(window.ResizeObserver) new ResizeObserver(()=>size(c)).observe(c.cv);
+    if(window.IntersectionObserver) new IntersectionObserver(es=>{ for(const e of es) c.vis = e.isIntersecting; }).observe(c.cv);
+  }
+  let raf = 0;
+  function loop(ts){                                                  // each chart redraws ~11 times a second;
+    raf = requestAnimationFrame(loop);                                // at most one chart per animation frame,
+    let pick = null;                                                  // so several on screen never add up to a long task
+    for(const sid in charts){ const c = charts[sid]; if(c.shown && c.vis && ts - (c.drawn || 0) >= 90 && (!pick || c.drawn < pick.drawn)) pick = c; }
+    if(pick){ pick.drawn = ts; try{ draw(pick, Date.now()); }catch(e){} }
+  }
+  function show(sid){ const c = charts[sid]; if(!c) return; c.shown = true; c.wrap.hidden = false; size(c); if(!raf) raf = requestAnimationFrame(loop); }
+  // the only inputs: a local reading, a message that actually went out, a Transmit change
+  function real(topic, obj){ try{ const T = topics[topic]; if(!T) return; const i = put(T.real, Date.now(), 25);
+    for(const k of T.keys) T.real.v[k][i] = num(obj[k]); }catch(e){} }
+  function sent(topic, out, spoof){ try{ const T = topics[topic]; if(!T) return; const i = put(T.sent, Date.now(), 0);
+    for(const k of T.keys) T.sent.v[k][i] = num(out[k]); T.sent.f[i] = spoof ? 1 : 0; }catch(e){} }
+  function tx(sid, on){ const g = txLog[sid] || (txLog[sid] = []); g.push({t:Date.now(), on}); if(g.length > 200) g.splice(0, 100); }
+
+  const nice = x => { const p = Math.pow(10, Math.floor(Math.log10(x))), m = x/p; return (m<=1?1:m<=2?2:m<=2.5?2.5:m<=5?5:10)*p; };
+  const decs = s => { let d=0; while(d<4 && Math.abs(Math.round(s*10**d) - s*10**d) > 1e-6) d++; return d; };
+  const fmtV = v => v!==v ? '—' : String(+v.toFixed(Math.abs(v)>=100 ? 0 : Math.abs(v)>=10 ? 1 : 2));
+  function domain(c, lo, hi, f){
+    const lo0 = lo;
+    if(!(lo <= hi)){ lo = f.nn ? 0 : -f.span/2; hi = lo + f.span; }
+    if(hi - lo < f.span){ const m = (lo + hi)/2; lo = m - f.span/2; hi = m + f.span/2; }
+    const o = c.dom;                                                  // keep the axis steady while the data fits
+    if(o && o.k === f.k && lo >= o.lo && hi <= o.hi && hi - lo >= 0.3*(o.hi - o.lo)) return o;
+    const pad = (hi - lo)*0.1; lo -= pad; hi += pad;
+    if(f.nn && lo < 0 && !(lo0 < 0)) lo = 0;
+    const step = nice((hi - lo)/4), D = {k:f.k, lo:Math.floor(lo/step)*step, hi:Math.ceil(hi/step)*step, step};
+    if(D.hi <= D.lo) D.hi = D.lo + step;
+    return (c.dom = D);
+  }
+  function txAt(log, t){ let on = true; for(const e of log){ if(e.t > t) break; on = e.on; } return on; }
+
+  function draw(c, wall){
+    if(!c.w) return;
+    const f = c.fs[c.fi], P = c.paused, now = P ? P.now : wall, src = P ? P.topics : topics;
+    const R = src[f.t].real, S = src[f.t].sent, log = P ? P.log : (txLog[c.sid] || []), k = f.k;
+    const S0 = SMAP[c.sid], spoofable = !!S0 && S0.prim === f.t && S0.key === k;   // Override replaces only this key
+    const K = colors(), ctx = c.ctx, w = c.w, pw = w - L - RM, ph = H - TOP - BOT, t0 = now - WIN;
+    const X = t => L + (t - t0)/WIN*pw;
+    // y range: what is on screen, the value held from before the window, and the student's lines
+    let lo = Infinity, hi = -Infinity; const see = v => { if(v === v){ if(v < lo) lo = v; if(v > hi) hi = v; } };
+    const jR = Math.max(0, first(R, t0) - 1), jS = Math.max(0, first(S, t0) - 1);
+    for(let j=jR; j<R.n; j++) see(R.v[k][at(R,j)]);
+    for(let j=jS; j<S.n; j++) see(S.v[k][at(S,j)]);
+    const th = lines(c); th.forEach(see);
+    const d = domain(c, lo, hi, f), Y = v => TOP + (d.hi - v)/(d.hi - d.lo)*ph;
+
+    ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0); ctx.clearRect(0, 0, w, H);
+    ctx.font = '10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+    // grid: solid hairlines at the y ticks and every 10 s
+    ctx.lineWidth = 1; ctx.strokeStyle = K.brd; ctx.fillStyle = K.dim; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.beginPath();
+    const dd = decs(d.step);
+    for(let n=0; n<=12; n++){ const v = d.lo + n*d.step; if(v > d.hi + d.step*1e-6) break;
+      const y = Math.round(Y(v)) + 0.5; ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.fillText((Math.abs(v) < 1e-9 ? 0 : v).toFixed(dd), L - 5, y); }
+    for(let s=0; s<=60; s+=10){ const x = Math.round(L + pw*s/60) + 0.5; ctx.moveTo(x, TOP); ctx.lineTo(x, TOP + ph); }
+    ctx.stroke();
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+    for(const s of [60, 40, 20]) ctx.fillText('−' + s + ' s', L + pw*(60 - s)/60, H - 4);
+    ctx.textAlign = 'right'; ctx.fillText(P ? 'paused' : 'now', L + pw, H - 4);
+
+    // stretches: transmit off (from the log), stale (8 s after a message with no next one), spoofed sends
+    const offs = [], stales = [], spoofs = [];
+    let from = null;
+    for(const e of log){ if(e.t > now) break; if(!e.on){ if(from === null) from = e.t; } else if(from !== null){ offs.push([from, e.t]); from = null; } }
+    if(from !== null) offs.push([from, now]);
+    let prev = null, run = null;
+    for(let j=0; j<S.n; j++){ const i = at(S,j), t = S.t[i]; if(t > now) break;
+      if(prev !== null && t - prev > STALE) stales.push([prev + STALE, t]);
+      const sp = spoofable && S.f[i];
+      if(sp && run === null) run = t; else if(!sp && run !== null){ spoofs.push([run, t]); run = null; }
+      prev = t; }
+    if(prev !== null && now - prev > STALE) stales.push([prev + STALE, now]);
+    if(run !== null) spoofs.push([run, Math.min(now, prev + STALE)]);
+
+    ctx.save(); ctx.beginPath(); ctx.rect(L, TOP, pw, ph); ctx.clip();
+    const band = (arr, col, a) => { ctx.globalAlpha = a; ctx.fillStyle = col;
+      for(const [a0, b0] of arr) if(b0 > t0){ const x0 = X(Math.max(a0, t0)); ctx.fillRect(x0, TOP, X(b0) - x0, ph); } ctx.globalAlpha = 1; };
+    band(spoofs, K.spoof, .14); band(offs, K.danger, .11); band(stales, K.danger, .15);
+    if(th.length){                                                    // the student's threshold lines
+      if(th.length === 2){ ctx.globalAlpha = .08; ctx.fillStyle = K.accent; const ya = Y(Math.max(...th)), yb = Y(Math.min(...th)); ctx.fillRect(L, ya, pw, yb - ya); ctx.globalAlpha = 1; }
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = K.accent; ctx.lineWidth = 1.5; ctx.beginPath();
+      for(const v of th){ const y = Y(v); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); } ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    // phone reads: every local reading; min/max per pixel column keeps spikes at any rate
+    ctx.globalAlpha = .6; ctx.strokeStyle = K.fg; ctx.lineWidth = 1.5; ctx.beginPath();
+    let pen = false, lastV = NaN, lastY = 0;
+    if(f.step){
+      for(let j=jR; j<R.n; j++){ const i = at(R,j), v = R.v[k][i]; if(v !== v){ pen = false; lastV = NaN; continue; }
+        const x = X(R.t[i]), y = Y(v); if(!pen){ ctx.moveTo(x, y); pen = true; } else { ctx.lineTo(x, lastY); ctx.lineTo(x, y); } lastV = v; lastY = y; }
+    } else {
+      let col = null, cf = 0, cmin = 0, cmax = 0, cl = 0;
+      const flush = () => { if(col === null) return; if(!pen){ ctx.moveTo(col, Y(cf)); pen = true; } else ctx.lineTo(col, Y(cf));
+        if(cmax !== cmin){ ctx.lineTo(col, Y(cmin)); ctx.lineTo(col, Y(cmax)); } ctx.lineTo(col, Y(cl)); col = null; };
+      for(let j=jR; j<R.n; j++){ const i = at(R,j), v = R.v[k][i];
+        if(v !== v){ flush(); pen = false; lastV = NaN; continue; }
+        const x = Math.round(X(R.t[i]));
+        if(x !== col){ flush(); col = x; cf = cmin = cmax = cl = v; } else { if(v < cmin) cmin = v; if(v > cmax) cmax = v; cl = v; }
+        lastV = v; }
+      flush(); lastY = Y(lastV);
+    }
+    if(pen && lastV === lastV) ctx.lineTo(X(now), lastY);               // the reading holds until the next one
+    ctx.stroke(); ctx.globalAlpha = 1;
+    // sent -> PLC: each message held until the next; after 8 s with none it is stale (dashed, frozen)
+    const live = new Path2D(), spf = new Path2D(), frz = new Path2D(), dl = [], ds = [];
+    let pe = null, py = 0;
+    for(let j=jS; j<S.n; j++){ const i = at(S,j), t = S.t[i]; if(t > now) break;
+      const nx = j + 1 < S.n ? Math.min(S.t[at(S,j+1)], now) : now, v = S.v[k][i];
+      if(v !== v){ pe = null; continue; }
+      const sp = spoofable && S.f[i], p = sp ? spf : live, x = X(t), y = Y(v), end = Math.min(nx, t + STALE);
+      if(pe === t){ p.moveTo(x, py); p.lineTo(x, y); } else p.moveTo(x, y);
+      p.lineTo(X(end), y);
+      if(nx > t + STALE){ frz.moveTo(X(t + STALE), y); frz.lineTo(X(nx), y); pe = null; } else pe = end;
+      py = y; (sp ? ds : dl).push(x, y); }
+    ctx.lineWidth = 2; ctx.strokeStyle = K.live; ctx.stroke(live); ctx.strokeStyle = K.spoof; ctx.stroke(spf);
+    ctx.setLineDash([2, 3]); ctx.lineWidth = 1.5; ctx.globalAlpha = .7; ctx.strokeStyle = K.fg; ctx.stroke(frz); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const m = (dl.length + ds.length)/2, gap = m ? pw/m : 0;          // a dot per message when they are far enough apart
+    if(gap >= 4){ const rd = Math.min(2.5, gap*0.25);
+      for(const [arr, col] of [[dl, K.live], [ds, K.spoof]])
+        for(const [r, fill] of [[rd + 1, K.field], [rd, col]]){ ctx.beginPath(); for(let q=0; q<arr.length; q+=2){ ctx.moveTo(arr[q] + r, arr[q+1]); ctx.arc(arr[q], arr[q+1], r, 0, 7); } ctx.fillStyle = fill; ctx.fill(); } }
+    // the moment each stale stretch begins: when the controller drops the point's fresh flag
+    ctx.setLineDash([3, 3]); ctx.strokeStyle = K.danger; ctx.lineWidth = 1.25; ctx.beginPath();
+    for(const [a0] of stales) if(a0 >= t0){ const x = Math.round(X(a0)) + 0.5; ctx.moveTo(x, TOP); ctx.lineTo(x, TOP + ph); }
+    ctx.stroke(); ctx.setLineDash([]);
+    const tag = (txt, x, y, col, align) => { const tw = ctx.measureText(txt).width; ctx.textAlign = align;
+      const bx = align === 'right' ? x - tw - 2 : x - 2; ctx.globalAlpha = .85; ctx.fillStyle = K.field; ctx.fillRect(bx, y - 7, tw + 4, 13); ctx.globalAlpha = 1; ctx.fillStyle = col; ctx.fillText(txt, x, y + 0.5); };
+    ctx.textBaseline = 'middle';
+    for(const [a0] of stales) if(a0 >= t0) tag('stale', Math.min(X(a0) + 4, L + pw - 32), TOP + ph - 9, K.danger, 'left');
+    if(th.length){ const hiV = Math.max(...th);
+      for(const v of th){ const y = Y(v) + (th.length === 2 && v !== hiV ? 9 : -9); tag(fmtV(v), L + pw - 3, Math.max(TOP + 7, Math.min(TOP + ph - 7, y)), K.dim, 'right'); } }
+    let hx = c.hx;
+    if(hx !== null){ hx = Math.round(Math.max(L, Math.min(L + pw, hx))) + 0.5;
+      ctx.globalAlpha = .65; ctx.strokeStyle = K.fg; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, TOP); ctx.lineTo(hx, TOP + ph); ctx.stroke(); ctx.globalAlpha = 1; }
+    ctx.restore();
+    // band names in the strip above the plot (skipped where they would collide)
+    const labs = [];
+    for(const [a0, b0] of offs) if(b0 > t0) labs.push([a0, 'TX off', K.danger]);
+    for(const [a0, b0] of spoofs) if(b0 > t0) labs.push([a0, 'spoof', K.spoof]);
+    labs.sort((p, q) => p[0] - q[0]);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; let xr = -1e9;
+    for(const [a0, txt, col] of labs){ const tw = ctx.measureText(txt).width; let x = Math.max(L, X(a0)) + 2;
+      if(x + tw > L + pw) x = L + pw - tw; if(x < xr + 6) continue; ctx.fillStyle = col; ctx.fillText(txt, x, TOP - 4); xr = x + tw; }
+
+    // the text twin of the chart: values at "now" (or at the crosshair) and the point's freshness
+    const tq = hx !== null ? t0 + (hx - L)/pw*WIN : now, ago = hx !== null ? `−${((now - tq)/1000).toFixed(1)} s` : (P ? 'paused' : 'now');
+    const ri = last(R, tq), si = last(S, tq), u = f.u;
+    let l1 = `${ago} · phone ${ri >= 0 ? fmtV(R.v[k][ri]) + u : '—'}`, l2;
+    if(si < 0){ l1 += ' · PLC —'; l2 = 'nothing sent yet'; }
+    else { const age = tq - S.t[si], sv = S.v[k][si], rel = hx !== null ? 'before' : 'ago';
+      l1 += ` · PLC ${fmtV(sv)}${u}${spoofable && S.f[si] ? ' spoofed' : ''}`;
+      if(age > STALE) l2 = `STALE · no msg for ${(age/1000).toFixed(0)} s (PLC holds it)`;
+      else if(!txAt(log, tq)) l2 = `TX off · msg ${(age/1000).toFixed(1)} s ${rel} · stale in ${((STALE - age)/1000).toFixed(1)} s`;
+      else l2 = `last msg ${(age/1000).toFixed(1)} s ${rel} · fresh`; }
+    const txt = l1 + '\n' + l2;
+    if(txt !== c.txt){ c.txt = txt; c.rd.textContent = txt; }
+  }
+  return {markup, init, show, real, sent, tx};
+})();
 
 // ---- sensor registry: each entry renders a card with its own Share (permission) button ----
 // prim/key/min/max/unit describe the PRIMARY scalar the PLC consumes (what Override drives).
@@ -286,6 +643,7 @@ for(const s of SENSORS){
      <button class="ghost" id="btn-${s.id}" disabled>Share</button></div>
     <div class="srow"><div class="sval na" id="val-${s.id}" style="flex:1">connect to the broker first</div>
        <span class="statechip" id="chip-${s.id}">idle</span></div>
+    ${trend.markup(s.id)}
     <div class="ctl" id="ctl-${s.id}">
       <div class="line"><span class="lab">Transmit</span>
         <span class="seg"><button id="tx-on-${s.id}" class="sel">ON</button><button id="tx-off-${s.id}">OFF</button></span>
@@ -303,17 +661,20 @@ for(const s of SENSORS){
     el('btn-'+s.id).disabled = true; el('btn-'+s.id).textContent = 'Requesting…';
     try { const ok = await s.start(); el('btn-'+s.id).textContent = ok ? 'Sharing' : 'Unavailable';
           el('btn-'+s.id).className = ok ? 'on' : 'ghost';
-          if(ok){ tx[s.id]=true; el('ctl-'+s.id).classList.add('show'); paintState(s.id,false); }
+          if(ok){ tx[s.id]=true; el('ctl-'+s.id).classList.add('show'); paintState(s.id,false); trend.show(s.id); }
           else setVal(s.id,'not available on this device',false); }
     catch(e){ el('btn-'+s.id).textContent='Denied'; el('btn-'+s.id).className='ghost'; setVal(s.id,'permission denied',false); }
   };
   // wire the per-sensor controls
   wireControls(s);
+  trend.init(s.id);
 }
 function wireControls(s){
   const sid=s.id;
-  el('tx-on-'+sid).onclick  = ()=>{ tx[sid]=true;  seg('tx',sid,'on');  paintState(sid, ov[sid]); };
-  el('tx-off-'+sid).onclick = ()=>{ tx[sid]=false; seg('tx',sid,'off'); paintState(sid, ov[sid]); };
+  // Transmit is a discrete event: ON sends the newest reading at once, OFF stops the very next send.
+  el('tx-on-'+sid).onclick  = ()=>{ const was=tx[sid]; tx[sid]=true; seg('tx',sid,'on'); trend.tx(sid,true);
+                                    if(!was) sendNow(sid); paintState(sid, ov[sid]); };
+  el('tx-off-'+sid).onclick = ()=>{ tx[sid]=false; seg('tx',sid,'off'); trend.tx(sid,false); paintState(sid, ov[sid]); };
   if(!s.prim) return;
   const r=el('ovr-'+sid), n=el('ovn-'+sid);
   ovv[sid]=+r.value;
@@ -332,11 +693,18 @@ function paintState(sid, spoof){
   if(!tx[sid]){ chip.textContent='OFF — PLC losing it'; chip.className='statechip off'; v.classList.remove('spoof'); v.classList.add('off'); return; }
   v.classList.remove('off');
   if(spoof){ chip.textContent='SPOOFED '+fmt(ovv[sid]); chip.className='statechip spoof'; v.classList.add('spoof');
-    const real = liveReal[sid]; v.textContent = `sending ${SMAP[sid].key}=${fmt(ovv[sid])}  (real ≈ ${real==null?'—':fmt(real)})`; return; }
+    const real = liveReal[sid], t = `sending ${SMAP[sid].key}=${fmt(ovv[sid])}  (real ≈ ${real==null?'—':fmt(real)})`;
+    delete liveText[sid]; if(v.textContent !== t) v.textContent = t; return; }
   chip.textContent='LIVE'; chip.className='statechip live'; v.classList.remove('spoof');
 }
 function fmt(x){ return typeof x==='number' ? (Math.abs(x)>=100?Math.round(x):+x.toFixed(2)) : x; }
-function setVal(id, text, ok=true){ const v=el('val-'+id); v.textContent=text; v.classList.toggle('na',!ok); }
+function setVal(id, text, ok=true){ delete liveText[id]; const v=el('val-'+id); v.textContent=text; v.classList.toggle('na',!ok); }
+// Live readouts change with every sensor event (up to ~60 a second). Repainting text that often costs a
+// phone more than anything else on the page, so a live readout is refreshed at most 10 times a second.
+const liveText = {};
+function setLive(id, text){ liveText[id] = text; }
+setInterval(()=>{ for(const id in liveText){ const t = liveText[id], v = el('val-'+id); delete liveText[id];
+  if(v.textContent !== t) v.textContent = t; v.classList.remove('na'); } }, 100);
 function enableShares(){ for(const s of SENSORS){ const b=el('btn-'+s.id); b.disabled=false; if(b.textContent==='Share') setVal(s.id,'tap Share to grant permission',false);} }
 
 // ---- individual sensor starters (each requests its OWN permission) ----
@@ -349,10 +717,10 @@ async function startMotion(){
     const a=e.accelerationIncludingGravity||e.acceleration, r=e.rotationRate;
     if(a && a.x!=null){ got=true;
       const mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
-      if(!(ov.motion||!tx.motion)) setVal('motion', `accel x ${a.x.toFixed(2)} y ${a.y.toFixed(2)} z ${a.z.toFixed(2)} |${mag.toFixed(2)}|\n`+
+      if(!(ov.motion||!tx.motion)) setLive('motion', `accel x ${a.x.toFixed(2)} y ${a.y.toFixed(2)} z ${a.z.toFixed(2)} |${mag.toFixed(2)}|\n`+
         (r&&r.alpha!=null?`gyro  α ${(r.alpha||0).toFixed(1)} β ${(r.beta||0).toFixed(1)} γ ${(r.gamma||0).toFixed(1)} °/s`:'gyro  n/a'));
-      throttled('accel',()=>gpub('motion','accel',{x:+a.x.toFixed(3),y:+a.y.toFixed(3),z:+a.z.toFixed(3),mag:+mag.toFixed(3)}));
-      if(r&&r.alpha!=null) throttled('gyro',()=>gpub('motion','gyro',{alpha:+(r.alpha||0).toFixed(2),beta:+(r.beta||0).toFixed(2),gamma:+(r.gamma||0).toFixed(2)}));
+      sample('motion','accel',{x:+a.x.toFixed(3),y:+a.y.toFixed(3),z:+a.z.toFixed(3),mag:+mag.toFixed(3)});
+      if(r&&r.alpha!=null) sample('motion','gyro',{alpha:+(r.alpha||0).toFixed(2),beta:+(r.beta||0).toFixed(2),gamma:+(r.gamma||0).toFixed(2)});
     }
   });
   setTimeout(()=>{ if(!got) setVal('motion','no motion events (sensor may be blocked)',false); }, 2500);
@@ -362,8 +730,8 @@ async function startOrientation(){
   if(!(await iosPerm(window.DeviceOrientationEvent))) return false;
   window.addEventListener('deviceorientation', e=>{
     if(e.alpha==null && e.beta==null) return;
-    if(!(ov.orient||!tx.orient)) setVal('orient', `compass α ${(e.alpha||0).toFixed(1)}°   tilt β ${(e.beta||0).toFixed(1)}° γ ${(e.gamma||0).toFixed(1)}°`);
-    throttled('orient',()=>gpub('orient','orient',{alpha:+(e.alpha||0).toFixed(2),beta:+(e.beta||0).toFixed(2),gamma:+(e.gamma||0).toFixed(2)}));
+    if(!(ov.orient||!tx.orient)) setLive('orient', `compass α ${(e.alpha||0).toFixed(1)}°   tilt β ${(e.beta||0).toFixed(1)}° γ ${(e.gamma||0).toFixed(1)}°`);
+    sample('orient','orient',{alpha:+(e.alpha||0).toFixed(2),beta:+(e.beta||0).toFixed(2),gamma:+(e.gamma||0).toFixed(2)});
   });
   return true;
 }
@@ -374,8 +742,8 @@ function startGeo(){
       const c=p.coords;
       // Coarsened to 3 decimals (~110 m) on purpose: enough to show movement for the lab,
       // not enough to pinpoint a student's home. This is the only value leaving the phone.
-      if(tx.geo) setVal('geo', `lat ${c.latitude.toFixed(3)}  lon ${c.longitude.toFixed(3)}  (coarse ~100 m)\nacc ${Math.round(c.accuracy)} m  spd ${c.speed==null?'—':c.speed.toFixed(1)} m/s  hdg ${c.heading==null?'—':Math.round(c.heading)+'°'}`);
-      throttled('geo',()=>gpub('geo','geo',{lat:+c.latitude.toFixed(3),lon:+c.longitude.toFixed(3),acc:+c.accuracy.toFixed(1),alt:c.altitude,spd:c.speed,hdg:c.heading}),2);
+      if(tx.geo) setLive('geo', `lat ${c.latitude.toFixed(3)}  lon ${c.longitude.toFixed(3)}  (coarse ~100 m)\nacc ${Math.round(c.accuracy)} m  spd ${c.speed==null?'—':c.speed.toFixed(1)} m/s  hdg ${c.heading==null?'—':Math.round(c.heading)+'°'}`);
+      sample('geo','geo',{lat:+c.latitude.toFixed(3),lon:+c.longitude.toFixed(3),acc:+c.accuracy.toFixed(1),alt:c.altitude,spd:c.speed,hdg:c.heading});
       res(true);
     }, err=>{ setVal('geo','permission denied / unavailable',false); res(false); }, {enableHighAccuracy:true, maximumAge:1000});
   });
@@ -390,43 +758,32 @@ async function startSound(){
     an.getByteTimeDomainData(buf);
     let sum=0; for(const v of buf){ const d=(v-128)/128; sum+=d*d; }
     const level = Math.min(100, Math.round(Math.sqrt(sum/buf.length)*300));
-    if(!(ov.sound||!tx.sound)) setVal('sound', `level ${level} / 100  ${'█'.repeat(Math.round(level/5))}`);
-    throttled('sound',()=>gpub('sound','sound',{level}),6);
+    if(!(ov.sound||!tx.sound)) setLive('sound', `level ${level} / 100  ${'█'.repeat(Math.round(level/5))}`);
+    sample('sound','sound',{level});
     requestAnimationFrame(tick);
   }
   tick(); return true;
 }
 async function startLight(){
   if(!('AmbientLightSensor' in window)) {
-    window.addEventListener('devicelight', e=>{ if(!(ov.light||!tx.light)) setVal('light', e.value.toFixed(0)+' lux'); throttled('light',()=>gpub('light','light',{lux:+e.value.toFixed(1)})); });
+    window.addEventListener('devicelight', e=>{ if(!(ov.light||!tx.light)) setLive('light', e.value.toFixed(0)+' lux'); sample('light','light',{lux:+e.value.toFixed(1)}); });
     return false; // Generic Sensor not present; iOS has no web light sensor
   }
   const als = new AmbientLightSensor({frequency:5});
-  als.addEventListener('reading',()=>{ if(!(ov.light||!tx.light)) setVal('light', als.illuminance.toFixed(0)+' lux'); throttled('light',()=>gpub('light','light',{lux:+als.illuminance.toFixed(1)})); });
+  als.addEventListener('reading',()=>{ if(!(ov.light||!tx.light)) setLive('light', als.illuminance.toFixed(0)+' lux'); sample('light','light',{lux:+als.illuminance.toFixed(1)}); });
   als.addEventListener('error',()=> setVal('light','sensor blocked',false));
   als.start(); return true;
 }
 async function startBattery(){
   if(!navigator.getBattery) return false;
   const b = await navigator.getBattery();
-  const upd=()=>{ if(tx.battery) setVal('battery', `${Math.round(b.level*100)} %  ${b.charging?'charging':'on battery'}`);
-    gpub('battery','battery',{level:Math.round(b.level*100),charging:b.charging}); };
+  const upd=()=>{ if(tx.battery) setLive('battery', `${Math.round(b.level*100)} %  ${b.charging?'charging':'on battery'}`);
+    sample('battery','battery',{level:Math.round(b.level*100),charging:b.charging}); };
   b.addEventListener('levelchange',upd); b.addEventListener('chargingchange',upd); upd(); return true;
 }
 
-// Keep-alive: every 2 s re-send the last payload of each sensor that is transmitting, so the
-// PLC's per-point 8 s freshness measures "this phone is still sending", even for values that
-// change rarely (battery) or only on events (light, geolocation). The re-send passes through
-// gpub, so Transmit OFF still silences it and Override still replaces the primary value.
-// Freshness is about arrival, not truth: a re-sent or spoofed value is just as "fresh".
-// Topics are re-sent one at a time (every 250 ms, round-robin) so the keep-alive never
-// arrives as a burst: the controller queues only a few MQTT messages between scans.
-let keepIdx = 0;
-setInterval(()=>{
-  const topics = Object.keys(lastObj); if(!topics.length) return;
-  const topic = topics[keepIdx++ % topics.length], {sid, obj} = lastObj[topic];
-  if(Date.now() - (lastPub[topic]||0) >= 2000){ lastPub[topic] = Date.now(); gpub(sid, topic, obj); }
-}, 250);
+// (No separate keep-alive for sensors: the send-rate timer above re-sends every transmitting
+// topic at least every 2 s, which is what keeps each point fresh at the controller.)
 const btnState = {btn1:0, btn2:0};
 
 // Phone as PLC I/O: momentary buttons -> network-only points phone_btn1/phone_btn2 (never IN7/IN8),
