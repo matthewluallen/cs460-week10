@@ -673,6 +673,8 @@ OBS_EVENT = "esp32_i2c_observe"                      # released twin (qemu-twin-
 GENERIC_EVENTS = ("i2c_event", "i2c_send", "i2c_recv")   # fallback for other builds
 BUS_OUT_DIR = os.environ.get("BUS_OUT_DIR", os.path.join(REPO_ROOT, "bus-analysis", "out"))
 BUS_TRACE_FILE = os.environ.get("BUS_TRACE_FILE", "/tmp/plc-bustap-%d.log" % os.getuid())
+if not re.fullmatch(r"/[A-Za-z0-9_./-]+", BUS_TRACE_FILE):  # it is spliced into a monitor command
+    BUS_TRACE_FILE = "/tmp/plc-bustap-%d.log" % os.getuid()
 BUS_MAX_SECONDS = 10
 BUS_MAX_TRACE = 256 * 1024 * 1024
 STUDIO_MAX_EVENTS = 50000
@@ -694,6 +696,23 @@ def _hmp(cmd):
     r = _qmp([("human-monitor-command", {"command-line": cmd})])[0]
     if isinstance(r, str) and r.strip():
         raise RuntimeError("monitor: " + r.strip())
+
+
+def _bus_safety_off():
+    """At start-up: if a previous Studio server died mid-capture, the twin may still be tracing
+    into a log file. Switch the whitelisted events off and park the log on /dev/null."""
+    for _ in range(20):
+        if os.path.exists(QMP_SOCK):
+            break
+        time.sleep(0.5)
+    try:
+        st = _qmp([("trace-event-get-state", {"name": OBS_EVENT})])[0]
+        if any(e.get("state") == "enabled" for e in st):
+            _qmp([("trace-event-set-state", {"name": OBS_EVENT, "enable": False})])
+            _hmp("logfile /dev/null")
+            print("[bridge] I2C trace was left ON by an earlier capture - switched it off", flush=True)
+    except Exception:                             # noqa: BLE001  (no twin yet / other build)
+        pass
 
 
 def _load_converter():
@@ -1081,6 +1100,7 @@ def main(argv=None):
     _BRIDGE_ADDR.update(bind=a.bind, port=a.port)
 
     hub = TwinHub(a.serial)
+    threading.Thread(target=_bus_safety_off, daemon=True).start()
 
     if a.console_port:
         threading.Thread(target=console_server, args=(a.console_port, hub), daemon=True).start()

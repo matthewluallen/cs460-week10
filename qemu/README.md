@@ -72,6 +72,19 @@ part annotated, and when you run it, it prints the exact command before executin
 | `./supply-chain/diff-images.sh` | `ls -l` the two images + compute the byte delta | 7 |
 | `./supply-chain/run-malicious.sh` | `RESTART=1 ICOUNT=off FLASH_IMG=…MALICIOUS.bin ./qemu/run.sh` | 7 |
 | `./supply-chain/arm.sh` / `benign.sh` | `echo ARM > /tmp/c2_state` / `rm -f /tmp/c2_state` | 7 |
+| `./bus-analysis/tap.sh [secs]` | `curl -X POST localhost:8080/bus/capture?seconds=6` — records YOUR running twin's I²C bus (→ `.sr`/`.pvs`/`.vcd` in `bus-analysis/out/`, sigrok decode of 0x59) | bus |
+| `./sbom/scan-running.sh` | fingerprint the image the twin booted → SPDX + CycloneDX → grype → RISK | SBOM |
+| `python3 qemu/fw_identity.py <image>` | read partition table, boot slot, ESP-IDF version and app ELF SHA-256 from a flash image | SBOM |
+
+### Studio server endpoints (all same-origin; writes need POST)
+
+| Endpoint | What it does |
+|---|---|
+| `GET /field`, `POST /field?bit=N&v=0\|1` | the AW9523 expander's `di`/`relays` bytes through QMP (chip level) |
+| `POST /bus/capture?seconds=N` (alias `POST /bustap?secs=N`), N ≤ 10 | live I²C capture of the running twin: QMP `logfile` + `trace-event-set-state esp32_i2c_observe` on, N s, off; converted to `.vcd`/`.sr`/`.pvs`/`.json` + sigrok decode. The trace event is never left on (also switched off at server start). |
+| `GET /bus/captures`, `GET /bus/files/<name>` | list / download captures (strict file-name pattern) |
+| `GET /twin/identity[?hash=1]` | the running twin's image: profile, boot slot, ESP-IDF, app ELF SHA-256 (from the flash image, not the firmware) |
+| `GET /fw/api/log`, `GET /fw/api/points` | read-only proxy to the firmware's HTTP HMI. If this server holds the firmware's own port (8080), it answers 503 `shadowed` and Provenance Studio reads `plc> log` over the console instead; `BRIDGE_PORT=8088 ./qemu/studio.sh` frees 8080 for the firmware. |
 
 ## Why the twin needs one capability (and not root)
 
