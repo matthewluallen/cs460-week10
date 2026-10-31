@@ -214,7 +214,7 @@ function lightCard(c,v,T){const x=1240,y=318,W=304,sel=lightSel(),a=ST.field.ana
       txt(22,yy+18,L.name,{size:13,weight:on?800:600,fill:T.ink})+txt(150,yy+18,'≈'+fmtR(L.r),{size:12.5,fill:T.sub})+
       txt(W-20,yy+18,mv+' mV',{anchor:'end',size:12.5,weight:800,fill:alarm?T.warnInk:T.ink,mono:1})+`</g>`;});
   const py=66+4*31+6;s+=`<line x1="12" y1="${py}" x2="${W-12}" y2="${py}" stroke="${T.cardRule}"/>`;
-  s+=txt(16,py+20,'WHAT THE CONTROLLER SEES',{size:12.5,weight:800,fill:T.mut,ls:'.4'});
+  s+=txt(16,py+20,'CONTROLLER READS',{size:12.5,weight:800,fill:T.mut,ls:'.4'});
   const iw=v.monitorIW&&Array.isArray(v.monitorIW.IW)?v.monitorIW.IW[0]:null;
   let big='CH1 = —',sub2=v.conn==='none'?'not connected':'no reading yet',tag=null;
   if(tw&&v.fieldFresh&&a&&a.writable){big=`CH1 = ${a.ch1_mv} mV`;sub2='chip register · your circuit owns CH1';tag='OBSERVED';}
