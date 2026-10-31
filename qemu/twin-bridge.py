@@ -109,6 +109,31 @@ FIELD_ANALOG_HINT = ("CH1/CH2 belong to the twin's built-in tank model. To wire 
                      "to them, restart the twin with field analog inputs: RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh")
 
 
+_ANALOG_OWNER = {"pid": None, "field": False}
+
+
+def _analog_is_field(frame):
+    """True when the twin lets an outside writer own CH1/CH2 (it was booted with its process model
+    off). Known once per twin process: from its environment when readable, otherwise by writing
+    back the frame just read (a no-op; a process-model twin refuses it and stays unchanged). The
+    qemu binary carries a file capability, which makes /proc/<pid>/environ root-only."""
+    tw = _twin_process()
+    pid = tw["pid"] if tw else None
+    if pid is not None and _ANALOG_OWNER["pid"] == pid:
+        return _ANALOG_OWNER["field"]
+    if tw and tw.get("nophys"):
+        field = True
+    else:
+        try:
+            _qmp([("qom-set", {"path": _IOEXP_PATH, "property": "analog-inputs", "value": frame})])
+            field = True
+        except RuntimeError:
+            field = False
+    if pid is not None:
+        _ANALOG_OWNER.update(pid=pid, field=field)
+    return field
+
+
 def _field_analog():
     """CH1/CH2 of the twin's IO expansion as the firmware reads them (the atomic `analog-inputs`
     frame) and who owns them: "field" when the twin was started with FIELD_ANALOG=1 (its process
@@ -118,8 +143,7 @@ def _field_analog():
         fr = _qmp([("qom-get", {"path": _IOEXP_PATH, "property": "analog-inputs"})])[0]
     except (RuntimeError, OSError):
         return None
-    tw = _twin_process()
-    owner = "field" if (tw and tw.get("nophys")) else "physics"
+    owner = "field" if _analog_is_field(fr) else "physics"
     return {"ch1_mv": fr.get("ch1_mv"), "ch2_mv": fr.get("ch2_mv"), "ch1_ua": fr.get("ch1_ua"),
             "ch2_ua": fr.get("ch2_ua"), "ch1_source": owner, "ch2_source": owner,
             "writable": owner == "field"}
