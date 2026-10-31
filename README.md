@@ -1,4 +1,4 @@
-# CS460 Week 10 — Inside the Stack: StampLC SBOM/HBOM + Bus & Firmware Analysis
+# CS460 Weeks 10–12 — Inside the Stack: StampLC SBOM/HBOM, Bus & Firmware Analysis, and Formally Verified Updates
 
 A hands-on lab on the **M5Stack StampLC**, a small real PLC (ESP32-S3; 4 relays,
 8 opto-isolated inputs, RS-485, Modbus). You will read what a device is *made of*
