@@ -563,7 +563,7 @@ body:not(.wf-collapsed) #bToggleWf::before{content:"\2713"}
 .hc-b{padding:2px 13px 13px}
 .hsrc{margin-left:auto;font:600 9px/1 var(--mono);letter-spacing:.08em;color:var(--warn);background:rgba(243,165,58,.12);border:1px solid rgba(243,165,58,.38);border-radius:999px;padding:3px 8px;text-transform:none}
 .hcc{display:flex;gap:12px;align-items:flex-start}
-.stamplc-svg{width:280px;flex:none;cursor:default}.stamplc-svg svg{display:block;width:100%;height:auto}
+.stamplc-svg{width:288px;flex:none;cursor:default}.stamplc-svg svg{display:block;width:100%;height:auto}
 .stamplc{width:190px;flex:none;border-radius:11px;padding:7px;position:relative;background:linear-gradient(180deg,#2b313c,#1c222c);border:1px solid #39424f;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 12px 28px -16px #000}
 .term{display:flex;gap:3px;justify-content:center;padding:2px}
 .term i{flex:1;height:11px;border-radius:2px;background:linear-gradient(180deg,#1f9d57,#157a41);border:1px solid #0d5e30}
@@ -1007,7 +1007,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
    if(!devUrl)refreshDeviceLcd(true);
    let svg=SK.defs(T)+SK.stamplc({x:8,y:12,used:{RELAY1:1,RELAY2:1,RELAY3:1,RELAY4:1},lcd:{href:devUrl,label:src.short}},vm,T);
    svg=svg.replace(/id="sk/g,'id="hdsk').replace(/#sk/g,'#hdsk');
-   el.innerHTML='<svg viewBox="0 0 486 392" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="StampLC controller">'+svg+'</svg>';}
+   el.innerHTML='<svg viewBox="0 0 500 392" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="StampLC controller">'+svg+'</svg>';}
  function refreshDeviceLcd(force){const now=performance.now();if(!force&&(now-devLcdAt<500||!devShown()))return;devLcdAt=now;
    try{if(!devScratch){devScratch=document.createElement('canvas');devScratch.width=480;devScratch.height=270;}
      const g=devScratch.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(cv,0,0,480,270);devUrl=devScratch.toDataURL('image/png');
