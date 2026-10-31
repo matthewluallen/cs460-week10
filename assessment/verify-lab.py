@@ -16,7 +16,7 @@ Usage:
   python assessment/verify-lab.py            # all applicable parts, in another shell
   python assessment/verify-lab.py P5         # one or more parts: P1 P3 P5 ...
   python assessment/verify-lab.py --boot-twin           # boot a twin if none is running, then verify
-  ./qemu/run.sh secure ; python assessment/verify-lab.py P9     # Part 9 needs the secure build
+  RESTART=1 ./qemu/run.sh secure ; python assessment/verify-lab.py P9   # Part 9 needs the secure build
   SERIAL_PORT=/dev/ttyACM0 OTA_HOST=10.0.0.5:80 HMI_HOST=10.0.0.5:8080 \
       python assessment/verify-lab.py        # physical board over USB + Ethernet
 
@@ -268,7 +268,7 @@ def P9_secure(c):
     ntp_v, ntp_ev = P8_ntp(c)
     no_wrap = "armed_wrap_to_1902=False" in ntp_ev
     if forced and not no_wrap:
-        return SKIP, "target behaves as the VULNERABLE build — boot ./qemu/run.sh secure for Part 9"
+        return SKIP, "target behaves as the VULNERABLE build — swap to it with RESTART=1 ./qemu/run.sh secure for Part 9"
     ok = overflow_blocked and no_wrap
     return (PASS if ok else FAIL), f"overflow_blocked={overflow_blocked}, clock_no_wrap={no_wrap}"
 

@@ -8,7 +8,7 @@ or a CWE string, it drives the live console and HTTP services and checks the
 *effect*. Boot the secure image first:
 
     ./qemu/build-twin.sh secure      # compile + package the hardened 8MB image
-    ./qemu/run.sh secure             # boot it in the twin; leave it running
+    RESTART=1 ./qemu/run.sh secure   # swap your running twin for it; leave it running
 
 Then, in another shell:   ./remediation/verify-secure.sh
 

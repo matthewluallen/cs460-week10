@@ -3,7 +3,7 @@
 # show each one now fails (Part 9). Behavioral proof of the hardening, not a grep.
 #
 #   ./qemu/build-twin.sh secure                         # compile + package the hardened 8MB image
-#   ./qemu/run.sh secure                                # boot it in the twin, leave it running
+#   RESTART=1 ./qemu/run.sh secure                      # swap your running twin for it, leave it running
 #   ./remediation/verify-secure.sh                      # <- then run this (another shell)
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -11,7 +11,7 @@ source "$HERE/../tools/teach.sh" 2>/dev/null || true
 type say >/dev/null 2>&1 || { step(){ printf '\n== %s ==\n' "$*"; }; say(){ printf '>> %s\n' "$*"; }; run(){ printf '   $ %s\n' "$*"; "$@"; }; observe(){ printf '-> %s\n' "$*"; }; predict(){ printf '?? PREDICT FIRST: %s\n' "$*"; }; finding(){ printf '** FINDING: %s\n' "$*"; }; note(){ printf '   %s\n' "$*"; }; }
 
 SOCK="${SERIAL_SOCK:-/tmp/plc-serial}"
-[ -S "$SOCK" ] || { echo "No serial socket at $SOCK — boot the SECURE twin first:  ./qemu/run.sh secure"; exit 1; }
+[ -S "$SOCK" ] || { echo "No serial socket at $SOCK — boot the SECURE twin first:  RESTART=1 ./qemu/run.sh secure"; exit 1; }
 
 step "Re-run the Part 6-8 attacks on the SECURE build (Part 9)"
 say  "This drives the LIVE console and HTTP services (it does not read a banner or grep"

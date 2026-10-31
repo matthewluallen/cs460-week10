@@ -46,7 +46,7 @@ the secure profile, then replay the earlier parts' attacks and watch each one be
 
 ```bash
 ./qemu/build-twin.sh secure      # compile + package the hardened 8MB image
-./qemu/run.sh secure             # boot it, leave it running
+RESTART=1 ./qemu/run.sh secure   # swap your running twin for it, leave it running
 ./remediation/verify-secure.sh   # re-run Part 6-8 attacks; each should be REFUSED
 ```
 

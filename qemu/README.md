@@ -24,6 +24,20 @@ single-client serial socket would connect but get nothing — the "stuck console
 now owns the one serial connection and fans it out, so that can't happen.) You only need
 `./qemu/run.sh` directly to boot a *different* profile (`secure`, `malicious`) by itself.
 
+**Already running? Nothing is booted twice.** `studio.sh`, `run.sh` and
+`assessment/verify-lab.py --boot-twin` all check first. A twin counts as running when its
+`qemu-system-xtensa` process is alive on the console socket **and** QEMU's control (QMP) socket
+reports it running — a socket file left by a crashed twin does not count, and is cleared on the
+next boot. If the running twin is the build you asked for (or you did not name one) it is reused;
+if you named a different build you are told how to switch:
+
+```bash
+./qemu/twin-status.sh            # RUNNING / STARTING / ORPHANED / STOPPED, and which build
+RESTART=1 ./qemu/run.sh secure   # replace the running twin (an open Studio tab reconnects)
+./qemu/twin-status.sh stop       # stop the twin and its Studio server
+./qemu/test-twin-status.sh       # regression test for all of the above (also runs in CI)
+```
+
 > **On an Apple-Silicon Mac?** There's no native-macOS twin — the patched QEMU is built
 > for Linux only (the release ships `qemu-twin-linux-x86_64` and `-linux-arm64`; stock
 > Homebrew `qemu-system-xtensa` can't model the StampLC's I²C / LCD / W5500, so it stalls
@@ -40,13 +54,14 @@ part annotated, and when you run it, it prints the exact command before executin
 
 | Run this | Instead of typing | Used in |
 |---|---|---|
-| `./qemu/run.sh` | the full `qemu-system-xtensa …` line (knobs: `ICOUNT`, `FLASH_IMG`, `W5_BIND`, `ALLOW_REBOOT`) | 6, 7 |
+| `./qemu/run.sh` | the full `qemu-system-xtensa …` line (knobs: `ICOUNT`, `FLASH_IMG`, `W5_BIND`, `ALLOW_REBOOT`, `RESTART`); reuses a twin that is already running | 6, 7 |
+| `./qemu/twin-status.sh [stop]` | `pgrep -f qemu-system-xtensa` + a QMP `query-status`, and the image on its command line | all |
 | `./qemu/console.sh` | attaches the `plc>` console via the bridge (`nc 127.0.0.1 8081`), so it coexists with the Studio; falls back to `nc -U /tmp/plc-serial` if no bridge is up | 6, 7 |
 | `./qemu/ota-push.sh [file]` | `curl -s -X POST --data-binary @file http://127.0.0.1:80/api/upload` | 6 |
 | `./qemu/relay.sh [name]` | `curl -s …:8080/api/points \| grep -o '"n":"relay0"[^}]*'` | 6, 7 |
 | `./firmware-ota/show-bug.sh` | `grep -rn 'verify_firmware\|verified\|Update.begin' sbom/firmware/src/` | 6 |
 | `./supply-chain/diff-images.sh` | `ls -l` the two images + compute the byte delta | 7 |
-| `./supply-chain/run-malicious.sh` | `ICOUNT=off FLASH_IMG=…MALICIOUS.bin ./qemu/run.sh` | 7 |
+| `./supply-chain/run-malicious.sh` | `RESTART=1 ICOUNT=off FLASH_IMG=…MALICIOUS.bin ./qemu/run.sh` | 7 |
 | `./supply-chain/arm.sh` / `benign.sh` | `echo ARM > /tmp/c2_state` / `rm -f /tmp/c2_state` | 7 |
 
 ## Why the twin needs one capability (and not root)

@@ -141,7 +141,10 @@ For the firmware/attack parts you want the text console too. Open a second termi
 ```
 
 You do **not** need a separate `./qemu/run.sh` for the default build — `studio.sh` already
-booted it, and `console.sh` attaches to that same twin. (`run.sh` is only for booting a
+booted it, and `console.sh` attaches to that same twin. Both scripts **check first**: if your
+twin is already running they reuse it instead of booting a second one (`./qemu/twin-status.sh`
+shows what is running; `./qemu/twin-status.sh stop` stops it). To switch builds, prefix
+`RESTART=1`. (`run.sh` is only for booting a
 *different* profile — `secure` or `malicious` — directly, as shown below.) The console is the
 real USB console:
 `mode run`, `io`, `force`, `status`, `busstream on`, `btn a|b|c`, `cwe`, `proto`,
@@ -152,7 +155,7 @@ next to the vulnerable one and re-run the attacks:
 
 ```bash
 ./qemu/build-twin.sh secure    # compile + package the hardened image (once)
-./qemu/run.sh secure           # boot it; ./qemu/console.sh to drive it
+RESTART=1 ./qemu/run.sh secure # swap your running twin for it; ./qemu/console.sh to drive it
 ./remediation/verify-secure.sh # re-run the Part 6-8 attacks — each is now refused
 ```
 

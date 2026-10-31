@@ -45,6 +45,7 @@ case "$PROFILE" in
   *) echo "usage: ./qemu/run.sh [vuln|secure|malicious]   (or set FLASH_IMG=<path>)"; exit 2;;
 esac
 IMG="${FLASH_IMG:-$IMGDEF}"
+[ -f "$IMG" ] && IMG="$(cd "$(dirname "$IMG")" && pwd)/$(basename "$IMG")"   # absolute: compared with the running twin's
 QEMU="$BDIR/qemu-system-xtensa"
 if [ ! -x "$QEMU" ]; then
   echo "Twin not fetched yet (or wrong platform). Run:  ./qemu/fetch-qemu.sh"
@@ -83,7 +84,8 @@ if twin_detect "$SERIAL_SOCK" 15; then
     exit 0
   else
     echo "A different build is already running: $TWIN_WHICH (pid $TWIN_PID)."
-    echo "You asked for the $WHICH. Switch with:   RESTART=1 ./qemu/run.sh $PROFILE"
+    if [ -n "${FLASH_IMG:-}" ]; then SWITCH="RESTART=1 FLASH_IMG=$IMG ./qemu/run.sh"; else SWITCH="RESTART=1 ./qemu/run.sh $PROFILE"; fi
+    echo "You asked for the $WHICH. Switch with:   $SWITCH"
     echo "(or stop it first:  ./qemu/twin-status.sh stop )"
     exit 3
   fi
@@ -97,7 +99,7 @@ elif [ "$TWIN_STATE" = "starting" ] || [ "$TWIN_STATE" = "orphaned" ]; then
     exit 3
   else
     echo "A twin process (pid $TWIN_PID) is alive but its console socket $SERIAL_SOCK was deleted,"
-    echo "so nothing new can attach to it. Replace it with:   RESTART=1 ./qemu/run.sh $PROFILE"
+    echo "so nothing new can attach to it. Replace it with:   RESTART=1 ./qemu/run.sh${1:+ $1}"
     exit 3
   fi
 fi

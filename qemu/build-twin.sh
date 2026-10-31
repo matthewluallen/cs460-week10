@@ -6,7 +6,8 @@
 #   ./qemu/build-twin.sh secure     # -> qemu/twin/stamplc-secure-8MB.bin
 #   ./qemu/build-twin.sh vuln       # -> qemu/twin/stamplc-vuln-8MB.bin
 #
-# Then:  ./qemu/run.sh secure   (in one terminal)  and  ./qemu/console.sh  (in another)
+# Then:  RESTART=1 ./qemu/run.sh secure   (in one terminal)  and  ./qemu/console.sh  (in another)
+#        (RESTART=1 replaces a twin that is already running; without it run.sh reuses that twin)
 # The twin is your test bench — no hardware. The console you get is the SAME plc>
 # console you'd get over USB on the real StampLC; every command works identically.
 set -euo pipefail

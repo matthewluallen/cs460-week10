@@ -21,5 +21,7 @@ predict "Before it boots: will the switch fire on its own, or wait for a signal 
 observe "It stays dormant until the C2 reply flips to the trigger — detonation is in arm.sh, next."
 finding "Note that nothing you did INBOUND started this; the device beacons OUTBOUND on its own."
 note "Latched relay0 persists until you reboot the twin — stop this and re-run to reset cleanly."
-note "\$ ICOUNT=off FLASH_IMG=$IMG ./qemu/run.sh   # handing the terminal to the twin now"
-exec env ICOUNT=off FLASH_IMG="$IMG" ./qemu/run.sh
+note "RESTART=1 replaces the twin you already have running (if any) with the trojaned one;"
+note "an open Studio tab reconnects to it by itself. Your normal twin comes back with: RESTART=1 ./qemu/studio.sh vuln"
+note "\$ RESTART=1 ICOUNT=off FLASH_IMG=$IMG ./qemu/run.sh   # handing the terminal to the twin now"
+exec env RESTART=1 ICOUNT=off FLASH_IMG="$IMG" ./qemu/run.sh

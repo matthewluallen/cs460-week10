@@ -45,7 +45,7 @@ fi
 observe "A build label alone is not evidence of behavior - prove it by running it."
 if [ "$ENV" = "m5stamplc_secure" ]; then
   note "Next: run this profile in the twin, then re-run the attacks to watch them fail:"
-  note "  ./qemu/run.sh secure            # boot the secure profile (profile switch wired by the lead)"
+  note "  RESTART=1 ./qemu/run.sh secure  # swap your running twin for the secure profile"
   note "  ./remediation/verify-secure.sh  # re-run Part 6-8 attacks; each should be REFUSED"
   finding "Record the source commit, effective build profile, and artifact hash for this"
   finding "arm - then the runtime observations you get from ./qemu/run.sh secure."

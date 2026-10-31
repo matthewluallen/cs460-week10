@@ -97,6 +97,8 @@ jobs:
         run: ./qemu/fetch-qemu.sh
       - name: Verify lab parts on the twin
         run: python assessment/verify-lab.py --boot-twin P1 P3 P5 P6 P8
+      - name: Already-running twin is reused, not re-booted
+        run: ./qemu/test-twin-status.sh
 
   formal-verify:
     # Week 12 / Level 3: Z3 must prove every security control on the verified build. This is the
