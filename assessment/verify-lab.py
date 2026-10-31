@@ -15,7 +15,7 @@ Usage:
   ./qemu/run.sh                              # boot the twin (vulnerable) in one shell
   python assessment/verify-lab.py            # all applicable parts, in another shell
   python assessment/verify-lab.py P5         # one or more parts: P1 P3 P5 ...
-  python assessment/verify-lab.py --boot-twin           # boot the twin myself, then verify
+  python assessment/verify-lab.py --boot-twin           # boot a twin if none is running, then verify
   ./qemu/run.sh secure ; python assessment/verify-lab.py P9     # Part 9 needs the secure build
   SERIAL_PORT=/dev/ttyACM0 OTA_HOST=10.0.0.5:80 HMI_HOST=10.0.0.5:8080 \
       python assessment/verify-lab.py        # physical board over USB + Ethernet
@@ -37,6 +37,36 @@ HMI_HOST  = os.environ.get("HMI_HOST", "127.0.0.1:8080")
 NTP_HOST  = os.environ.get("NTP_HOST", "127.0.0.1")
 NTP_PORT  = os.environ.get("NTP_PORT", "12345")
 
+BRIDGE_CON = int(os.environ.get("BRIDGE_CONSOLE_PORT", "8081"))
+
+def _pgrep(pattern):
+    try:
+        return subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True).stdout.split()
+    except FileNotFoundError:
+        return []
+
+def bridge_holds_console():
+    """True when ./qemu/studio.sh's bridge is attached to this twin and its console port answers."""
+    if not _pgrep(f"twin-bridge.py.*--serial {SERIAL}"):
+        return False
+    try:
+        socket.create_connection(("127.0.0.1", BRIDGE_CON), timeout=1).close()
+        return True
+    except OSError:
+        return False
+
+def twin_already_running():
+    """Same rule as qemu/twin-status.sh: a live qemu process on THIS socket AND the socket answers."""
+    if not _pgrep(f"qemu-system-xtensa.*unix:{SERIAL},server"):
+        return False
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(1.5)
+    try:
+        s.connect(SERIAL); return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
 # ------------------------------------------------------------------ transport
 class Console:
     """A line console over either a Unix socket (twin) or a serial port (physical)."""
@@ -52,11 +82,18 @@ class Console:
             except ImportError:
                 sys.exit("SERIAL_PORT set but pyserial is missing — pip install pyserial")
             self._ser = serial.Serial(SERPORT, BAUD, timeout=0)
+        elif bridge_holds_console():
+            # ./qemu/studio.sh is running: its bridge owns the twin's ONE console connection,
+            # so a second direct client would sit unanswered. Attach through the bridge instead.
+            self.kind = "bridge"
+            s = socket.create_connection(("127.0.0.1", BRIDGE_CON), timeout=5)
+            s.setblocking(False)
+            self._sock = s
         else:
             t0 = time.time()
             while not os.path.exists(SERIAL):
                 if time.time() - t0 > 30:
-                    sys.exit(f"twin serial socket never appeared: {SERIAL} — is ./qemu/run.sh running?")
+                    sys.exit(f"twin serial socket never appeared: {SERIAL} — start it: ./qemu/studio.sh")
                 time.sleep(0.2)
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             s.connect(SERIAL); s.setblocking(False)
@@ -89,7 +126,9 @@ class Console:
         self.send(line); return self.drain(wait)
 
     def label(self):
-        return f"physical StampLC ({SERPORT})" if self.kind == "serial" else f"twin ({SERIAL})"
+        if self.kind == "serial": return f"physical StampLC ({SERPORT})"
+        if self.kind == "bridge": return f"twin ({SERIAL}, via the Studio bridge on :{BRIDGE_CON})"
+        return f"twin ({SERIAL})"
 
     def close(self):
         try:
@@ -287,7 +326,8 @@ def boot_twin():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("parts", nargs="*", help="e.g. P1 P3 P5 (default: P1–P8)")
-    ap.add_argument("--boot-twin", action="store_true", help="boot the QEMU twin, verify, tear it down")
+    ap.add_argument("--boot-twin", action="store_true",
+                    help="boot the QEMU twin if none is already running, verify, and tear down only a twin it booted")
     args = ap.parse_args()
     want = [p.upper() for p in args.parts] or list(DEFAULT)
     bad = [p for p in want if p not in CHECKS]
@@ -295,7 +335,12 @@ def main():
 
     proc = img = None
     if args.boot_twin:
-        proc, img = boot_twin()
+        if SERPORT:
+            print("  note: SERIAL_PORT is set (physical board) — --boot-twin ignored", flush=True)
+        elif twin_already_running():
+            print(f"  twin already running on {SERIAL} — reusing it (not booting a second one)", flush=True)
+        else:
+            proc, img = boot_twin()
 
     c = Console()
     needs_device = any(CHECKS[p][1] for p in want)

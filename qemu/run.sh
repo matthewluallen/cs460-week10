@@ -17,6 +17,8 @@
 #   ALLOW_REBOOT=1     drop -no-reboot so ESP.restart() actually reboots
 #                      (watch the OTA-flashed image boot); default keeps -no-reboot
 #   SERIAL_SOCK / QMP_SOCK   unix socket paths (defaults /tmp/plc-serial, /tmp/plc-qmp)
+#   RESTART=1          stop an already-running twin on SERIAL_SOCK and boot fresh
+#                      (without it, a twin that is already running is reused, not rebooted)
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -56,6 +58,39 @@ if [ ! -f "$IMG" ]; then
   esac
   exit 1
 fi
+SERIAL_SOCK="${SERIAL_SOCK:-/tmp/plc-serial}"; QMP_SOCK="${QMP_SOCK:-/tmp/plc-qmp}"
+
+# ── already running? then there is nothing to boot ──────────────────────────
+# A twin counts as running only if its qemu process is alive AND its console socket
+# answers (a leftover socket file from a crashed twin does not count). See twin-status.sh.
+#   no profile given           → reuse whatever twin is running
+#   profile/FLASH_IMG given    → reuse it if it is that build; otherwise say how to switch
+#   RESTART=1                  → stop the running twin and boot fresh
+# shellcheck source=twin-status.sh
+. "$HERE/twin-status.sh"
+EXPLICIT=0; { [ $# -ge 1 ] || [ -n "${FLASH_IMG:-}" ]; } && EXPLICIT=1
+if twin_detect "$SERIAL_SOCK" 15; then
+  if [ "${RESTART:-0}" = "1" ]; then
+    echo "RESTART=1: stopping the running twin (pid $TWIN_PID, $TWIN_WHICH)…"
+    twin_stop "$SERIAL_SOCK"
+  elif [ "$EXPLICIT" = "0" ] || [ "$TWIN_IMG" = "$IMG" ]; then
+    echo "twin already running — not booting a second one."
+    echo "      pid $TWIN_PID · $TWIN_WHICH · console $SERIAL_SOCK"
+    echo "      drive it:      ./qemu/studio.sh  (browser Studio)   or   ./qemu/console.sh  (plc> text console)"
+    echo "      other build:   RESTART=1 ./qemu/run.sh secure|malicious|vuln     stop it: ./qemu/twin-status.sh stop"
+    exit 0
+  else
+    echo "A different build is already running: $TWIN_WHICH (pid $TWIN_PID)."
+    echo "You asked for the $WHICH. Switch with:   RESTART=1 ./qemu/run.sh $PROFILE"
+    echo "(or stop it first:  ./qemu/twin-status.sh stop )"
+    exit 3
+  fi
+elif [ "$TWIN_STATE" = "starting" ]; then
+  echo "A twin (pid $TWIN_PID) is still booting and its console has not answered yet."
+  echo "Wait a few seconds and re-run, or check it with ./qemu/twin-status.sh (stop: ./qemu/twin-status.sh stop)."
+  exit 3
+fi
+
 echo "booting the $WHICH:  $(basename "$IMG")"
 
 # ── virtual-clock throttle ──
@@ -70,9 +105,8 @@ esac
 REBOOT_ARGS=(-no-reboot)
 [ "${ALLOW_REBOOT:-0}" = "1" ] && REBOOT_ARGS=()
 
-SERIAL_SOCK="${SERIAL_SOCK:-/tmp/plc-serial}"; QMP_SOCK="${QMP_SOCK:-/tmp/plc-qmp}"
 W5_BIND="${W5_BIND:-127.0.0.1}"
-rm -f "$SERIAL_SOCK" "$QMP_SOCK"
+rm -f "$SERIAL_SOCK" "$QMP_SOCK"     # only stale sockets reach here (a live twin exited above)
 
 # ── least privilege: let the UNPRIVILEGED emulator bind the OTA port (80) ──
 # The W5500 bridge binds the guest's listen ports on the host; 80 is a privileged
