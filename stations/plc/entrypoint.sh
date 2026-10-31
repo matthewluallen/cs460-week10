@@ -11,4 +11,14 @@ fi
 export W5_BIND=0.0.0.0          # expose Modbus :502 + HTTP :80 on the plant network
 export SERIAL_SOCK=/tmp/plc-serial
 echo "[plc] booting the twin (${PROFILE:-vuln}) + bridge; Modbus :502, HTTP :80, Studio :8080 on $(hostname -i)"
+# Once the console answers, point the controller at the phone broker (mqtt station) so phone
+# sensors arrive as NETWORK points. Firmware without the `mqtt` command just prints "? type 'help'".
+MQTT_BROKER="${MQTT_BROKER:-10.20.30.40}"
+( for _ in $(seq 1 90); do
+    (printf 'status\n'; sleep 2) | timeout 4 nc 127.0.0.1 8081 2>/dev/null | grep -q 'MODE=' && break
+    sleep 2
+  done
+  echo "[plc] mqtt connect $MQTT_BROKER"
+  (printf 'mqtt connect %s\n' "$MQTT_BROKER"; sleep 3) | timeout 6 nc 127.0.0.1 8081 2>/dev/null | tr -d '\r' | grep -m1 -i 'mqtt' || true
+) &
 exec ./qemu/studio.sh "${PROFILE:-vuln}"

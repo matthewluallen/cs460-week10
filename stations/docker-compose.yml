@@ -7,7 +7,9 @@
 #   plc       10.20.30.10   the controller — the QEMU twin + bridge (Modbus :502, HTTP :80, Studio :8080)
 #   hmi       10.20.30.20   a SCADA HMI that polls the controller over Modbus (dashboard :8800)
 #   engineer  10.20.30.30   an engineering/attacker workstation — a Modbus master
+#   mqtt      10.20.30.40   the phone broker + sensor page (MQTT :1883, phone page / MQTT-over-WS :8090)
 #   capture                 a passive sniffer (Wireshark/tshark) watching the plant network
+#                           (Modbus :502, DNP3 :20000, MQTT :1883, phone MQTT-over-WS :8090)
 #
 # First (once, in the repo root, so the twin is present for the mounted plc station):
 #   ./qemu/fetch-qemu.sh
@@ -84,8 +86,9 @@ services:
     ports:
       - "8090:8090"              # the phone sensor page + QR + MQTT-over-WebSocket (make PUBLIC)
       - "1883:1883"              # MQTT/TCP — the twin (plc) subscribes here
-    # Phones reach :8090 over the Codespace public forward and publish their sensors; the
-    # StampLC twin subscribes to phone/+/… at 10.20.30.40:1883 and maps chosen topics to %IW.
+    # Phones reach :8090 over the Codespace public forward and publish their sensors; the plc
+    # station's entrypoint runs `mqtt connect 10.20.30.40` once the twin is up, so the controller
+    # subscribes to phone/+/… here and maps them to NETWORK points (never to the IN1–IN8 terminals).
 
   capture:
     build:
