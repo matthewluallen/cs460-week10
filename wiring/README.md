@@ -1,15 +1,52 @@
-# Part 5 — Run it remotely
+# Part 5 — Wire & run: one input → your logic → one output
 
-Your ladder logic (Part 4) drives one input → one output on a real StampLC. **The bench is
-pre‑wired by your instructor** — you don't build anything. You operate it **remotely**
-through the class front end (URL + your team code, handed out in class), and you never join
-the lab network.
+Your ladder logic (Part 4) drives one input → one output. **The canonical path is your own
+twin**: boot it, drive the input, and read the output back — no bench, no team code, the same
+`plc>` console and `io` readback you'd get over USB on real hardware. An instructor-run
+**Team Console** (a shared classroom bench) is an optional alternative, documented further down.
 
-> Students: skip to **"Run it"** below. The wiring section is the instructor's bench‑setup
-> reference for how the pre‑wired rig is put together — it's here so you understand what
-> you're driving, not something you assemble.
+> Students: run it on your own twin (next section). The in-room wiring and Team Console
+> sections below are the instructor's reference for the optional shared rig — there so you
+> understand what you're driving, not something you assemble.
 
-## The signal chain
+## Run it on your own twin (canonical)
+
+No bench and no team code — each student drives their own twin, which boots the real firmware:
+
+```bash
+./qemu/run.sh        # boot your twin (leave it running)
+./qemu/console.sh    # the plc> console, in another shell
+```
+
+Apply your Part‑4 program, then assert the input and read the output back:
+
+```
+mode run
+force di0 1          # assert DI0 (the input your rung reads); 'force di0 0' clears it
+io                   # read the output image back
+```
+
+```
+DI : 1 0 0 0 0 0 0 0
+RELAY cmd/act : 1/1 0/0 0/0 0/0
+```
+
+`RELAY cmd/act : 1/1` for relay0 is your evidence — the logic **commanded** the coil on
+(`cmd=1`) and the device reports it **actually** on (`act=1`). Prefer that readback over "the
+light looks on." You can also drive it visually in **Logic Studio** (`./qemu/studio.sh`). The
+machine-checkable anchor is `python assessment/verify-lab.py P5`, which forces the input and
+asserts the relay on the running target — the **same check passes on a physical StampLC**.
+
+---
+
+## Optional: the Team Console (shared classroom bench)
+
+The rest of this page is the **optional** in-class path: an instructor pre-wires one bench per
+team and students drive it remotely through a team-gated front end. The input→logic→output
+result is the same as the twin above; the difference is a shared physical rig instead of your
+own twin.
+
+### The signal chain
 
 ```
    YOU (remote)                          LAB BENCH (your team's StampLC)
@@ -29,7 +66,7 @@ the lab network.
 - **Output** — **relay0** switches a **SnapCircuits LED**. You also read the relay's state
   back over Modbus, so the front end can show "output: on/off" even without eyes on the bench.
 
-## In-room wiring (what the bench looks like)
+### In-room wiring (what the bench looks like)
 
 - **Output:** StampLC **relay0** terminal → SnapCircuits LED (through its resistor/lamp
   block). When your logic sets relay0, the LED lights.
@@ -50,7 +87,7 @@ the lab network.
 > are *labels you can give a relay inside a PLC program* — they aren't the relay's name. Part 4
 > drives **relay0**.
 
-## Run it
+### Run it
 
 1. Open the front end, enter your **team code**.
 2. **Apply** your program from Part 4.
@@ -93,7 +130,7 @@ the lab network.
 > run the front end yourself (dev/offline, mock mode), serve the browser tools with
 > `./tools/serve-web.sh` and open `index.html` (the Team Console).
 
-## One security beat to notice
+### One security beat to notice
 
 The front end asks for a code; the **device itself does not**. The same Modbus coil / `force`
 path your trigger uses has **no authentication** — which is the point of the E‑stop comment in

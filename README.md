@@ -54,6 +54,18 @@ bridges it to your twin, so the connection is same-origin — nothing to configu
 > (USB needs the device on the machine running the browser, so this path doesn't work from a
 > cloud Codespace — use the twin there. Every step is validated identically on real silicon.)
 
+### Extensions (Weeks 10–11)
+
+Three short extensions deepen the core parts above. Do each after the part it builds on; they
+are graded the same way and their objectives + MITRE/CWE mapping are in
+[`assessment/objectives.md`](assessment/objectives.md).
+
+| Ext | Builds on | What you do | Where |
+|---|---|---|---|
+| **E1 — Provenance Studio** | 1 · 5 · 9 | Match a live `/api/log` event to the firmware **source line + CWE**, and spot the **provenance gap** — an output change with no WRITE/FORCE row (the signature of an unaudited, memory-corruption write) | [`web/public/provenance_studio.html`](web/public/provenance_studio.html) |
+| **E2 — Signal Journey** | 1 · 4 · 5 · 7 | Follow one byte across five lenses — Wireshark → sigrok → firmware source → ladder → relay — and say what each lens can and cannot show | [`web/public/signal_journey.html`](web/public/signal_journey.html) |
+| **E3 — Phone-as-sensor false-data injection** | 5 · 8 | Withhold a sensor the PLC trusts (availability) and spoof its value (integrity), then build a plausibility gate that still passes the real reading | [`docs/assignment-phone-sensor-fdi.html`](docs/assignment-phone-sensor-fdi.html) |
+
 ## Browser tools (served from `web/public/`)
 
 Several parts use small browser apps that run straight from this repo — no build step, no
