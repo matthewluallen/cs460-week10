@@ -11,7 +11,7 @@ Starts (or reuses) the twin + Studio server with ./qemu/studio.sh, then checks:
     force flag — and refuses a foreign Origin.
 Leaves the twin and server running (stop: ./qemu/twin-status.sh stop). Exit 0 iff all pass.
 """
-import base64, http.client, os, socket, subprocess, sys, time
+import base64, http.client, os, re, socket, subprocess, sys, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PORT = int(os.environ.get("BRIDGE_PORT", "8080"))
@@ -67,6 +67,13 @@ def main():
     else:
         print("Studio server never came up — see /tmp/test-bridge-studio.log"); return 1
 
+    # the twin's own Modbus service comes up a few seconds after the console; wait for a good read
+    for _ in range(60):
+        try:
+            if '"ok": true' in req("GET", "/modbus?fc=3&addr=0&count=1")[2]: break
+        except OSError: pass
+        time.sleep(0.5)
+
     ss = subprocess.run(["ss", "-ltnH", "sport = :%d" % PORT], capture_output=True, text=True).stdout
     check("127.0.0.1:%d" % PORT in ss and "0.0.0.0:%d" % PORT not in ss and "*:%d" % PORT not in ss,
           "listens on localhost only", " ".join(ss.split()[3:4]) or ss.strip())
@@ -76,7 +83,7 @@ def main():
     st, _, _ = req("POST", "/modbus?fc=5&addr=3&value=1", origin=EVIL)
     check(st == 403, "Modbus write from another site's page refused", "HTTP %d" % st)
     st, _, body = req("POST", "/modbus?fc=5&addr=3&value=0", origin=SELF)
-    check(st == 200 and '"ok": true' in body, "Modbus write from the Studio's own page accepted", "HTTP %d" % st)
+    check(st == 200 and '"ok": true' in body, "Modbus write from the Studio's own page accepted", "HTTP %d %s" % (st, body[:90]))
     st, hdrs, _ = req("GET", "/modbus?fc=3&addr=0&count=2")
     check(st == 200 and "access-control-allow-origin" not in hdrs,
           "reads carry no Access-Control-Allow-Origin (other sites can't read values)", "HTTP %d" % st)
@@ -95,10 +102,15 @@ def main():
     st, _, body = req("POST", "/field?bit=2&v=1", origin=SELF)
     check(st == 200 and '"ok": true' in body and '"di": 4' in body, "/field sets IN3 (di2) at the expander", body[:80])
     time.sleep(1.5)
-    io = console("io")
-    di_line = next((l for l in io.splitlines() if l.startswith("DI")), "")
-    check(di_line.split(":")[-1].split()[2:3] == ["1"] and "F" not in di_line,
-          "`io` shows DI2 = 1 with no force flag (it came over the I2C bus)", di_line.strip())
+    io = ""
+    for _ in range(3):
+        io = console("io")
+        if re.search(r"DI\s*:", io): break
+    m = re.search(r"DI\s*:\s*([0-9F ]+)", io)
+    bits = m.group(1).split() if m else []
+    check(bits[2:3] == ["1"] and "F" not in m.group(1),
+          "`io` shows DI2 = 1 with no force flag (it came over the I2C bus)",
+          ("DI : " + " ".join(bits)) if m else "no DI line: %r" % io[:120])
     st, _, body = req("POST", "/field?di=0", origin=SELF)
     check(st == 200 and '"di": 0' in body, "/field restores the input byte", body[:60])
 
