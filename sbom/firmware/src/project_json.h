@@ -108,14 +108,14 @@ inline const char* decode(const uint8_t* data, size_t size, Definition& out) {
     for (unsigned i = 0; i < plc::NDI; ++i) { if (!di[i].is<uint8_t>()) return "digital input type"; staged.digital_inputs[i] = di[i]; }
     for (unsigned i = 0; i < plc::NQ; ++i) { if (!outputs[i].is<uint8_t>()) return "digital output type"; staged.digital_outputs[i] = outputs[i]; }
     for (unsigned i = 0; i < plc::NIW; ++i) {
-        char source[18];
+        char source[25];
         if (!text(words[i], source)) return "word source type";
         if (!strcmp(source, "parameter")) staged.word_inputs[i] = WordSource::Parameter;
         else if (!strcmp(source, "board_temperature")) staged.word_inputs[i] = WordSource::BoardTemperature;
         else if (!strcmp(source, "process1")) staged.word_inputs[i] = WordSource::Process1;
         else if (!strcmp(source, "process2")) staged.word_inputs[i] = WordSource::Process2;
         else if (!strcmp(source, "process3")) staged.word_inputs[i] = WordSource::Process3;
-        else return "unsupported word source";
+        else if (!phone_source_from_name(source, staged.word_inputs[i])) return "unsupported word source";
         if (!parameters[i].is<int32_t>()) return "parameter int32 required";
         staged.parameters[i] = parameters[i];
     }

@@ -15,7 +15,31 @@ constexpr unsigned InstructionCapacity = 32, TagCapacity = 24;
 constexpr unsigned HardwareOutputs = 7; // base0..3, expansion mechanical4, SSR0=5, SSR1=6
 constexpr uint32_t ScanMs = 50;
 enum class Space : uint8_t { IX, QX, MX, IW };
-enum class WordSource : uint8_t { Parameter, BoardTemperature, Process1, Process2, Process3 };
+enum class WordSource : uint8_t { Parameter, BoardTemperature, Process1, Process2, Process3, PhoneFirst };
+// Network-only phone points (point_map.json phone_points). Each point i offers two
+// sources: PhoneFirst+2i = its value ("phone_<name>") and PhoneFirst+2i+1 = its fresh
+// flag ("phone_<name>_fresh", 1 while a sample arrived within PHONE_STALE_MS). They
+// never touch the physical input image, never block RUN and never raise a fault:
+// handling a stale or spoofed phone is the ladder's job (that is the lesson).
+constexpr unsigned PhoneSourceCount = 2 * pointmap::PHONE_POINT_COUNT;
+constexpr unsigned WordSourceCount = unsigned(WordSource::PhoneFirst) + PhoneSourceCount;
+static_assert(WordSourceCount <= 255, "WordSource is stored in one byte");
+inline bool is_process_source(WordSource s) { return s >= WordSource::Process1 && s <= WordSource::Process3; }
+inline bool is_phone_source(WordSource s) { return unsigned(s) >= unsigned(WordSource::PhoneFirst) && unsigned(s) < WordSourceCount; }
+inline unsigned phone_slot(WordSource s) { return unsigned(s) - unsigned(WordSource::PhoneFirst); }
+// "phone_<name>" or "phone_<name>_fresh" -> source; false when unknown.
+inline bool phone_source_from_name(const char* text, WordSource& out) {
+    if (!text || strncmp(text, "phone_", 6)) return false;
+    const char* rest = text + 6;
+    for (unsigned i = 0; i < pointmap::PHONE_POINT_COUNT; ++i) {
+        const char* name = pointmap::PHONE_POINTS[i].name;
+        const size_t n = strlen(name);
+        if (strncmp(rest, name, n)) continue;
+        if (!rest[n]) { out = WordSource(unsigned(WordSource::PhoneFirst) + 2 * i); return true; }
+        if (!strcmp(rest + n, "_fresh")) { out = WordSource(unsigned(WordSource::PhoneFirst) + 2 * i + 1); return true; }
+    }
+    return false;
+}
 enum class Status : uint8_t { Unconfigured, Invalid, Ready };
 
 struct Tag {
@@ -109,8 +133,8 @@ inline const char* validate(const Definition& d) {
     }
     if (!bindings::valid(d.process_bindings)) return "invalid process_bindings";
     for (auto source : d.word_inputs) {
-        if (unsigned(source) > unsigned(WordSource::Process3)) return "unsupported word source";
-        if (source >= WordSource::Process1 && !d.process_bindings.inputs[unsigned(source) - unsigned(WordSource::Process1)].configured)
+        if (unsigned(source) >= WordSourceCount) return "unsupported word source";
+        if (is_process_source(source) && !d.process_bindings.inputs[unsigned(source) - unsigned(WordSource::Process1)].configured)
             return "word source requires an explicit configured process binding";
     }
     if ((outputs & 0x70) && !d.io_expansion) return "expansion output requires io_expansion identity";
@@ -154,13 +178,18 @@ struct Active {
 inline const char* status_name(Status status) {
     return status == Status::Ready ? "ready" : status == Status::Invalid ? "invalid_project" : "unconfigured";
 }
+// phone_words: PhoneSourceCount entries (value, fresh) per phone point, or nullptr (all 0).
 inline void inputs(const Definition& d, plc::Engine& engine, const bool physical[plc::NDI],
-                   int32_t board_temperature, const int32_t parameters[plc::NIW], const int32_t* process_values = nullptr) {
+                   int32_t board_temperature, const int32_t parameters[plc::NIW], const int32_t* process_values = nullptr,
+                   const int32_t* phone_words = nullptr) {
     for (unsigned i = 0; i < plc::NDI; ++i) engine.set_input(i, physical[d.digital_inputs[i]]);
     for (unsigned i = 0; i < plc::NIW; ++i) {
         const auto source = d.word_inputs[i];
-        const int32_t value = source == WordSource::Parameter ? parameters[i] : source == WordSource::BoardTemperature ? board_temperature :
-            process_values ? process_values[unsigned(source) - unsigned(WordSource::Process1)] : 0;
+        int32_t value = 0;
+        if (source == WordSource::Parameter) value = parameters[i];
+        else if (source == WordSource::BoardTemperature) value = board_temperature;
+        else if (is_process_source(source)) value = process_values ? process_values[unsigned(source) - unsigned(WordSource::Process1)] : 0;
+        else if (is_phone_source(source)) value = phone_words ? phone_words[phone_slot(source)] : 0;
         engine.set_analog(i, value);
     }
     // All MX is application state. No process command or first-scan assignments.
@@ -171,7 +200,7 @@ inline void outputs(const Definition& d, const plc::Engine& engine, bool enabled
 }
 inline uint8_t process_mask(const Definition& d) {
     uint8_t mask = 0;
-    for (auto source : d.word_inputs) if (source >= WordSource::Process1 && source <= WordSource::Process3)
+    for (auto source : d.word_inputs) if (is_process_source(source))
         mask |= 1u << (unsigned(source) - unsigned(WordSource::Process1));
     return mask;
 }

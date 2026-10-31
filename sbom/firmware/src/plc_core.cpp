@@ -452,7 +452,14 @@ static void core_scan(execution::Origin origin) {
         physical_inputs[i] = plc_di_is_forced(i) ? plc_di_forced_val(i) : digital[i];
         modbus_server.set_coil(pointmap::DI_MIRROR_BASE + i, physical_inputs[i]);
     }
-    plc_project_inputs(physical_inputs, s_tempx10);
+    // Network-only phone points (MQTT): one snapshot per scan, never the physical image.
+    // The project reads them only through explicit phone_* word sources; the Modbus
+    // mirror (registers 140-165) is refreshed here so readers see the scan's values.
+    const uint32_t phone_now = millis();
+    int32_t phone_words[phone::WordCount];
+    mqtt_sensors_words(phone_words, phone_now);
+    mqtt_sensors_publish_registers(phone_now);
+    plc_project_inputs(physical_inputs, s_tempx10, phone_words);
     // Every selected process source comes from this project's embedded bindings.
 
     // Fixed-size local evidence; publish only after all final output handling.
@@ -467,20 +474,8 @@ static void core_scan(execution::Origin origin) {
     evidence.mode_at_solve=s_mode;
     evidence.di_force_mask=s_di_force_en;evidence.coil_force_mask=s_coil_force_en;
     for(int i=0;i<8;++i){if(digital[i])evidence.raw_di|=1<<i;if(g_engine.input(i))evidence.input_di|=1<<i;}
-    // Phone-sensor bridge (MQTT): a subscribed phone's live light/motion/tilt override
-    // the free process-role input words %IW1..3 (and mirror to regs 50..52 for the HMI),
-    // so ladder logic can react to a phone. Aged-out when the phone stops publishing.
-    if (mqtt_sensors_fresh()) {
-        g_engine.set_analog(1, mqtt_sensors_light_x1());        // %IW1 = light (lux)
-        g_engine.set_analog(2, mqtt_sensors_accel_mag_x100());  // %IW2 = |accel|*100
-        g_engine.set_analog(3, mqtt_sensors_tilt_beta());       // %IW3 = tilt beta
-        modbus_server.set_register(50, (uint16_t)mqtt_sensors_light_x1());
-        modbus_server.set_register(51, (uint16_t)mqtt_sensors_accel_mag_x100());
-        modbus_server.set_register(52, (uint16_t)mqtt_sensors_tilt_beta());
-    }
-    // Phone-as-input: a subscribed phone's momentary buttons OR into %IX6 / %IX7.
-    if (mqtt_sensors_btn(1)) { g_engine.set_input(6, true); modbus_server.set_coil(pointmap::DI_MIRROR_BASE + 6, true); }
-    if (mqtt_sensors_btn(2)) { g_engine.set_input(7, true); modbus_server.set_coil(pointmap::DI_MIRROR_BASE + 7, true); }
+    // The phone no longer writes %IX6/%IX7, the DI mirror coils or %IW1..3: IN1-IN8 are
+    // only ever the field wiring (plus audited forces). See mqtt_sensors.h.
     for(int i=0;i<plc::NIW;++i)evidence.analog[i]=g_engine.analog(i);
     { PlcBindingsSnapshot binding;plc_bindings_capture(binding);
       evidence.binding_generation=binding.generation;

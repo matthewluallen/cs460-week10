@@ -2,12 +2,12 @@
 #pragma once
 #include <stdint.h>
 namespace pointmap {
-constexpr uint16_t VERSION = 4;
-constexpr char SHA256[] = "402a896362ad6614b6580b3a8c3a1b07947ab768909ddb5d88908739fb7f2252";
+constexpr uint16_t VERSION = 5;
+constexpr char SHA256[] = "4f2aba795c03c069150aa7980526a2b2173ab6280997478c1345d1954707e86b";
 constexpr uint16_t DIGEST_BASE = 43;
 constexpr uint16_t DI_MIRROR_BASE = 100;
 constexpr int VM_WORD_COUNT = 8;
-constexpr uint16_t DIGEST_WORDS[] = {0x402a,0x8963,0x62ad,0x6614,0xb658,0x0b3a,0x8c3a,0x1b07,0x947a,0xb768,0x909d,0xdb5d,0x8890,0x8739,0xfb7f,0x2252};
+constexpr uint16_t DIGEST_WORDS[] = {0x4f2a,0xba79,0x5c03,0xc069,0x150a,0xa798,0x0526,0xa2b2,0x173a,0xb628,0x0997,0x478c,0x1345,0xd195,0x4707,0xe86b};
 constexpr uint16_t EXPANSION_RELAY = 0;
 constexpr uint16_t RELAY0 = 1;
 constexpr uint16_t RELAY1 = 2;
@@ -48,6 +48,32 @@ constexpr uint16_t DEVICE_MAC_WORD2 = 42;
 constexpr uint16_t TAG_CONFLICT_COUNT = 27;
 constexpr uint16_t TAG_CONFLICT_KEY = 28;
 constexpr uint16_t TAG_CONFLICT_SRC = 29;
+constexpr uint16_t PHONE_LIGHT_LUX = 140;
+constexpr uint16_t PHONE_ACCEL_X100 = 141;
+constexpr uint16_t PHONE_GYRO_A = 142;
+constexpr uint16_t PHONE_GYRO_B = 143;
+constexpr uint16_t PHONE_GYRO_G = 144;
+constexpr uint16_t PHONE_HEADING = 145;
+constexpr uint16_t PHONE_TILT_B = 146;
+constexpr uint16_t PHONE_TILT_G = 147;
+constexpr uint16_t PHONE_SOUND = 148;
+constexpr uint16_t PHONE_SPEED_X100 = 149;
+constexpr uint16_t PHONE_COURSE = 150;
+constexpr uint16_t PHONE_LAT_X1000_HI = 151;
+constexpr uint16_t PHONE_LAT_X1000_LO = 152;
+constexpr uint16_t PHONE_LON_X1000_HI = 153;
+constexpr uint16_t PHONE_LON_X1000_LO = 154;
+constexpr uint16_t PHONE_BATTERY = 155;
+constexpr uint16_t PHONE_CHARGING = 156;
+constexpr uint16_t PHONE_BTN1 = 157;
+constexpr uint16_t PHONE_BTN2 = 158;
+constexpr uint16_t PHONE_FRESH_LO = 159;
+constexpr uint16_t PHONE_FRESH_HI = 160;
+constexpr uint16_t PHONE_SEEN_LO = 161;
+constexpr uint16_t PHONE_SEEN_HI = 162;
+constexpr uint16_t PHONE_MSGS_ACCEPTED = 163;
+constexpr uint16_t PHONE_MSGS_REJECTED = 164;
+constexpr uint16_t PHONE_PINNED = 165;
 struct Metric { const char* name; uint16_t address; bool coil, signed_value; };
 constexpr Metric SPARKPLUG_METRICS[] = {
     {"DI/IN0",100,true,false},
@@ -95,4 +121,27 @@ constexpr ProcessFieldDef PROCESS_FIELDS[] = {
     {"object_centi_c","C",100,4},
     {"distance_mm","mm",1,5},
 };
+constexpr uint32_t PHONE_STALE_MS = 8000;
+enum class PhoneKind : uint8_t { Analog, Bool, Momentary };
+struct PhonePoint { const char* name; const char* topic; const char* key; int32_t scale; uint16_t reg; uint8_t words; bool signed_value; PhoneKind kind; const char* unit; };
+constexpr PhonePoint PHONE_POINTS[] = {
+    {"light_lux", "light", "lux", 1, 140, 1, false, PhoneKind::Analog, "lux"},
+    {"accel_x100", "accel", "mag", 100, 141, 1, false, PhoneKind::Analog, "m/s2_x100"},
+    {"gyro_a", "gyro", "alpha", 1, 142, 1, true, PhoneKind::Analog, "deg/s"},
+    {"gyro_b", "gyro", "beta", 1, 143, 1, true, PhoneKind::Analog, "deg/s"},
+    {"gyro_g", "gyro", "gamma", 1, 144, 1, true, PhoneKind::Analog, "deg/s"},
+    {"heading", "orient", "alpha", 1, 145, 1, false, PhoneKind::Analog, "deg"},
+    {"tilt_b", "orient", "beta", 1, 146, 1, true, PhoneKind::Analog, "deg"},
+    {"tilt_g", "orient", "gamma", 1, 147, 1, true, PhoneKind::Analog, "deg"},
+    {"sound", "sound", "level", 1, 148, 1, false, PhoneKind::Analog, "level_0_100"},
+    {"speed_x100", "geo", "spd", 100, 149, 1, false, PhoneKind::Analog, "m/s_x100"},
+    {"course", "geo", "hdg", 1, 150, 1, false, PhoneKind::Analog, "deg"},
+    {"lat_x1000", "geo", "lat", 1000, 151, 2, true, PhoneKind::Analog, "deg_x1000"},
+    {"lon_x1000", "geo", "lon", 1000, 153, 2, true, PhoneKind::Analog, "deg_x1000"},
+    {"battery", "battery", "level", 1, 155, 1, false, PhoneKind::Analog, "percent"},
+    {"charging", "battery", "charging", 1, 156, 1, false, PhoneKind::Bool, "bool"},
+    {"btn1", "btn1", "v", 1, 157, 1, false, PhoneKind::Momentary, "bool"},
+    {"btn2", "btn2", "v", 1, 158, 1, false, PhoneKind::Momentary, "bool"},
+};
+constexpr unsigned PHONE_POINT_COUNT = 17;
 } // namespace pointmap

@@ -5,6 +5,7 @@
 #include "svc_config.h"
 #include "mqtt_sparkplug.h"
 #include "mqtt_sensors.h"
+#include "mqtt_runtime.h"
 #include "port_c.h"
 #include "eth_net.h"
 #include <WiFi.h>
@@ -95,6 +96,8 @@ bool console_telemetry_muted() {
     return acquisition_record_busy() || diagnostic_log_console_busy() || runtime_busy() || display_capture_console_busy() || s_quiet || (s_last_input_ms != 0 && (uint32_t)(millis() - s_last_input_ms) < 4000);
 }
 
+static char s_mqtt_broker[64] = "";   // last `mqtt connect` host, for `mqtt status`
+
 static int32_t tag_value(const TagDef* t) { return plc_tag_value(t); }
 
 static void print_point(const TagDef* t) {
@@ -150,7 +153,8 @@ static void cmd_help() {
     Serial.println(F("  logs exercise 1..32 generate marked task logs (PROGRAM only)"));
     Serial.println(F("  mon <tag> [n]        stream a point n times (default 10)"));
     Serial.println(F("  cwe                  embedded weaknesses & service ports"));
-    Serial.println(F("  mqtt connect <host>  subscribe phone sensors -> %IW1..3 (mqtt status to read)"));
+    Serial.println(F("  mqtt connect <host>  subscribe phone sensors -> network-only phone points (regs 140-165)"));
+    Serial.println(F("  mqtt status | pin <phone-id> | unpin   every phone point, freshness, pinned id (auth: none)"));
     Serial.println(F("  clk                  show the wall-clock (stored as 32-bit - Y2038 target)"));
     Serial.println(F("  ntpsync [ip] [port] | auto [ip] [sec] | off   sync time from the net (unauth)"));
     Serial.println(F("  netcfg [json]        per-interface net config: eth/wifi static|dhcp, wifi sta|ap, ntp, auth, save, explain"));
@@ -363,20 +367,39 @@ static void cmd_svcinfo() {
 }
 
 static void cmd_mqtt(const char* sub, const char* host) {
-    // Point the twin at the phone-sensor MQTT broker and subscribe phone/+/... -> %IW.
+    // Point the controller at the phone-sensor MQTT broker. Phone values become network-only
+    // phone points (never IN1-IN8 / %IX); a project reads them via phone_* word sources.
     if (sub && !strcmp(sub, "connect") && host && host[0]) {
         if (!svc_set(SVC_MQTT, true)) { Serial.println("{\"mqtt\":\"error\",\"reason\":\"service budget full (disable a network service)\"}"); return; }
+        strncpy(s_mqtt_broker, host, sizeof(s_mqtt_broker) - 1);
+        s_mqtt_broker[sizeof(s_mqtt_broker) - 1] = 0;
         mqtt_sparkplug_begin(host, 1883, "TBD", "stamplc");
-        Serial.printf("{\"mqtt\":\"connecting\",\"broker\":\"%s:1883\",\"maps\":{\"%%IW1\":\"light\",\"%%IW2\":\"accel_mag_x100\",\"%%IW3\":\"tilt_beta\"},\"regs\":[50,51,52]}\n", host);
+        Serial.printf("{\"mqtt\":\"connecting\",\"broker\":\"%s:1883\",\"subscribes\":\"phone/+/{light,accel,gyro,orient,sound,geo,battery,btn1,btn2}\","
+                      "\"points\":\"network-only, regs 140-165, word sources phone_<name>[_fresh]\",\"authentication\":\"none\"}\n", host);
         return;
     }
     if (sub && !strcmp(sub, "status")) {
-        Serial.printf("{\"mqtt\":\"status\",\"connected\":%s,\"fresh\":%s,\"light\":%d,\"accel_mag_x100\":%d,\"tilt_beta\":%d}\n",
-            mqtt_sparkplug_connected() ? "true" : "false", mqtt_sensors_fresh() ? "true" : "false",
-            mqtt_sensors_light_x1(), mqtt_sensors_accel_mag_x100(), mqtt_sensors_tilt_beta());
+        const MqttStatus runtime = mqtt_runtime_status();
+        console_emit_json(mqtt_sensors_status_json(mqtt_sparkplug_connected(), s_mqtt_broker, runtime.received, runtime.dropped));
         return;
     }
-    Serial.println("{\"mqtt\":\"usage\",\"cmds\":[\"mqtt connect <broker-host>\",\"mqtt status\"],\"note\":\"phone/+/{light,accel,orient} -> %IW1..3 + regs 50..52\"}");
+    if (sub && !strcmp(sub, "pin")) {
+        if (!host || !mqtt_sensors_pin(host)) {
+            Serial.println("{\"mqtt\":\"error\",\"reason\":\"usage: mqtt pin <phone-id> (1-31 chars A-Z a-z 0-9 - _, shown on the phone page)\"}");
+            return;
+        }
+        plc_log(SRC_USB, "", "MQTT phone pinned to %s (identity by claim; auth none)", host);
+        Serial.printf("{\"mqtt\":\"pinned\",\"phone\":\"%s\",\"note\":\"only phone/%s/... is accepted; points reset to missing; any client that publishes this id is still accepted (authentication: none)\"}\n", host, host);
+        return;
+    }
+    if (sub && !strcmp(sub, "unpin")) {
+        mqtt_sensors_unpin();
+        plc_log(SRC_USB, "", "MQTT phone pin cleared (any phone id accepted)");
+        Serial.println("{\"mqtt\":\"unpinned\",\"note\":\"any phone id is accepted again (last writer wins); points reset to missing\"}");
+        return;
+    }
+    Serial.println("{\"mqtt\":\"usage\",\"cmds\":[\"mqtt connect <broker-host>\",\"mqtt status\",\"mqtt pin <phone-id>\",\"mqtt unpin\"],"
+                   "\"note\":\"phone/<id>/<topic> -> network-only phone points (regs 140-165, word sources phone_<name> and phone_<name>_fresh); stale after 8 s; authentication none\"}");
 }
 
 static void cmd_cwe() {

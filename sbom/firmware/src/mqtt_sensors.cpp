@@ -1,78 +1,94 @@
 #include "mqtt_sensors.h"
 #include "mqtt_runtime.h"
+#include "modbus_tcp_server.h"
 #include <Arduino.h>
-#include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <math.h>
 
 namespace {
-int32_t  s_light = 0, s_accel_x100 = 0, s_tilt = 0;
-uint32_t s_last = 0;
-bool     s_have = false;
-int32_t  s_btn1 = 0, s_btn2 = 0;
-uint32_t s_btn_last = 0;
-
-// Minimal, allocation-free JSON scalar extractor: find "<key>" then parse the number that
-// follows a ':' . Only what a phone publishes ({"lux":..},{"mag":..},{"beta":..}); not a
-// general JSON parser. Returns false if the key or a number isn't found.
-bool json_num(const char* s, size_t n, const char* key, double& out) {
-    char pat[24];
-    int pl = snprintf(pat, sizeof(pat), "\"%s\"", key);
-    if (pl <= 0 || (size_t)pl >= n) return false;
-    for (size_t i = 0; i + (size_t)pl < n; i++) {
-        if (memcmp(s + i, pat, pl)) continue;
-        size_t j = i + pl;
-        while (j < n && (s[j] == ' ' || s[j] == ':')) j++;
-        char buf[32]; size_t k = 0;
-        while (j < n && k < sizeof(buf) - 1 &&
-               (isdigit((unsigned char)s[j]) || s[j] == '-' || s[j] == '+' ||
-                s[j] == '.' || s[j] == 'e' || s[j] == 'E')) buf[k++] = s[j++];
-        buf[k] = 0;
-        if (!k) return false;
-        out = atof(buf);
-        return true;
-    }
-    return false;
-}
-int16_t clamp16(int32_t v) { return v > 32767 ? 32767 : (v < -32768 ? -32768 : (int16_t)v); }
+phone::State s;
+// Ingest runs on the MQTT delivery path (loop task); the scan, console and Modbus mirror
+// read the same state. The recursive image lock keeps every reader consistent.
+struct Guard { Guard() { plc_image_lock(); } ~Guard() { plc_image_unlock(); } };
 }
 
 void mqtt_sensors_ingest(const char* topic, const uint8_t* payload, size_t len) {
-    if (!topic || !payload || !len) return;
-    const char* sl = strrchr(topic, '/');
-    if (!sl) return;
-    const char* sensor = sl + 1;
-    const char* s = (const char*)payload;
-    double v;
-    if (!strcmp(sensor, "light")) {
-        if (json_num(s, len, "lux", v)) { s_light = (int32_t)lround(v); s_have = true; s_last = millis(); }
-    } else if (!strcmp(sensor, "accel")) {
-        if (json_num(s, len, "mag", v)) { s_accel_x100 = (int32_t)lround(v * 100.0); s_have = true; s_last = millis(); }
-    } else if (!strcmp(sensor, "orient")) {
-        if (json_num(s, len, "beta", v)) { s_tilt = (int32_t)lround(v); s_have = true; s_last = millis(); }
-    } else if (!strcmp(sensor, "btn1")) {
-        if (json_num(s, len, "v", v)) { s_btn1 = v != 0 ? 1 : 0; s_btn_last = millis(); }
-    } else if (!strcmp(sensor, "btn2")) {
-        if (json_num(s, len, "v", v)) { s_btn2 = v != 0 ? 1 : 0; s_btn_last = millis(); }
-    }
+    Guard guard;
+    s.ingest(topic, payload, len, millis());
 }
 
 void mqtt_sensors_subscribe() {
-    mqtt_runtime_subscribe("phone/+/light", 0);
-    mqtt_runtime_subscribe("phone/+/accel", 0);
-    mqtt_runtime_subscribe("phone/+/orient", 0);
-    mqtt_runtime_subscribe("phone/+/btn1", 0);
-    mqtt_runtime_subscribe("phone/+/btn2", 0);
+    // One wildcard subscription per published topic. The id is checked in ingest, so a
+    // pinned controller still sees (and counts) other phones' messages as rejected.
+    for (unsigned i = 0; i < phone::Count; ++i) {
+        const char* topic = pointmap::PHONE_POINTS[i].topic;
+        bool repeat = false;
+        for (unsigned j = 0; j < i; ++j) if (!strcmp(pointmap::PHONE_POINTS[j].topic, topic)) repeat = true;
+        if (repeat) continue;
+        char filter[40];
+        snprintf(filter, sizeof(filter), "phone/+/%s", topic);
+        mqtt_runtime_subscribe(filter, 0);
+    }
 }
 
-bool mqtt_sensors_btn(int n) {
-    if (millis() - s_btn_last > 10000) return false;   // safety: release if the phone goes quiet
-    return n == 1 ? s_btn1 != 0 : s_btn2 != 0;
+void mqtt_sensors_words(int32_t (&words)[phone::WordCount], uint32_t now) {
+    Guard guard;
+    s.words(words, now);
 }
 
-bool mqtt_sensors_fresh() { return s_have && (millis() - s_last < 8000); }
-int16_t mqtt_sensors_light_x1()       { return clamp16(s_light); }
-int16_t mqtt_sensors_accel_mag_x100() { return clamp16(s_accel_x100); }
-int16_t mqtt_sensors_tilt_beta()      { return clamp16(s_tilt); }
+void mqtt_sensors_publish_registers(uint32_t now) {
+    Guard guard;
+    for (unsigned i = 0; i < phone::Count; ++i) {
+        const auto& def = pointmap::PHONE_POINTS[i];
+        const int32_t v = s.value(i, now);
+        if (def.words == 2) {
+            const uint32_t bits = uint32_t(v);
+            modbus_server.set_register(def.reg, uint16_t(bits >> 16));
+            modbus_server.set_register(def.reg + 1, uint16_t(bits));
+        } else modbus_server.set_register(def.reg, def.signed_value ? phone::reg_s16(v) : phone::reg_u16(v));
+    }
+    const uint32_t fresh = s.fresh_mask(now), seen = s.seen_mask();
+    modbus_server.set_register(pointmap::PHONE_FRESH_LO, uint16_t(fresh));
+    modbus_server.set_register(pointmap::PHONE_FRESH_HI, uint16_t(fresh >> 16));
+    modbus_server.set_register(pointmap::PHONE_SEEN_LO, uint16_t(seen));
+    modbus_server.set_register(pointmap::PHONE_SEEN_HI, uint16_t(seen >> 16));
+    modbus_server.set_register(pointmap::PHONE_MSGS_ACCEPTED, uint16_t(s.accepted));
+    modbus_server.set_register(pointmap::PHONE_MSGS_REJECTED, uint16_t(s.rejected()));
+    modbus_server.set_register(pointmap::PHONE_PINNED, s.pinned[0] ? 1 : 0);
+}
+
+bool mqtt_sensors_pin(const char* id) { Guard guard; return s.pin(id); }
+void mqtt_sensors_unpin() { Guard guard; s.unpin(); }
+
+String mqtt_sensors_status_json(bool connected, const char* broker, uint32_t received, uint32_t dropped) {
+    // Snapshot under the lock; the caller writes the reply without holding it.
+    phone::State copy;
+    const uint32_t now = millis();
+    { Guard guard; copy = s; }
+    String out;
+    out.reserve(2400);
+    char b[200];
+    snprintf(b, sizeof(b), "{\"mqtt\":\"status\",\"connected\":%s,\"broker\":\"%s\",\"authentication\":\"none\",",
+             connected ? "true" : "false", broker && broker[0] ? broker : "");
+    out += b;
+    if (copy.pinned[0]) { snprintf(b, sizeof(b), "\"pinned\":\"%s\",\"accepts\":\"pinned phone id only (a claim, not proof)\",", copy.pinned); out += b; }
+    else out += "\"pinned\":null,\"accepts\":\"any phone id (last writer wins)\",";
+    snprintf(b, sizeof(b), "\"last_id\":\"%s\",\"accepted\":%lu,\"rejected\":{\"other_id\":%lu,\"bad_id\":%lu,\"no_field\":%lu},",
+             copy.last_id, (unsigned long)copy.accepted, (unsigned long)copy.other_id,
+             (unsigned long)copy.bad_id, (unsigned long)copy.no_field);
+    out += b;
+    snprintf(b, sizeof(b), "\"mqtt_received\":%lu,\"mqtt_dropped\":%lu,\"stale_ms\":%lu,\"regs\":\"%u-%u\",\"points\":{",
+             (unsigned long)received, (unsigned long)dropped, (unsigned long)pointmap::PHONE_STALE_MS,
+             unsigned(pointmap::PHONE_POINTS[0].reg), unsigned(pointmap::PHONE_PINNED));
+    out += b;
+    for (unsigned i = 0; i < phone::Count; ++i) {
+        const auto& def = pointmap::PHONE_POINTS[i];
+        const auto& p = copy.points[i];
+        char age[16];
+        if (p.seen) snprintf(age, sizeof(age), "%lu", (unsigned long)(now - p.last_ms)); else strcpy(age, "null");
+        snprintf(b, sizeof(b), "%s\"%s\":{\"v\":%ld,\"fresh\":%d,\"age_ms\":%s,\"reg\":%u,\"unit\":\"%s\"}",
+                 i ? "," : "", def.name, (long)copy.value(i, now), copy.fresh(i, now) ? 1 : 0, age, unsigned(def.reg), def.unit);
+        out += b;
+    }
+    out += "}}";
+    return out;
+}

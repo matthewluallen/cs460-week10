@@ -13,7 +13,8 @@ bool plc_project_can_run(bool arm);
 void plc_project_refresh_expansion(); // loop owner only; never called by protocol task
 void plc_project_observe_temperature(bool valid); // finite driver report, not independent bus evidence
 uint32_t plc_project_generation();
-void plc_project_inputs(const bool physical[plc::NDI], int32_t board_temperature);
+// phone_words: phone::WordCount (value, fresh) pairs from mqtt_sensors_words(), or nullptr.
+void plc_project_inputs(const bool physical[plc::NDI], int32_t board_temperature, const int32_t* phone_words = nullptr);
 void plc_project_outputs(bool enabled, bool physical[project::HardwareOutputs]);
 bool plc_project_output_mapped(uint8_t physical);
 uint8_t plc_project_di(uint8_t logical);
