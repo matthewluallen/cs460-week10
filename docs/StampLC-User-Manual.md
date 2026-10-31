@@ -194,8 +194,9 @@ Type `help` at the `plc>` prompt for the live list. The most useful:
 | `cwe` | list the embedded teaching weaknesses & service ports |
 | `log` | the source‑attributed audit log |
 | `bustrace on\|off` | retain decoded bus diagnostics for later review |
-| `mqtt connect <host>` | subscribe the phone page's sensors as network‑only phone points (§9) |
-| `mqtt status` · `mqtt pin <id>` · `mqtt unpin` | every phone point with value, freshness and age; accept one phone id only / any |
+| `mqtt connect <ip>` | (re)connect to an MQTT broker and subscribe the phone page's sensors as network‑only phone points (§9); the broker is saved and dialed again at boot |
+| `mqtt disconnect` | stop and destroy the MQTT client and forget the saved broker (nothing is dialed until the next `mqtt connect`) |
+| `mqtt status` · `mqtt pin <id>` · `mqtt unpin` | client state, broker, free heap, every phone point with value, freshness and age; accept one phone id only / any |
 | `reboot` | software restart |
 
 ---
@@ -259,7 +260,10 @@ the program sees a tripped E‑stop until IN3 is driven to 1.
 Sensors / status (read‑only Modbus registers): `vin_mv` (supply mV), `current_ma`,
 `temp_c_x10` (°C ×10), `scan_last_us` / `scan_max_us` (cycle time), `fault_count`, `heartbeat`.
 
-**Phone points (network‑only, MQTT).** `mqtt connect <broker>` subscribes to the phone page's
+**Phone points (network‑only, MQTT).** The firmware has **no default broker**: nothing is dialed
+until you run `mqtt connect <broker IPv4>` (on the twin the host is `127.0.0.1`). That broker is
+saved and dialed again at boot; `mqtt connect` to another broker replaces the client cleanly, and
+`mqtt disconnect` stops it and forgets the saved broker. The client subscribes to the phone page's
 topics `phone/<id>/…`. Every value becomes a phone point with its **own 8 s freshness timer**,
 mirrored to Modbus holding registers 140–165 and listed by `mqtt status`. Phone points never
 touch IN1–IN8, `%IX` or the input mirror coils. A project reads one only by binding a word

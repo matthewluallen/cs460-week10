@@ -51,8 +51,10 @@
 #define OPCUA_TCP_PORT 4840
 #define BACNET_PORT 47808   // BACnet/IP (UDP)
 
-// MQTT / Sparkplug B (LS-18): the student sets the broker; empty host = no connect.
-#define MQTT_BROKER_HOST "10.13.37.1"
+// MQTT / Sparkplug B (LS-18): the student sets the broker with `mqtt connect <host>`
+// (saved in NVS, used at the next boot). There is no built-in default broker any more:
+// the old 10.13.37.1 placeholder was dialed at every boot and retried for ever.
+#define MQTT_BROKER_HOST ""
 #define MQTT_BROKER_PORT 1883
 #define MODBUS_TCP_MAX_CLIENTS 4
 #define MODBUS_SCAN_CYCLE_MS 50

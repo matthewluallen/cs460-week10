@@ -32,5 +32,12 @@ bool mqtt_sensors_pin(const char* id);
 void mqtt_sensors_unpin();
 
 // One JSON line for `mqtt status`: connection, pin, counters and every point.
-// received/dropped: the MQTT runtime's delivery counters (a full queue drops messages).
-String mqtt_sensors_status_json(bool connected, const char* broker, uint32_t received, uint32_t dropped);
+// The MQTT link as the console sees it; printed ahead of the phone points.
+struct MqttLinkInfo {
+    bool connected;
+    const char* client;        // idle | connecting | connected | stopping
+    const char* broker;        // configured broker host ("" if none)
+    const char* saved_broker;  // broker dialed at boot ("" if none)
+    uint32_t received, dropped, clients, heap_free;
+};
+String mqtt_sensors_status_json(const MqttLinkInfo& link);

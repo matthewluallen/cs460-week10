@@ -209,7 +209,13 @@ void setup() {
 #ifdef ENABLE_ETHERNET
     // (HTTP HMI/editor was started earlier, right after Modbus, to claim its socket first.)
     // Selectable fieldbus / IIoT services (LS-18), same I/O image as Modbus/TCP.
-    if (svc_enabled(SVC_MQTT)) mqtt_sparkplug_begin(MQTT_BROKER_HOST, 1883, "TBD", "stamplc");
+    // MQTT dials only a broker someone configured (`mqtt connect <host>` saves it). With
+    // none saved nothing is dialed: an unreachable default retried for ever and held a
+    // socket, a task and its buffers for nothing.
+    if (svc_enabled(SVC_MQTT)) {
+        char broker[64]; svc_get_mqtt_broker(broker, sizeof(broker));
+        mqtt_sparkplug_begin(broker, MQTT_BROKER_PORT, "TBD", "stamplc");
+    }
     eth_ota_begin();  // W5500 unsigned-OTA listener :80 (CWE-494) - twin-visible
 #else
     // Start OTA handler (non-fatal)

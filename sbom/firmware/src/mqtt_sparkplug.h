@@ -14,5 +14,11 @@
 // host/port of the broker; group + node id form the Sparkplug topic namespace.
 void mqtt_sparkplug_begin(const char* broker_host, uint16_t broker_port,
                           const char* group_id, const char* node_id);
+// Loop task only. A non-empty host (re)configures the client: any existing client is
+// stopped and destroyed first (off the loop task), then the new one starts from poll().
+// An empty host never dials anything.
 void mqtt_sparkplug_poll();     // maintain session, publish DDATA, service DCMD; call from loop()
+void mqtt_sparkplug_end();      // stop and destroy the client; nothing dials until begin()
 bool mqtt_sparkplug_connected();
+bool mqtt_sparkplug_pending();  // a restart is waiting for the previous client to finish stopping
+const char* mqtt_sparkplug_broker();  // last configured broker host ("" if none)
