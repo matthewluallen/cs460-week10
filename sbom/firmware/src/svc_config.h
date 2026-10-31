@@ -35,5 +35,9 @@ bool svc_set(int i, bool on);            // false if refused (over the SVC_MAX_N
 bool svc_is_net(int i);                  // true if the service consumes a W5500 socket
 int  svc_net_enabled_count();            // # enabled network (socket) services
 int  svc_find(const char* name);
+// MQTT broker the controller dials at boot (set by `mqtt connect`, cleared by `mqtt
+// disconnect`). Empty = no broker configured = nothing is dialed. Persisted in NVS "svc".
+void svc_get_mqtt_broker(char* out, size_t n);
+void svc_set_mqtt_broker(const char* host);   // nullptr or "" clears it
 uint32_t svc_get_sock_timeout_s();       // W5500 socket age-out (s); 0 disables
 void     svc_set_sock_timeout_s(uint32_t s);

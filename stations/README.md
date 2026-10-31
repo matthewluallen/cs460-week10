@@ -25,7 +25,8 @@ Week-4 wind-turbine lab, applied to the StampLC — and it stands alone (no wind
 | **plc** (10.20.30.10) | the controller — the QEMU twin + bridge; its own Modbus/TCP and HTTP are bound on the plant network | 8080 Studio, 502 Modbus, 80 HTTP |
 | **hmi** (10.20.30.20) | a SCADA HMI that **polls the controller over Modbus** and shows a live dashboard | 8800 |
 | **engineer** (plant, dynamic IP) | an engineering / attacker workstation — a **Modbus master** that reads and (on the vulnerable build) writes the controller with no auth | — |
-| **capture** | a passive sniffer (Wireshark/tshark) that sees the Modbus frames between the stations | writes `captures/plant.pcap` |
+| **mqtt** (10.20.30.40) | the phone broker + sensor page: phones scan a QR code and publish their sensors; the controller subscribes | 8090 phone page, 1883 MQTT |
+| **capture** | a passive sniffer (Wireshark/tshark) that sees the Modbus **and MQTT** frames between the stations | writes `captures/plant.pcap` |
 
 ## Run it
 
@@ -54,16 +55,25 @@ docker compose -f stations/docker-compose.yml run --rm engineer python3 /app/eng
 
 ### See the real frames (the span port)
 ```bash
-docker compose -f stations/docker-compose.yml logs -f capture        # live decoded Modbus
+docker compose -f stations/docker-compose.yml logs -f capture        # live decoded Modbus + MQTT
 # or open the pcap in Wireshark:
-#   stations/captures/plant.pcap   (filter: modbus)
+#   stations/captures/plant.pcap   (filters: modbus · mqtt · mqtt.topic contains "phone/")
 ```
+
+### Phones as network inputs (MQTT)
+Make port **8090** public in the Ports tab, open it, and scan the QR code with your phone. Every
+sensor you share is published as `phone/<id>/<sensor>` (plain JSON) to the broker; the controller
+station subscribes (its entrypoint runs `mqtt connect 10.20.30.40`) and maps them to **network**
+points — separate from the IN1–IN8 terminals, so a wired switch and a phone never share an input.
+In the capture you can read each value in the clear (`mqtt.topic`, `mqtt.msg`): anyone on this
+network can read it, and anyone who can publish can forge it. The phone page's **spoof** and
+**transmit off** controls are those two attacks (integrity and availability).
 
 ## The point
 This is the **network plane**. The same points the ladder drives over the **I²C bus** (the
 bus plane, inside the controller) are here read and written over **Modbus/TCP between
-machines**. Two paths to one process — and the network path has no authentication on the
-vulnerable build. Run `./qemu/build-twin.sh secure` and set `PROFILE=secure` in the compose
+machines**, and phone sensors arrive as **MQTT** publishes. Two paths to one process — and on
+the vulnerable build the network path has no authentication in either protocol. Run `./qemu/build-twin.sh secure` and set `PROFILE=secure` in the compose
 to watch the engineer's writes get refused.
 
 ## Secure / malicious profiles

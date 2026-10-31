@@ -86,8 +86,11 @@
 <div class="card qr">
   <img src="/qr.png" alt="QR to this page">
   <div class="t"><b>On a laptop?</b> Scan with a phone to open this page there. Then
-  <b>Connect</b> and <b>Share</b> the sensors you want. The M5StampLC in QEMU subscribes to the
-  ones it wants and maps them to <code>%IW</code> input registers.</div>
+  <b>Connect</b> and <b>Share</b> the sensors you want. The M5StampLC subscribes to every one of them
+  and keeps each as a <b>network-only phone point</b> with its own 8&nbsp;s freshness timer (Modbus
+  registers 140&ndash;165). A ladder reads a point only if its project binds it to a word input
+  (<code>phone_&lt;point&gt;</code>, or <code>phone_&lt;point&gt;_fresh</code> for the 1/0 fresh flag).
+  Phone points never drive the wired inputs IN1&ndash;IN8.</div>
 </div>
 
 <div class="lead">
@@ -103,9 +106,12 @@
     (including coarse location if you share it). I'm using a device and account I'm OK with that on.</span></label>
   <button id="go" class="bigbtn" disabled>Connect to broker</button>
   <div class="status"><span class="dot" id="bdot"></span><span id="bstat">broker: not connected</span> · <span id="cnt">0 msgs</span></div>
-  <div class="note">Client id <code id="cid">—</code>. Each sensor is shared only after you grant its
-  permission below. Topics: <code>phone/&lt;id&gt;/&lt;sensor&gt;</code>. A <span class="pill wired">used by logic</span>
-  tag marks the sensors this PLC maps into its input registers.</div>
+  <div class="note">Phone id <code id="cid">—</code> (kept on this phone so it survives a reload). To make the
+  PLC accept only this phone, type <code>mqtt pin <span id="cidpin">—</span></code> at the <code>plc&gt;</code> console.
+  That is identity by <b>claim</b>: any client that publishes this id is still accepted
+  (<code>mqtt status</code> shows <code>"authentication":"none"</code>). Each sensor is shared only after you grant
+  its permission below. Topics: <code>phone/&lt;id&gt;/&lt;sensor&gt;</code>. A <span class="pill wired">PLC point</span>
+  tag names the network-only point each value lands in.</div>
 </div>
 
 <!-- display theme: the ladder-driven color (or a user choice) recolors the whole pane -->
@@ -123,14 +129,16 @@
   </div>
 </div>
 
-<!-- phone as PLC I/O: momentary buttons (phone -> %IX) + a PLC-logic-driven background -->
+<!-- phone as PLC I/O: momentary buttons (network-only phone points) + a PLC-logic-driven background -->
 <div class="card" id="iocard">
   <div class="srow"><div><div class="sname">Phone as PLC I/O</div>
-    <div class="sdesc">buttons drive the ladder's inputs; the ladder drives this color back</div></div>
+    <div class="sdesc">buttons are network-only points <b>phone_btn1</b> / <b>phone_btn2</b> (registers 157/158) &mdash;
+      never the wired IN7/IN8. A stale button reads 0. Use them only as Start/request inputs, never as Stop or
+      E-stop. The ladder drives this color back.</div></div>
     <span class="pill" id="rgbpill">display: —</span></div>
   <div style="display:flex;gap:12px;margin-top:12px">
-    <button id="btn1" class="ghost" style="flex:1;padding:22px" disabled>BTN 1<br><span class="sdesc">%IX6</span></button>
-    <button id="btn2" class="ghost" style="flex:1;padding:22px" disabled>BTN 2<br><span class="sdesc">%IX7</span></button>
+    <button id="btn1" class="ghost" style="flex:1;padding:22px" disabled>BTN 1<br><span class="sdesc">phone_btn1 · reg 157</span></button>
+    <button id="btn2" class="ghost" style="flex:1;padding:22px" disabled>BTN 2<br><span class="sdesc">phone_btn2 · reg 158</span></button>
   </div>
   <div id="rgbswatch" class="swatch" style="background:var(--field);color:var(--dim)">
     PLC display · relay0→R relay1→G relay2→B</div>
@@ -141,8 +149,11 @@
 
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <script>
-const cid = 'ph-' + Math.random().toString(36).slice(2, 7);
+// A stable id (kept in localStorage) so `mqtt pin <id>` on the PLC survives a page reload.
+// It is only a label in the topic: anyone can publish under it (authentication: none).
+const cid = (()=>{ try{ let v=localStorage.getItem('cs460-phone-id'); if(!/^ph-[a-z0-9]{5}$/.test(v||'')){ v='ph-'+Math.random().toString(36).slice(2,7).padEnd(5,'0'); localStorage.setItem('cs460-phone-id',v); } return v; }catch(e){ return 'ph-'+Math.random().toString(36).slice(2,7).padEnd(5,'0'); } })();
 document.getElementById('cid').textContent = cid;
+document.getElementById('cidpin').textContent = cid;
 const base = 'phone/' + cid;
 const KEY = new URLSearchParams(location.search).get('k') || '';   // per-session access key (from the QR/link)
 let client = null, count = 0;
@@ -220,6 +231,7 @@ function pub(topic, obj){
   count++; el('cnt').textContent = count + ' msgs';
 }
 let lastPub = {};
+const lastObj = {};  // topic -> {sid, obj}: last real payload, re-sent by the keep-alive
 function throttled(topic, fn, hz=8){ const now=Date.now(); if(now-(lastPub[topic]||0) > 1000/hz){ lastPub[topic]=now; fn(); } }
 
 // ---- per-sensor control state: transmit on/off + override ----
@@ -234,6 +246,7 @@ const liveReal = {};// sid -> last real primary value (for the "real vs spoofed"
 //                    every OTHER byte on the wire looks completely normal.
 function gpub(sid, topic, obj){
   const S = SMAP[sid];
+  lastObj[topic] = {sid, obj};                           // remembered for the keep-alive below
   if(S && topic===S.prim && obj && S.key in obj) liveReal[sid] = obj[S.key];
   if(!tx[sid]) return;                                   // transmission off
   let out = obj, spoof=false;
@@ -246,17 +259,20 @@ function gpub(sid, topic, obj){
 // prim/key/min/max/unit describe the PRIMARY scalar the PLC consumes (what Override drives).
 const SENSORS = [
  { id:'motion', name:'Motion', desc:'accelerometer (m/s²) + gyroscope (°/s)', topics:'accel, gyro', start:startMotion,
-   wired:true, prim:'accel', key:'mag', min:0, max:40, step:0.1, unit:'m/s²', maps:'%IW (accel magnitude)' },
+   wired:true, prim:'accel', key:'mag', min:0, max:40, step:0.1, unit:'m/s²',
+   maps:'phone_accel_x100 (|a|×100, reg 141) · phone_gyro_a / _b / _g (°/s, regs 142–144)' },
  { id:'orient', name:'Orientation', desc:'compass heading α + tilt β,γ (attitude — not the gyro)', topics:'orient', start:startOrientation,
-   wired:true, prim:'orient', key:'beta', min:-180, max:180, step:1, unit:'° tilt', maps:'%IW (tilt β)' },
+   wired:true, prim:'orient', key:'beta', min:-180, max:180, step:1, unit:'° tilt',
+   maps:'phone_heading (α 0–359°, reg 145; wraps 359→0) · phone_tilt_b (β, reg 146) · phone_tilt_g (γ, reg 147)' },
  { id:'light',  name:'Ambient light', desc:'illuminance in lux (Android Chrome only)', topics:'light', start:startLight,
-   wired:true, prim:'light', key:'lux', min:0, max:2000, step:1, unit:'lux', maps:'%IW (light level)' },
+   wired:true, prim:'light', key:'lux', min:0, max:2000, step:1, unit:'lux', maps:'phone_light_lux (lux, reg 140)' },
  { id:'sound',  name:'Microphone level', desc:'RMS loudness 0–100 (no audio is sent)', topics:'sound', start:startSound,
-   wired:false, prim:'sound', key:'level', min:0, max:100, step:1, unit:'/100', maps:null },
+   wired:true, prim:'sound', key:'level', min:0, max:100, step:1, unit:'/100', maps:'phone_sound (0–100, reg 148)' },
  { id:'geo',    name:'Geolocation', desc:'coarse latitude/longitude (~100 m), accuracy, speed, heading', topics:'geo', start:startGeo,
-   wired:false, prim:null },
+   wired:true, prim:null,
+   maps:'phone_speed_x100 (m/s×100, reg 149) · phone_course (°, reg 150) · phone_lat_x1000 / phone_lon_x1000 (s32, regs 151–154). Speed/heading are null while still, so those points go stale.' },
  { id:'battery',name:'Battery', desc:'charge level % and charging state', topics:'battery', start:startBattery,
-   wired:false, prim:null },
+   wired:true, prim:null, maps:'phone_battery (%, reg 155) · phone_charging (1/0, reg 156)' },
 ];
 const SMAP = Object.fromEntries(SENSORS.map(s=>[s.id,s]));
 const host = document.getElementById('sensors');
@@ -264,21 +280,22 @@ for(const s of SENSORS){
   const c = document.createElement('div'); c.className='card sensor'; c.id='card-'+s.id;
   const canOverride = !!s.prim;
   c.innerHTML = `<div class="srow">
-     <div><div class="sname">${s.name} ${s.wired?'<span class="pill wired">used by logic</span>':''}</div>
-       <div class="sdesc">${s.desc}</div></div>
+     <div><div class="sname">${s.name} ${s.wired?'<span class="pill wired">PLC point</span>':''}</div>
+       <div class="sdesc">${s.desc}</div>
+       <div class="sdesc">→ ${s.maps} &middot; each with its own <code>_fresh</code> flag</div></div>
      <button class="ghost" id="btn-${s.id}" disabled>Share</button></div>
     <div class="srow"><div class="sval na" id="val-${s.id}" style="flex:1">connect to the broker first</div>
        <span class="statechip" id="chip-${s.id}">idle</span></div>
     <div class="ctl" id="ctl-${s.id}">
       <div class="line"><span class="lab">Transmit</span>
         <span class="seg"><button id="tx-on-${s.id}" class="sel">ON</button><button id="tx-off-${s.id}">OFF</button></span>
-        <span class="ovhint">off = the PLC loses this reading (availability)</span></div>
+        <span class="ovhint">off = after 8 s the PLC marks it stale (fresh 0) and the value freezes (availability)</span></div>
       ${canOverride?`<div class="line"><span class="lab">Override</span>
         <span class="seg"><button id="ov-off-${s.id}" class="sel">real</button><button id="ov-on-${s.id}">spoof</button></span>
         <input type="range" id="ovr-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${((s.min+s.max)/2).toFixed(0)}" disabled>
         <input type="number" id="ovn-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${((s.min+s.max)/2).toFixed(0)}" disabled>
         <span class="ovhint">${s.unit}</span></div>
-        <div class="ovhint">Spoof replaces only <code>${s.key}</code> &mdash; every other byte on the wire stays normal (${s.maps||'input'}).</div>`:''}
+        <div class="ovhint">Spoof replaces only <code>${s.key}</code> &mdash; every other byte on the wire stays normal, the point stays fresh, and the PLC cannot tell.</div>`:''}
     </div>
     <div class="tp">topic phone/…/${s.topics}</div>`;
   host.appendChild(c);
@@ -397,7 +414,23 @@ async function startBattery(){
   b.addEventListener('levelchange',upd); b.addEventListener('chargingchange',upd); upd(); return true;
 }
 
-// Phone as PLC I/O: momentary buttons -> %IX, and the ladder-driven RGB comes back here.
+// Keep-alive: every 2 s re-send the last payload of each sensor that is transmitting, so the
+// PLC's per-point 8 s freshness measures "this phone is still sending", even for values that
+// change rarely (battery) or only on events (light, geolocation). The re-send passes through
+// gpub, so Transmit OFF still silences it and Override still replaces the primary value.
+// Freshness is about arrival, not truth: a re-sent or spoofed value is just as "fresh".
+// Topics are re-sent one at a time (every 250 ms, round-robin) so the keep-alive never
+// arrives as a burst: the controller queues only a few MQTT messages between scans.
+let keepIdx = 0;
+setInterval(()=>{
+  const topics = Object.keys(lastObj); if(!topics.length) return;
+  const topic = topics[keepIdx++ % topics.length], {sid, obj} = lastObj[topic];
+  if(Date.now() - (lastPub[topic]||0) >= 2000){ lastPub[topic] = Date.now(); gpub(sid, topic, obj); }
+}, 250);
+const btnState = {btn1:0, btn2:0};
+
+// Phone as PLC I/O: momentary buttons -> network-only points phone_btn1/phone_btn2 (never IN7/IN8),
+// and the ladder-driven RGB comes back here.
 function wirePhoneIO(){
   client.subscribe('stamplc/display/rgb');            // the twin publishes the logic's color
   client.on('message', (t,p)=>{
@@ -412,8 +445,8 @@ function wirePhoneIO(){
   });
   for(const [id,topic] of [['btn1','btn1'],['btn2','btn2']]){
     const b=el(id); b.disabled=false;
-    const down=e=>{ e.preventDefault(); b.className='on'; pub(topic,{v:1}); };
-    const up  =e=>{ e.preventDefault(); b.className='ghost'; pub(topic,{v:0}); };
+    const down=e=>{ e.preventDefault(); b.className='on'; btnState[topic]=1; pub(topic,{v:1}); };
+    const up  =e=>{ e.preventDefault(); b.className='ghost'; btnState[topic]=0; pub(topic,{v:0}); };
     b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up);
     b.addEventListener('pointerleave',up); b.addEventListener('pointercancel',up);
     // keyboard parity: Enter/Space hold the input while pressed, release on key-up (and on blur)
@@ -421,6 +454,9 @@ function wirePhoneIO(){
     b.addEventListener('keyup',  e=>{ if(e.key==='Enter'||e.key===' ') up(e); });
     b.addEventListener('blur',   ()=>{ if(b.className==='on') up({preventDefault(){}}); });
   }
+  // Button keep-alive: re-send the current state every 2 s so phone_btn*_fresh shows the link is up.
+  // If this stops (page closed, network lost) the PLC releases the button after 8 s.
+  let bi = 0; setInterval(()=>{ const t = bi++ % 2 ? 'btn2' : 'btn1'; pub(t,{v:btnState[t]}); }, 1000);
 }
 
 el('consent').onchange = e => { el('go').disabled = !e.target.checked; };   // gate Connect on explicit consent

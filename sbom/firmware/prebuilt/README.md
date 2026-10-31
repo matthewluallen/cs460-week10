@@ -7,9 +7,9 @@ firmware on a device — **no toolchain, no build**. (To modify + rebuild instea
 
 | File | What it is |
 |---|---|
-| `stamplc-factory-8MB.bin` | **One-file image** — flash to offset `0x0` (bootloader + partitions + boot_app0 + app merged). Easiest. The file is ~1.7 MB; "8MB" is the **target flash size**, not the file length. The QEMU twin's release asset `stamplc-flash-8MB.bin` is **this exact image padded to a full 8 MB with 0xFF** (verified byte-identical prefix) — same firmware, two packagings; `qemu/smoke-test.py` pads this file the same way at runtime. |
+| `stamplc-factory-8MB.bin` | **One-file image** — flash to offset `0x0` (bootloader + partitions + **NVS with the factory default program** + boot_app0 + app merged). Easiest. The file is ~1.8 MB; "8MB" is the **target flash size**, not the file length. It boots with **Motor start/stop + E-stop** installed, in PROGRAM mode (see [`../BUILD.md`](../BUILD.md)). Flashing it at `0x0` replaces whatever program and saved settings were in the board's NVS. The QEMU twin's release asset `stamplc-flash-8MB.bin` is built as **this exact image padded to a full 8 MB with 0xFF** (check: `cmp -n $(stat -c%s stamplc-factory-8MB.bin) stamplc-factory-8MB.bin ../../../qemu/twin/stamplc-flash-8MB.bin`); `qemu/smoke-test.py` pads this file the same way at runtime. |
 | `firmware.bin` | App only (offset `0x10000`) |
-| `bootloader.bin` / `partitions.bin` / `boot_app0.bin` | The other parts (`0x0` / `0x8000` / `0xe000`) |
+| `bootloader.bin` / `partitions.bin` / `nvs-factory.bin` / `boot_app0.bin` | The other parts (`0x0` / `0x8000` / `0x9000` / `0xe000`). `nvs-factory.bin` is the NVS partition holding only the factory default program. |
 | `SHA256SUMS.txt` | Integrity — `sha256sum -c SHA256SUMS.txt` |
 | `manifest.json` | ESP Web Tools descriptor (for a WebSerial flash button) |
 
@@ -30,10 +30,13 @@ No local tools needed; needs a USB-connected board (so not from a cloud Codespac
 **C — separate parts (equivalent to A):**
 ```bash
 esptool --chip esp32s3 write_flash \
-  0x0 bootloader.bin  0x8000 partitions.bin  0xe000 boot_app0.bin  0x10000 firmware.bin
+  0x0 bootloader.bin  0x8000 partitions.bin  0x9000 nvs-factory.bin \
+  0xe000 boot_app0.bin  0x10000 firmware.bin
 ```
 
-**D — PlatformIO (if you already have it):** `cd .. && pio run -e m5stamplc -t upload`.
+**D — PlatformIO (if you already have it):** `cd .. && pio run -e m5stamplc -t upload`. This
+writes the app only: the board keeps the program already in its NVS (load the factory program
+from the Studio's *Example projects* if you want it).
 
 After flashing: `esptool --chip esp32s3 run`, or just power-cycle. Serial console is
 115200 baud.
@@ -42,4 +45,6 @@ After flashing: `esptool --chip esp32s3 run`, or just power-cycle. Serial consol
 - A cloud Codespace can't reach USB — download the image and flash from a machine with
   the board (A/B/C), or use `pio run -t upload` on a local clone.
 - Provenance: built from `sbom/firmware` at the repo's buildable commit (point-map schema
-  `tbd.plc-point-map/v3`); re-verifiable with `pio run` (see `../BUILD.md`).
+  `tbd.plc-point-map/v5`) with `scripts/factory_image.py`; re-verifiable with `pio run` (see
+  `../BUILD.md`). Earlier prebuilts (point map v3) still ran an old built-in program
+  (`di0_start`/`di2_estop_in`, energize-to-trip, no seal-in, fault not latched).

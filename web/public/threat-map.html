@@ -241,9 +241,9 @@ const ATTACKS = [
   },
   {
     key:'phone-inject', name:'Unauthenticated phone-sensor → PLC input injection', phase:'Part 5 · MQTT bridge',
-    intro:`Phones publish light / accelerometer / orientation / button data over MQTT; the PLC maps them to input words (<code>%IW</code>) and input bits (<code>%IX6/7</code>) with no authentication. A rogue publisher impersonates a phone and drives the ladder logic with false sensor data — a false-data-injection surface on the process inputs.`,
-    evidence:`# impersonate a phone, inject a bright-light reading that trips the logic\nmosquitto_pub -h 10.20.30.40 -t 'phone/evil/light' -m '{"lux":60000}'\n# PLC writes it to %IW (plausibility-gated on the HMI); same for btn1 -> %IX6`,
-    fix:`Authenticate publishers; validate/plausibility-gate %IW (the HMI already gates out-of-range values); bind a phone session to a team token.`,
+    intro:`Phones publish light, motion, gyro, orientation, sound, location, battery and button data over MQTT. The PLC keeps each value as a network-only phone point (Modbus 140–165, each with its own 8 s freshness flag) that a project can bind to a word input (<code>phone_&lt;point&gt;</code>) — with no authentication. Pinning one phone id (<code>mqtt pin</code>) is identity by claim: a rogue publisher that reuses the id is accepted, and a spoofed value is just as fresh as a real one. A false-data-injection surface on the process inputs.`,
+    evidence:`# impersonate a phone, inject a bright-light reading that trips the logic\nmosquitto_pub -h 10.20.30.40 -t 'phone/ph-abc12/light' -m '{"lux":60000}'\n# PLC: phone_light_lux = 60000, phone_light_lux_fresh = 1 (mqtt status shows "authentication":"none"); same for btn1 -> phone_btn1`,
+    fix:`Authenticate publishers (TLS client certificates, broker ACLs per topic, signed payloads); plausibility-gate the value in the ladder and act only while its _fresh flag is 1; never let a network value feed a stop or safety function.`,
     fw:{
       emb3d:[{id:'TID-406',title:'Unauthorized Messages or Connections'},{id:'TID-310',title:'Remotely Accessible Unauthenticated Services'}],
       cwe:[{id:'CWE-345',title:'Insufficient Verification of Data Authenticity'},{id:'CWE-306',title:'Missing Authentication'}],

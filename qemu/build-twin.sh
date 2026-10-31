@@ -33,35 +33,17 @@ if ! command -v pio >/dev/null 2>&1; then
 fi
 run pio run -d "$FW" -e "$ENV"
 
-step "Packaging bootloader + partitions + app into one 8 MB image"
-say  "The twin boots a single flash image. We merge the just-built pieces at the"
-say  "documented offsets (bootloader@0x0, partitions@0x8000, boot_app0@0xe000, app@0x10000)"
-say  "and pad to 8 MB — exactly the layout a real StampLC is flashed with."
-# boot_app0.bin location varies: older pioarduino put it under the project's
-# .pio/packages, current builds keep it only in the global ~/.platformio. The
-# trailing `|| true` matters: under `set -euo pipefail` a failing ls/find in a
-# command substitution aborts the whole script (RC 2) BEFORE the fallback runs.
-BOOTAPP0="$(ls "$FW"/.pio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin 2>/dev/null | head -1 || true)"
-[ -n "$BOOTAPP0" ] || BOOTAPP0="$(find "$FW/.pio" "$HOME/.platformio" -name boot_app0.bin 2>/dev/null | head -1 || true)"
-for f in "$BUILD/bootloader.bin" "$BUILD/partitions.bin" "$BUILD/firmware.bin" "$BOOTAPP0"; do
-  [ -f "$f" ] || { echo "missing build artifact: $f"; exit 1; }
-done
-# locate esptool (PlatformIO ships it; fall back to a module invocation)
-if command -v esptool.py >/dev/null 2>&1; then ESPTOOL=(esptool.py)
-elif python3 -c 'import esptool' 2>/dev/null;  then ESPTOOL=(python3 -m esptool)
-else ESPTOOL=(pio pkg exec -- esptool.py); fi
+step "Packaging bootloader + partitions + factory project + app into one 8 MB image"
+say  "The twin boots a single flash image. We place the just-built pieces at the documented"
+say  "offsets (bootloader@0x0, partitions@0x8000, NVS@0x9000, boot_app0@0xe000, app@0x10000)"
+say  "and pad to 8 MB with 0xFF (erased flash) — the layout a real StampLC is flashed with."
+say  "The NVS partition carries the factory default project (motor start/stop + E-stop): the"
+say  "same bytes the Studio would load, stored where the loader keeps them (namespace plc, key"
+say  "project_v1). So the image boots with that program installed, in PROGRAM mode."
+# scripts/factory_image.py does the merge in plain Python (no esptool needed) and writes the
+# NVS partition itself; it finds boot_app0.bin under .pio or ~/.platformio.
 mkdir -p "$HERE/twin"
-run "${ESPTOOL[@]}" --chip esp32s3 merge_bin -o "$OUT" \
-    --flash_mode dio --flash_freq 80m --flash_size 8MB \
-    0x0 "$BUILD/bootloader.bin" 0x8000 "$BUILD/partitions.bin" \
-    0xe000 "$BOOTAPP0" 0x10000 "$BUILD/firmware.bin"
-# esptool 5.x merge_bin no longer pads the output to --flash_size, so it emits a
-# ~1.8 MB file. The QEMU twin's SPI-flash (if=mtd) only accepts a 2/4/8/16 MB image
-# ("Drive size error"), so pad to a full 8 MB with 0xFF (the erased-flash value).
-WANT=$((8*1024*1024)); HAVE=$(wc -c < "$OUT")
-if [ "$HAVE" -lt "$WANT" ]; then
-  python3 -c "import sys; f=open('$OUT','ab'); f.write(b'\xff'*($WANT-$HAVE)); f.close()"
-fi
+run python3 "$FW/scripts/factory_image.py" merge --build-dir "$BUILD" --out "$OUT" --pad-8mb
 observe "wrote $(basename "$OUT")  ($(wc -c < "$OUT") bytes)"
 say  "Boot it:   ./qemu/run.sh $PROFILE      Control it:   ./qemu/console.sh"
 note "The secure build ships NO default password — enroll one with 'passwd <12+ chars>' at the"

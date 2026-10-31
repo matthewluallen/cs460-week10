@@ -47,6 +47,11 @@ echo
 echo "  Scan the QR above with your phone, or open:"
 echo "    ${URL}"
 echo
+echo "  Then, at the plc> console (./qemu/console.sh), point the twin at this broker:"
+echo "    mqtt connect 127.0.0.1        (saved; 'mqtt disconnect' stops it and forgets it)"
+echo "    mqtt status                   (every phone point, its age and fresh flag)"
+echo "    mqtt pin <phone id>           (optional: accept only the id shown on your phone)"
+echo
 if [ "${PUB:-}" = "public" ]; then
   echo "  HEADS UP: :${PORT} is now PUBLIC. Anyone with this link can open the page and see"
   echo "  the sensors you choose to Share. It stays public until you stop the bridge or run"

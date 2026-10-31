@@ -79,11 +79,22 @@ hardware bill of materials.
 
 ### Part 5 — Wire & run (input → logic → output) `[both]`
 **SWBAT** drive one input through the ladder to one output and **observe** the physical relay
-change, then **demonstrate** the fail-safe interlock.
-- **Observable:** in RUN, forcing `di0_start` energizes relay0 **and** relay1; forcing
-  `di2_estop_in` drops the motor (relay0→0) and latches the fault lamp (relay3→1).
-- **Anchor:** `verify-lab.py P5` (forces the inputs and polls `io` for the relay state on the
-  running target — identical on hardware and twin).
+change, then **demonstrate** the fail-safe interlock of the factory motor program
+(`motor-start-stop-estop`: Start `start_pb` = IN1/di0, Stop `stop_pb` = IN2/di1, E-stop
+`estop_ok` = IN3/di2 wired **N.C.** so 1 = healthy and 0 = tripped or wire cut, Reset
+`reset_pb` = IN4/di3; motor = RELAY 1/relay0, run light = RELAY 2/relay1, fault lamp =
+RELAY 4/relay3).
+- **Observable:** in RUN with `estop_ok` = 1, pressing `start_pb` energizes relay0 **and**
+  relay1 and they **stay on** after the button is released (seal-in); `stop_pb` drops them;
+  `estop_ok` = 0 drops the motor and latches the fault lamp (relay3 → 1); restoring
+  `estop_ok` = 1 does **not** restart the motor and does **not** clear the fault; `reset_pb`
+  clears the fault but the motor stays off; only a new `start_pb` press runs it again.
+- **Twin note:** the twin's input byte boots as 0, so IN3 (the N.C. E-stop) reads **tripped**
+  until something drives it to 1 — exactly what a real N.C. loop does with a cut wire. The
+  check therefore holds `estop_ok` at 1 first (`force estop_ok 1`) and pulses `reset_pb`; a
+  student's predesigned circuit must do the same (E-stop slide ON at start-up).
+- **Anchor:** `verify-lab.py P5` (forces the inputs by tag and polls `io` for the relay state
+  on the running target — identical on hardware and twin — and releases every force at the end).
 - **Mapping:** ATT&CK **T0831** (Manipulation of Control), **T1692.001** (Unauthorized Message: Command Message; formerly T0855) · CIE: the output is the ground truth.
 
 ### Part 6 — Firmware & the unsigned update `[both]`

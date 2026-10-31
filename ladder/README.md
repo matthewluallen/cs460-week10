@@ -8,13 +8,17 @@ Two programs are provided:
 
 - [`passthrough.st`](passthrough.st) — the simplest: **DI 0 → Relay 0**. One input, one
   output.
-- [`latch_with_estop.st`](latch_with_estop.st) — a step up: a latching relay (set/reset)
-  with an **E-stop** that forces the output off. Note the comment in it (`CWE-306`): the
-  E-stop has **no authentication** — anyone who can write that coil can trip it (we come
-  back to this as a security point, and it's the thing to name in your finding).
+- [`latch_with_estop.st`](latch_with_estop.st) — a step up: the **factory motor program**
+  (motor start/stop with a seal-in, an **N.C. E-stop** whose trip latches a fault, a Reset,
+  and no automatic restart), written as readable structured text. The same program is the
+  Studio example *Motor start/stop + E-stop* and is what the factory and twin images ship
+  installed. Note the comment in it (`CWE-306`): the E-stop is only as trustworthy as the
+  input image — anyone who can force or write it can make a tripped E-stop look healthy (we
+  come back to this as a security point, and it's the thing to name in your finding).
 
-**Output syntax.** Both programs write their output as **`COIL[n]`** (the Modbus coil
-image) — e.g. `COIL[0] := lamp;`. `COIL[0]` is the coil that energizes **physical relay0**,
+**Output syntax.** `latch_with_estop.st` uses IEC located variables (`%IX0.n` = IN n+1,
+`%QX0.n` = RELAY n+1), exactly like the Studio's ST export. `passthrough.st` writes its
+output as **`COIL[n]`** (the Modbus coil image) — e.g. `COIL[0] := lamp;`. `COIL[0]` is the coil that energizes **physical relay0**,
 which is what drives your lamp; they are the same output, not two different commands. (An
 older draft of `passthrough.st` wrote `Relay[0]`; that has been normalized to `COIL[0]` so
 the two samples agree and so the write lines up with the Modbus-coil security point above.)

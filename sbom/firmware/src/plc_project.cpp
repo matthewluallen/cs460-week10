@@ -70,7 +70,7 @@ void plc_project_refresh_expansion() {
     Guard guard;expansion=next;
 }
 uint32_t plc_project_generation() { Guard guard; return active.generation; }
-void plc_project_inputs(const bool physical[plc::NDI], int32_t board_temperature) {
+void plc_project_inputs(const bool physical[plc::NDI], int32_t board_temperature, const int32_t* phone_words) {
     if (active.ready()) {
         int32_t values[bindings::Count]{};
         const bool executing=plc_mode()!=PLC_PROGRAM;
@@ -78,7 +78,7 @@ void plc_project_inputs(const bool physical[plc::NDI], int32_t board_temperature
             plc_fault_raise(50,"project source invalid/epoch changed");
         if(executing&&!expansion_ready())plc_fault_raise(51,"project IO expansion identity/stale");
         if(executing&&!temperature_ready())plc_fault_raise(52,"project board temperature invalid");
-        project::inputs(active.definition, g_engine, physical, board_temperature, active.parameters,values);
+        project::inputs(active.definition, g_engine, physical, board_temperature, active.parameters, values, phone_words);
     }
     else {
         for (unsigned i = 0; i < plc::NDI; ++i) g_engine.set_input(i, false);

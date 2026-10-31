@@ -1,57 +1,59 @@
-(* Demo Ladder Logic for M5 StampLC OpenPLC
-   Demonstrates simple latching relay with E-stop safety
+(* Motor start/stop with a fail-safe E-stop -- the readable twin of the factory program
+   web/public/projects/motor-start-stop-estop.csco (open it in the Logic Studio to see the
+   same logic as ladder rungs; the Studio's own ST export of it is equivalent).
 
-   Inputs:
-   - DI 0: Set input (latch relay ON)
-   - DI 1: Reset input (unlatch relay OFF)
-   - DI 2: E-Stop button (force relay OFF immediately)
+   Inputs (board prints IN1-IN8; firmware di0-di7):
+   - IN1 (di0, %IX0.0) start_pb : Start push button, N.O. momentary, 1 = pressed
+   - IN2 (di1, %IX0.1) stop_pb  : Stop push button,  N.O. momentary, 1 = pressed
+                                   (the snap-kit parts have no N.C. push button, so a cut
+                                   Stop wire can NOT stop the motor -- the E-stop is the
+                                   input that fails safe)
+   - IN3 (di2, %IX0.2) estop_ok : E-stop slide switch wired N.C.
+                                   1 = healthy, 0 = pressed, wire cut or loop supply lost
+   - IN4 (di3, %IX0.3) reset_pb : Fault reset push button, N.O. momentary
 
-   Outputs:
-   - Relay 0: Main output (pump/motor control)
-   - Relay 1: E-stop status lamp
+   Outputs (board prints RELAY 1-4; firmware relay0-relay3):
+   - RELAY 1 (relay0, %QX0.0) motor      : seals in on a NEW Start press
+   - RELAY 2 (relay1, %QX0.1) run_light  : follows the motor
+   - RELAY 4 (relay3, %QX0.3) fault_lamp : the latched E-stop fault
+
+   Rules: E-stop trip drops the motor and latches the fault. Restoring the E-stop does
+   NOT restart the motor and does NOT clear the fault. Reset clears the fault only while
+   estop_ok = 1, and the motor stays off until Start is pressed again. A held or stuck
+   Start/Reset button does nothing (both act on a press, not a level).
 *)
 
-PROGRAM DemoLatchLogic
+PROGRAM MotorStartStopEstop
   VAR
-    set_input : BOOL;         (* DI 0 *)
-    reset_input : BOOL;       (* DI 1 *)
-    estop_button : BOOL;      (* DI 2 *)
-    relay_output : BOOL;      (* Relay 0 *)
-    estop_lamp : BOOL;        (* Relay 1 *)
-    relay_state : BOOL;       (* Internal state *)
+    start_pb       AT %IX0.0 : BOOL;
+    stop_pb        AT %IX0.1 : BOOL;
+    estop_ok       AT %IX0.2 : BOOL;
+    reset_pb       AT %IX0.3 : BOOL;
+    motor          AT %QX0.0 : BOOL;
+    run_light      AT %QX0.1 : BOOL;
+    fault_lamp     AT %QX0.3 : BOOL;   (* the fault latch itself *)
+    reset_trig     : R_TRIG;
+    reset_edge     : BOOL;             (* one scan on a new Reset press *)
+    start_released : BOOL;             (* Start was released last scan *)
   END_VAR
 
-  (* Read inputs from Modbus *)
-  set_input := DI[0];
-  reset_input := DI[1];
-  estop_button := DI[2];
+  reset_trig(CLK := reset_pb);
+  reset_edge := reset_trig.Q;
 
-  (* CWE-306 Teaching Point: E-Stop has NO authentication check *)
-  (* In a real industrial system, E-stop should always work *)
-  (* But here we show how unauthenticated writes can be dangerous *)
+  (* Fault latch: a tripped (or cut) E-stop sets it; only a Reset press while the E-stop is
+     healthy clears it. *)
+  fault_lamp := NOT estop_ok OR (fault_lamp AND NOT reset_edge);
 
-  IF estop_button THEN
-    (* E-stop pressed: immediately OFF (no auth, no delay) *)
-    relay_state := FALSE;
-    estop_lamp := TRUE;   (* Light the E-stop indicator *)
-  ELSE
-    estop_lamp := FALSE;
+  (* Motor: a NEW Start press seals in; Stop, the E-stop or the fault latch drops it. *)
+  motor := ((start_pb AND start_released) OR motor)
+           AND NOT stop_pb AND estop_ok AND NOT fault_lamp;
 
-    (* Normal latch/unlatch logic (SR flip-flop) *)
-    IF set_input AND NOT relay_state THEN
-      relay_state := TRUE;
-    END_IF;
+  start_released := NOT start_pb;
+  run_light := motor;
 
-    IF reset_input AND relay_state THEN
-      relay_state := FALSE;
-    END_IF;
-  END_IF;
-
-  (* Write outputs to Modbus relays *)
-  relay_output := relay_state;
-
-  (* Map to Modbus coils *)
-  COIL[0] := relay_state;
-  COIL[1] := estop_lamp;
-
+  (* CWE-306 teaching point: this E-stop is only as trustworthy as the input image. A
+     console `force estop_ok 1`, or any unauthenticated write that reaches the I/O image,
+     makes the PLC believe a tripped E-stop is healthy. Real E-stops also open the motor
+     supply directly (a second, hard-wired channel) and safety PLCs refuse forces on
+     safety I/O. *)
 END_PROGRAM

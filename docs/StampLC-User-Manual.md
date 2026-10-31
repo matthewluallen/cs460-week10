@@ -194,6 +194,9 @@ Type `help` at the `plc>` prompt for the live list. The most useful:
 | `cwe` | list the embedded teaching weaknesses & service ports |
 | `log` | the source‑attributed audit log |
 | `bustrace on\|off` | retain decoded bus diagnostics for later review |
+| `mqtt connect <ip>` | (re)connect to an MQTT broker and subscribe the phone page's sensors as network‑only phone points (§9); the broker is saved and dialed again at boot |
+| `mqtt disconnect` | stop and destroy the MQTT client and forget the saved broker (nothing is dialed until the next `mqtt connect`) |
+| `mqtt status` · `mqtt pin <id>` · `mqtt unpin` | client state, broker, free heap, every phone point with value, freshness and age; accept one phone id only / any |
 | `reboot` | software restart |
 
 ---
@@ -233,26 +236,61 @@ API can present the `plc>` CLI in the browser with no terminal app — the stude
 
 ## 9. I/O reference (point names)
 
-Outputs (relays / SSR):
+The board prints **IN1–IN8** and **RELAY 1–4**; the firmware counts from zero (**di0–di7**,
+**relay0–relay3**). Each relay is **N.O · COM · N.C**.
 
-| Tag | Typical use |
-|---|---|
-| `relay0` | relay 0 (label it in your program, e.g. `motor`) |
-| `relay1`, `relay2`, `relay3` | relays 1–3 (e.g. `light_green` / `light_yellow` / `light_red`) |
-| `ssr1`, `ssr2` | solid‑state outputs |
-| `estop` | E‑stop status lamp |
+**Tags come from the installed program.** `points`, `show`, `force` and `set` accept the tag
+names of the loaded project (or the address form `IX0`–`IX7` / `QX0`–`QX3`). The factory and
+twin images ship with **Motor start/stop + E-stop** installed (PROGRAM mode at boot):
 
-Inputs:
+| Terminal (firmware) | Tag | Typical device | 1 means |
+|---|---|---|---|
+| IN1 (di0) | `start_pb` | Start push button, N.O. momentary | pressed |
+| IN2 (di1) | `stop_pb` | Stop push button, N.O. momentary | pressed |
+| IN3 (di2) | `estop_ok` | E‑stop wired **N.C.** | healthy (0 = tripped or wire cut) |
+| IN4 (di3) | `reset_pb` | Fault reset push button, N.O. momentary | pressed |
+| RELAY 1 (relay0) | `motor` | motor (via an interposing relay) | running (seals in) |
+| RELAY 2 (relay1) | `run_light` | run light | follows the motor |
+| RELAY 4 (relay3) | `fault_lamp` | fault lamp | E‑stop fault latched |
 
-| Tag | Typical use |
-|---|---|
-| `di0_start` | start pushbutton |
-| `di1_stop` | stop pushbutton |
-| `di2_estop_in` | E‑stop contact |
-| `di3` … `di7` | general digital inputs |
+The E‑stop latch is cleared only by `reset_pb` while `estop_ok` = 1, and the motor never
+restarts by itself. With nothing wired to IN3 (and on the twin, whose inputs read 0 at boot)
+the program sees a tripped E‑stop until IN3 is driven to 1.
 
-Sensors / status (read‑only): `vin_mv` (supply mV), `current_ma`, `temp_c_x10`
-(°C ×10), `scan_last_us` / `scan_max_us` (cycle time), `fault_count`, `heartbeat`.
+Sensors / status (read‑only Modbus registers): `vin_mv` (supply mV), `current_ma`,
+`temp_c_x10` (°C ×10), `scan_last_us` / `scan_max_us` (cycle time), `fault_count`, `heartbeat`.
+
+**Phone points (network‑only, MQTT).** The firmware has **no default broker**: nothing is dialed
+until you run `mqtt connect <broker IPv4>` (on the twin the host is `127.0.0.1`). That broker is
+saved and dialed again at boot; `mqtt connect` to another broker replaces the client cleanly, and
+`mqtt disconnect` stops it and forgets the saved broker. The client subscribes to the phone page's
+topics `phone/<id>/…`. Every value becomes a phone point with its **own 8 s freshness timer**,
+mirrored to Modbus holding registers 140–165 and listed by `mqtt status`. Phone points never
+touch IN1–IN8, `%IX` or the input mirror coils. A project reads one only by binding a word
+input to `phone_<point>` (value) or `phone_<point>_fresh` (1 while fresh). A stale value holds
+its last sample; phone buttons read 0 when stale.
+
+| Point | Topic.key | Register | Unit |
+|---|---|---|---|
+| `light_lux` | light.lux | 140 | lux |
+| `accel_x100` | accel.mag | 141 | m/s² ×100 |
+| `gyro_a`, `gyro_b`, `gyro_g` | gyro.alpha/beta/gamma | 142–144 | °/s |
+| `heading` | orient.alpha | 145 | ° (compass, wraps 359 → 0) |
+| `tilt_b`, `tilt_g` | orient.beta/gamma | 146–147 | ° |
+| `sound` | sound.level | 148 | 0–100 |
+| `speed_x100` | geo.spd | 149 | m/s ×100 |
+| `course` | geo.hdg | 150 | ° (direction of travel) |
+| `lat_x1000`, `lon_x1000` | geo.lat/lon | 151–152, 153–154 | ° ×1000 (signed 32‑bit, high word first) |
+| `battery` | battery.level | 155 | % |
+| `charging` | battery.charging | 156 | 1/0 |
+| `btn1`, `btn2` | btn1.v, btn2.v | 157, 158 | 1/0 (momentary) |
+| fresh bits | — | 159–160 | bit n = point n fresh |
+| seen bits | — | 161–162 | bit n = point n received since boot / pin change |
+| accepted / rejected / pinned | — | 163 / 164 / 165 | counters; 1 = pinned |
+
+`mqtt pin <phone-id>` accepts only that phone id (the id shown on the phone page); `mqtt unpin`
+accepts any. The id is a claim in the topic, not authentication — `mqtt status` reports
+`"authentication":"none"`, and a spoofed value is just as fresh as a real one.
 
 ---
 
@@ -285,7 +323,7 @@ never expose its raw services to the internet, and power it down when not in use
 | `[ETH] hardware=0 link=0` | No W5500 PoE module. Normal on a Wi‑Fi‑only unit. |
 | Wi‑Fi won't connect | Re‑enter SSID/pass in the config menu (§5.1); confirm the access point is up and on 2.4 GHz; check the printed IP. |
 | Outputs won't actuate | The controller is in **PROGRAM** (outputs inhibited). Switch to **RUN** with a valid program loaded. |
-| `? unknown tag` from `force`/`set` | Use a real point name from `points` (e.g. `relay0`, not a program label like `motor`). |
+| `? unknown tag` from `force`/`set` | Tags come from the loaded program: use a name `points` lists (e.g. `start_pb` with the factory program) or the address form `IX0`–`IX7` / `QX0`–`QX3`. |
 | No `plc>` prompt | Confirm 115200 8‑N‑1 and the right serial port; press Enter. |
 | No hardware at all | The firmware can run in an emulator (QEMU) instead — see `docs/QEMU-Twin.md`. |
 

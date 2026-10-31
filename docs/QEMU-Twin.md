@@ -49,6 +49,15 @@ image). You don't need to build anything:
 nc -U /tmp/plc-serial    # (another shell) the plc> console
 ```
 
+The firmware image boots with the factory default program installed — **Motor start/stop +
+E-stop** (`web/public/projects/motor-start-stop-estop.csco`), in PROGRAM mode; type `mode run`
+to start it. It is stored where any loaded project lives (NVS namespace `plc`, key
+`project_v1`) and was seeded from source by `sbom/firmware/scripts/factory_image.py`, the same
+script `./qemu/build-twin.sh` uses. The twin's input byte boots as 0, so the program's N.C.
+E-stop (`estop_ok`, IN3) reads **tripped** until something drives it to 1 (`force estop_ok 1`,
+or the Studio Test bench's E-stop switch ON); see `wiring/README.md`. Loading another project
+replaces it in your image file (QEMU writes flash changes back to the file).
+
 The rest of this document is for building the binary yourself or understanding how
 the twin works.
 
