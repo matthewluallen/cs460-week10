@@ -85,7 +85,8 @@ services:
       - "8090:8090"              # the phone sensor page + QR + MQTT-over-WebSocket (make PUBLIC)
       - "1883:1883"              # MQTT/TCP — the twin (plc) subscribes here
     # Phones reach :8090 over the Codespace public forward and publish their sensors; the
-    # StampLC twin subscribes to phone/+/… at 10.20.30.40:1883 and maps chosen topics to %IW.
+    # StampLC twin subscribes to phone/+/… at 10.20.30.40:1883 once told to (plc> mqtt connect
+    # 10.20.30.40; saved for later boots) and keeps every value as a network-only phone point.
 
   capture:
     build:
