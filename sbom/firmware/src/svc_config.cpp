@@ -68,3 +68,23 @@ void svc_set_sock_timeout_s(uint32_t s) {
   Preferences p;
   if (p.begin(NS, false)) { p.putUInt("socktmo", s); p.end(); }
 }
+
+// Saved MQTT broker (numeric IPv4 on the W5500 path). Empty by default: the firmware no
+// longer dials a built-in placeholder at boot.
+void svc_get_mqtt_broker(char* out, size_t n) {
+  if (!out || !n) return;
+  out[0] = 0;
+  Preferences p;
+  if (p.begin(NS, true)) {
+    if (p.isKey("mqtt_host")) p.getString("mqtt_host", out, n);
+    p.end();
+  }
+  out[n - 1] = 0;
+}
+void svc_set_mqtt_broker(const char* host) {
+  Preferences p;
+  if (!p.begin(NS, false)) return;
+  if (host && host[0]) p.putString("mqtt_host", host);
+  else if (p.isKey("mqtt_host")) p.remove("mqtt_host");
+  p.end();
+}

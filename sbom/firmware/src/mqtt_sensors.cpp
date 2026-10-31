@@ -59,7 +59,7 @@ void mqtt_sensors_publish_registers(uint32_t now) {
 bool mqtt_sensors_pin(const char* id) { Guard guard; return s.pin(id); }
 void mqtt_sensors_unpin() { Guard guard; s.unpin(); }
 
-String mqtt_sensors_status_json(bool connected, const char* broker, uint32_t received, uint32_t dropped) {
+String mqtt_sensors_status_json(const MqttLinkInfo& link) {
     // Snapshot under the lock; the caller writes the reply without holding it.
     phone::State copy;
     const uint32_t now = millis();
@@ -67,8 +67,9 @@ String mqtt_sensors_status_json(bool connected, const char* broker, uint32_t rec
     String out;
     out.reserve(2400);
     char b[200];
-    snprintf(b, sizeof(b), "{\"mqtt\":\"status\",\"connected\":%s,\"broker\":\"%s\",\"authentication\":\"none\",",
-             connected ? "true" : "false", broker && broker[0] ? broker : "");
+    snprintf(b, sizeof(b), "{\"mqtt\":\"status\",\"connected\":%s,\"client\":\"%s\",\"broker\":\"%s\",\"saved_broker\":\"%s\",\"authentication\":\"none\",",
+             link.connected ? "true" : "false", link.client ? link.client : "idle",
+             link.broker ? link.broker : "", link.saved_broker ? link.saved_broker : "");
     out += b;
     if (copy.pinned[0]) { snprintf(b, sizeof(b), "\"pinned\":\"%s\",\"accepts\":\"pinned phone id only (a claim, not proof)\",", copy.pinned); out += b; }
     else out += "\"pinned\":null,\"accepts\":\"any phone id (last writer wins)\",";
@@ -76,8 +77,9 @@ String mqtt_sensors_status_json(bool connected, const char* broker, uint32_t rec
              copy.last_id, (unsigned long)copy.accepted, (unsigned long)copy.other_id,
              (unsigned long)copy.bad_id, (unsigned long)copy.no_field);
     out += b;
-    snprintf(b, sizeof(b), "\"mqtt_received\":%lu,\"mqtt_dropped\":%lu,\"stale_ms\":%lu,\"regs\":\"%u-%u\",\"points\":{",
-             (unsigned long)received, (unsigned long)dropped, (unsigned long)pointmap::PHONE_STALE_MS,
+    snprintf(b, sizeof(b), "\"mqtt_received\":%lu,\"mqtt_dropped\":%lu,\"clients_started\":%lu,\"heap_free\":%lu,\"stale_ms\":%lu,\"regs\":\"%u-%u\",\"points\":{",
+             (unsigned long)link.received, (unsigned long)link.dropped, (unsigned long)link.clients,
+             (unsigned long)link.heap_free, (unsigned long)pointmap::PHONE_STALE_MS,
              unsigned(pointmap::PHONE_POINTS[0].reg), unsigned(pointmap::PHONE_PINNED));
     out += b;
     for (unsigned i = 0; i < phone::Count; ++i) {

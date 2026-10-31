@@ -16,6 +16,9 @@ It plays the phone with a tiny raw-socket MQTT 3.1.1 client (no libraries) and a
   5. each point goes stale on its own 8 s timer: analog holds, a momentary button reads 0
   6. a project that binds phone_light_lux + phone_light_lux_fresh drives a relay, and the
      fresh gate drops it when the phone goes quiet; then the factory program is reloaded
+  7. the client lifecycle: `mqtt connect` again replaces the client cleanly (no heap loss over
+     repeated reconnects), `mqtt disconnect` stops it and forgets the saved broker, and
+     `mqtt connect` brings it back
 Exit 0 = all passed. Env: SERIAL_SOCK, BROKER (host:port the script publishes to),
 TWIN_BROKER (the host the twin dials; the twin maps 127.0.0.1 to this machine), MODBUS.
 """
@@ -96,13 +99,18 @@ def main():
     con.connect(SERIAL); con.setblocking(False); drain(1.0)
     print("== phone points: twin", SERIAL, "· broker", BROKER, "==", flush=True)
     cmd("mqtt unpin", 1.0)
-    print("  " + cmd(f"mqtt connect {TWIN_BROKER}", 2.0).strip().splitlines()[0][:160])
-    t0 = time.time(); st = {}
-    while time.time() - t0 < 30:
-        st = status()
-        if st.get("connected"): break
-        time.sleep(1)
-    check("mqtt.connected", st.get("connected") is True, f"broker {st.get('broker')}")
+    def connect(wait=40):
+        reply = cmd(f"mqtt connect {TWIN_BROKER}", 2.0).strip()
+        print("  " + (reply.splitlines() or ["(no reply)"])[0][:200])
+        t0 = time.time(); st = {}
+        while time.time() - t0 < wait:
+            st = status()
+            if st.get("connected"): break
+            time.sleep(1)
+        return st
+    st = connect()
+    check("mqtt.connected", st.get("connected") is True,
+          f"client={st.get('client')} broker={st.get('broker')} saved={st.get('saved_broker')} heap_free={st.get('heap_free')}")
     check("mqtt.authentication_none", st.get("authentication") == "none")
 
     ph = Mqtt(BROKER, "test-phone-points")
@@ -184,6 +192,27 @@ def main():
     time.sleep(9.0); io2 = cmd("io", 1.5)                # phone silent: fresh gate drops the alarm
     check("project.fresh_gate", relay(io2, 0) == "0" and relay(io2, 1) == "0",
           f"after 9 s of silence relay0={relay(io2, 0)} relay1={relay(io2, 1)}")
+
+    # client lifecycle: reconnect replaces the client without losing heap; disconnect stops it
+    heaps = []
+    for _ in range(3):
+        st = connect()
+        time.sleep(2.0); heaps.append(status().get("heap_free", 0))
+    check("lifecycle.reconnect", st.get("connected") is True and st.get("clients_started", 0) >= 4,
+          f"clients_started={st.get('clients_started')}")
+    check("lifecycle.no_heap_leak", heaps and max(heaps) - min(heaps) < 3072 and heaps[-1] >= heaps[0] - 3072,
+          f"heap_free after each reconnect: {heaps}")
+    reply = cmd("mqtt disconnect", 2.0)
+    t0 = time.time(); st = {}
+    while time.time() - t0 < 20:
+        st = status()
+        if st.get("client") == "idle": break
+        time.sleep(1)
+    check("lifecycle.disconnect", st.get("client") == "idle" and st.get("connected") is False and st.get("saved_broker") == ""
+          and st.get("heap_free", 0) > heaps[-1], f"client={st.get('client')} saved={st.get('saved_broker')!r} heap_free={st.get('heap_free')}")
+    st = connect()
+    check("lifecycle.connect_again", st.get("connected") is True and st.get("saved_broker") == TWIN_BROKER,
+          f"client={st.get('client')} saved={st.get('saved_broker')}")
 
     # restore the factory default program (PROGRAM mode, as shipped)
     factory = open(os.path.join(ROOT, "sbom", "firmware", "factory", "default-project.json"), "rb").read()

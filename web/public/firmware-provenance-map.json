@@ -1,20 +1,20 @@
 {
  "meta": {
-  "generated_utc": "2026-10-31T14:24:05Z",
+  "generated_utc": "2026-10-31T15:27:47Z",
   "source": "sbom/firmware/src/*.cpp plc_log() call sites",
   "elf": {
    "enriched": true,
    "elf": "/home/claude/cs460-week10/sbom/firmware/.pio/build/m5stamplc/firmware.elf",
    "objdump": "/root/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump",
    "addr2line": "/root/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-addr2line",
-   "resolved_exact": 53,
+   "resolved_exact": 55,
    "resolved_nearest": 5,
    "unresolved": 0,
    "build_note": "func+addr re-derived from this ELF's DWARF; rebuild the firmware and re-run with --elf to keep them true."
   },
   "live_feed": "/api/log  (web_api_log_json) and serial 'log' / busstream",
   "note": "STATIC half of the Logic-Studio association. A live /api/log line is matched to a row by its 'match' regex -> source file:line + CWE. An output change with no matching WRITE/FORCE row is the provenance gap that reveals an unaudited (memory-corruption) write.",
-  "count": 58
+  "count": 60
  },
  "events": [
   {
@@ -32,7 +32,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x42027f39",
+   "addr": "0x420280dd",
    "func": "BacnetResponder::handle()",
    "addr_exact": true
   },
@@ -51,7 +51,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x4202f2b1",
+   "addr": "0x4202f455",
    "func": "Dnp3Outstation::apply_crob(unsigned char const*, int, char const*, unsigned long)",
    "addr_exact": true
   },
@@ -70,7 +70,7 @@
     "eng": "A commanded point write that passed mode + arbiter checks and reached the process image.",
     "cyber": "Authored, audited write: it is attributable to a source and appears in the provenance log. Contrast an output that moves with NO matching entry here."
    },
-   "addr": "0x4202f366",
+   "addr": "0x4202f50a",
    "func": "Dnp3Outstation::apply_crob(unsigned char const*, int, char const*, unsigned long)",
    "addr_exact": true
   },
@@ -89,7 +89,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4202f37c",
+   "addr": "0x4202f520",
    "func": "Dnp3Outstation::apply_crob(unsigned char const*, int, char const*, unsigned long)",
    "addr_exact": true
   },
@@ -108,7 +108,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x4202f702",
+   "addr": "0x4202f8a6",
    "func": "Dnp3Outstation::handle()",
    "addr_exact": true
   },
@@ -127,7 +127,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x4202f73d",
+   "addr": "0x4202f8e1",
    "func": "Dnp3Outstation::handle()",
    "addr_exact": true
   },
@@ -146,7 +146,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x42030049",
+   "addr": "0x420301ed",
    "func": "EnipIdentity::handle()",
    "addr_exact": true
   },
@@ -165,7 +165,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x42030088",
+   "addr": "0x4203022c",
    "func": "EnipIdentity::handle()",
    "addr_exact": true
   },
@@ -184,7 +184,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x4203004e",
+   "addr": "0x420301f2",
    "func": "EnipIdentity::handle()",
    "addr_exact": true
   },
@@ -203,7 +203,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x420314f4",
+   "addr": "0x42031698",
    "func": "eth_http_handle()",
    "addr_exact": true
   },
@@ -222,7 +222,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x420351a0",
+   "addr": "0x42035344",
    "func": "Iec104Outstation::handle()",
    "addr_exact": true
   },
@@ -241,7 +241,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x4203520b",
+   "addr": "0x420353af",
    "func": "Iec104Outstation::handle()",
    "addr_exact": true
   },
@@ -260,7 +260,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x420352b8",
+   "addr": "0x4203545c",
    "func": "Iec104Outstation::handle()",
    "addr_exact": true
   },
@@ -279,7 +279,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x42035356",
+   "addr": "0x420354fa",
    "func": "Iec104Outstation::handle()",
    "addr_exact": true
   },
@@ -298,7 +298,7 @@
     "eng": "A commanded point write that passed mode + arbiter checks and reached the process image.",
     "cyber": "Authored, audited write: it is attributable to a source and appears in the provenance log. Contrast an output that moves with NO matching entry here."
    },
-   "addr": "0x420353a6",
+   "addr": "0x4203554a",
    "func": "Iec104Outstation::handle()",
    "addr_exact": true
   },
@@ -317,7 +317,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x420353fd",
+   "addr": "0x420355a1",
    "func": "Iec104Outstation::handle()",
    "addr_exact": true
   },
@@ -336,7 +336,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x420377f1",
+   "addr": "0x420379a1",
    "func": "ModbusTCPServer::handle_frame(unsigned char const*, unsigned short, unsigned char*, unsigned int, unsigned short&, char const*, unsigned char, PlcAccessPeer)",
    "addr_exact": true
   },
@@ -355,7 +355,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. CWE-306 is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x42037339",
+   "addr": "0x420374e9",
    "func": "ModbusTCPServer::fc_write_single_coil(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": false
   },
@@ -374,7 +374,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x42037359",
+   "addr": "0x42037509",
    "func": "ModbusTCPServer::fc_write_single_coil(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": true
   },
@@ -393,7 +393,7 @@
     "eng": "A commanded point write that passed mode + arbiter checks and reached the process image.",
     "cyber": "Authored, audited write: it is attributable to a source and appears in the provenance log. Contrast an output that moves with NO matching entry here."
    },
-   "addr": "0x420373bc",
+   "addr": "0x4203756c",
    "func": "ModbusTCPServer::fc_write_single_coil(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": true
   },
@@ -412,7 +412,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. CWE-306 is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x42037411",
+   "addr": "0x420375c1",
    "func": "ModbusTCPServer::fc_write_single_register(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": false
   },
@@ -431,7 +431,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x4203741c",
+   "addr": "0x420375cc",
    "func": "ModbusTCPServer::fc_write_single_register(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": true
   },
@@ -450,7 +450,7 @@
     "eng": "A commanded point write that passed mode + arbiter checks and reached the process image.",
     "cyber": "Authored, audited write: it is attributable to a source and appears in the provenance log. Contrast an output that moves with NO matching entry here."
    },
-   "addr": "0x42037468",
+   "addr": "0x42037618",
    "func": "ModbusTCPServer::fc_write_single_register(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": true
   },
@@ -469,7 +469,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. CWE-306 is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x420374d0",
+   "addr": "0x42037680",
    "func": "ModbusTCPServer::fc_write_multiple_coils(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": false
   },
@@ -488,7 +488,7 @@
     "eng": "A commanded point write that passed mode + arbiter checks and reached the process image.",
     "cyber": "Authored, audited write: it is attributable to a source and appears in the provenance log. Contrast an output that moves with NO matching entry here."
    },
-   "addr": "0x420374d5",
+   "addr": "0x42037685",
    "func": "ModbusTCPServer::fc_write_multiple_coils(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": true
   },
@@ -507,7 +507,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. CWE-306 is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x4203758b",
+   "addr": "0x4203773b",
    "func": "ModbusTCPServer::fc_write_multiple_registers(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": false
   },
@@ -526,7 +526,7 @@
     "eng": "A commanded point write that passed mode + arbiter checks and reached the process image.",
     "cyber": "Authored, audited write: it is attributable to a source and appears in the provenance log. Contrast an output that moves with NO matching entry here."
    },
-   "addr": "0x42037590",
+   "addr": "0x42037740",
    "func": "ModbusTCPServer::fc_write_multiple_registers(unsigned char const*, unsigned char*, unsigned short&, char const*)",
    "addr_exact": true
   },
@@ -545,7 +545,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x4203a37d",
+   "addr": "0x4203a79d",
    "func": "OpcUaServer::handle()",
    "addr_exact": true
   },
@@ -564,7 +564,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4203a465",
+   "addr": "0x4203a885",
    "func": "OpcUaServer::handle()",
    "addr_exact": true
   },
@@ -583,14 +583,14 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x4203a382",
+   "addr": "0x4203a7a2",
    "func": "OpcUaServer::handle()",
    "addr_exact": true
   },
   {
-   "id": "plc_console.cpp:251",
+   "id": "plc_console.cpp:250",
    "file": "plc_console.cpp",
-   "line": 251,
+   "line": 250,
    "src": "SRC_USB",
    "src_label": "usb",
    "category": "system",
@@ -602,14 +602,52 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4203b6a4",
+   "addr": "0x4203bab8",
    "func": "_ZL7processPc$constprop$0",
    "addr_exact": true
   },
   {
-   "id": "plc_console.cpp:391",
+   "id": "plc_console.cpp:392",
    "file": "plc_console.cpp",
-   "line": 391,
+   "line": 392,
+   "src": "SRC_USB",
+   "src_label": "usb",
+   "category": "system",
+   "cwe": null,
+   "template": "MQTT broker -> %s:%u (saved)",
+   "match": "^MQTT\\ broker\\ \\->\\ (.*?):(-?[0-9A-Fa-fx]+)\\ \\(saved\\)$",
+   "gloss": {
+    "plain": "A system-level event.",
+    "eng": "Core lifecycle / fault / project event.",
+    "cyber": "Context for the timeline; rarely attributable to a remote peer."
+   },
+   "addr": "0x4203c571",
+   "func": "_ZL7processPc$constprop$0",
+   "addr_exact": true
+  },
+  {
+   "id": "plc_console.cpp:402",
+   "file": "plc_console.cpp",
+   "line": 402,
+   "src": "SRC_USB",
+   "src_label": "usb",
+   "category": "system",
+   "cwe": null,
+   "template": "MQTT disconnected; saved broker cleared",
+   "match": "^MQTT\\ disconnected;\\ saved\\ broker\\ cleared$",
+   "gloss": {
+    "plain": "A system-level event.",
+    "eng": "Core lifecycle / fault / project event.",
+    "cyber": "Context for the timeline; rarely attributable to a remote peer."
+   },
+   "addr": "0x4203c5de",
+   "func": "_ZL7processPc$constprop$0",
+   "addr_exact": true
+  },
+  {
+   "id": "plc_console.cpp:421",
+   "file": "plc_console.cpp",
+   "line": 421,
    "src": "SRC_USB",
    "src_label": "usb",
    "category": "system",
@@ -621,14 +659,14 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4203c1b0",
+   "addr": "0x4203c6e0",
    "func": "_ZL7processPc$constprop$0",
    "addr_exact": true
   },
   {
-   "id": "plc_console.cpp:397",
+   "id": "plc_console.cpp:427",
    "file": "plc_console.cpp",
-   "line": 397,
+   "line": 427,
    "src": "SRC_USB",
    "src_label": "usb",
    "category": "system",
@@ -640,14 +678,14 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4203c1f8",
+   "addr": "0x4203c728",
    "func": "_ZL7processPc$constprop$0",
    "addr_exact": true
   },
   {
-   "id": "plc_console.cpp:587",
+   "id": "plc_console.cpp:617",
    "file": "plc_console.cpp",
-   "line": 587,
+   "line": 617,
    "src": "SRC_USB",
    "src_label": "usb",
    "category": "system",
@@ -659,14 +697,14 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4203cc81",
+   "addr": "0x4203d1ad",
    "func": "_ZL7processPc$constprop$0",
    "addr_exact": true
   },
   {
-   "id": "plc_console.cpp:674",
+   "id": "plc_console.cpp:704",
    "file": "plc_console.cpp",
-   "line": 674,
+   "line": 704,
    "src": "SRC_USB",
    "src_label": "usb",
    "category": "system",
@@ -678,7 +716,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4203bef1",
+   "addr": "0x4203c309",
    "func": "_ZL7processPc$constprop$0",
    "addr_exact": true
   },
@@ -697,7 +735,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x4203db80",
+   "addr": "0x4203e0a8",
    "func": "plc_set_mode(PlcMode, WriteSource, char const*)",
    "addr_exact": true
   },
@@ -716,7 +754,7 @@
     "eng": "PROGRAM/RUN/REMOTE transition through plc_set_mode(), with its guard.",
     "cyber": "Mode is the master gate for remote writes. Who moved it, and from where, is the first question in an incident."
    },
-   "addr": "0x4203d73c",
+   "addr": "0x4203dc64",
    "func": "plc_mode_allows_download(WriteSource)",
    "addr_exact": false
   },
@@ -735,7 +773,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x4203db9d",
+   "addr": "0x4203e0c5",
    "func": "plc_set_mode(PlcMode, WriteSource, char const*)",
    "addr_exact": true
   },
@@ -754,7 +792,7 @@
     "eng": "The guard (mode gate / protocol arbiter / ACL) rejected the command; the process image did not change.",
     "cyber": "This is the control working. The refusal is the weakness that WOULD exist without the gate -- the log proves the gate fired."
    },
-   "addr": "0x4203dba0",
+   "addr": "0x4203e0c8",
    "func": "plc_set_mode(PlcMode, WriteSource, char const*)",
    "addr_exact": true
   },
@@ -773,7 +811,7 @@
     "eng": "PROGRAM/RUN/REMOTE transition through plc_set_mode(), with its guard.",
     "cyber": "Mode is the master gate for remote writes. Who moved it, and from where, is the first question in an incident."
    },
-   "addr": "0x4203dc08",
+   "addr": "0x4203e130",
    "func": "plc_set_mode(PlcMode, WriteSource, char const*)",
    "addr_exact": true
   },
@@ -792,7 +830,7 @@
     "eng": "A maintenance force through the audited plc_force_coil() path -- bypasses the running logic but is still logged.",
     "cyber": "Forces are legitimate but high-trust. Every force here is attributable; a relay that changes with no force and no write is the tell for a memory-corruption path."
    },
-   "addr": "0x4203d7b1",
+   "addr": "0x4203dcd9",
    "func": "plc_force_coil(unsigned short, bool, WriteSource, char const*)",
    "addr_exact": true
   },
@@ -811,7 +849,7 @@
     "eng": "A maintenance force through the audited plc_force_coil() path -- bypasses the running logic but is still logged.",
     "cyber": "Forces are legitimate but high-trust. Every force here is attributable; a relay that changes with no force and no write is the tell for a memory-corruption path."
    },
-   "addr": "0x4203d828",
+   "addr": "0x4203dd50",
    "func": "plc_unforce_coil(unsigned short, WriteSource, char const*)",
    "addr_exact": true
   },
@@ -830,7 +868,7 @@
     "eng": "A maintenance force through the audited plc_force_coil() path -- bypasses the running logic but is still logged.",
     "cyber": "Forces are legitimate but high-trust. Every force here is attributable; a relay that changes with no force and no write is the tell for a memory-corruption path."
    },
-   "addr": "0x4203d8ef",
+   "addr": "0x4203de17",
    "func": "plc_force_di(unsigned char, bool, WriteSource, char const*)",
    "addr_exact": true
   },
@@ -849,7 +887,7 @@
     "eng": "A maintenance force through the audited plc_force_coil() path -- bypasses the running logic but is still logged.",
     "cyber": "Forces are legitimate but high-trust. Every force here is attributable; a relay that changes with no force and no write is the tell for a memory-corruption path."
    },
-   "addr": "0x4203d95a",
+   "addr": "0x4203de82",
    "func": "plc_unforce_di(unsigned char, WriteSource, char const*)",
    "addr_exact": true
   },
@@ -868,7 +906,7 @@
     "eng": "A maintenance force through the audited plc_force_coil() path -- bypasses the running logic but is still logged.",
     "cyber": "Forces are legitimate but high-trust. Every force here is attributable; a relay that changes with no force and no write is the tell for a memory-corruption path."
    },
-   "addr": "0x4203d9e5",
+   "addr": "0x4203df0d",
    "func": "plc_clear_all_forces(WriteSource, char const*)",
    "addr_exact": true
   },
@@ -887,7 +925,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4203dd47",
+   "addr": "0x4203e26f",
    "func": "plc_fault_raise(unsigned short, char const*)",
    "addr_exact": true
   },
@@ -906,7 +944,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4203db13",
+   "addr": "0x4203e03b",
    "func": "plc_fault_clear_all(WriteSource, char const*)",
    "addr_exact": true
   },
@@ -925,7 +963,7 @@
     "eng": "PROGRAM/RUN/REMOTE transition through plc_set_mode(), with its guard.",
     "cyber": "Mode is the master gate for remote writes. Who moved it, and from where, is the first question in an incident."
    },
-   "addr": "0x4203eeb8",
+   "addr": "0x4203f3e0",
    "func": "plc_core_begin()",
    "addr_exact": true
   },
@@ -944,7 +982,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4204558a",
+   "addr": "0x42045ae2",
    "func": "plc_project_startup_poll()",
    "addr_exact": true
   },
@@ -963,7 +1001,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x42048f20",
+   "addr": "0x42049478",
    "func": "plc_bindings_load(char const*, unsigned int, PlcBindingVersion const*)",
    "addr_exact": true
   },
@@ -982,7 +1020,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x4204bc71",
+   "addr": "0x4204c1c9",
    "func": "S7Fingerprint::handle()",
    "addr_exact": true
   },
@@ -1001,7 +1039,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x4204bdd4",
+   "addr": "0x4204c32c",
    "func": "S7Fingerprint::handle()",
    "addr_exact": true
   },
@@ -1020,7 +1058,7 @@
     "eng": "A read/enumeration/handshake -- no output changed, but the device disclosed identity or state.",
     "cyber": "Reconnaissance surface. No write, but it maps the device for an attacker (ATT&CK for ICS discovery)."
    },
-   "addr": "0x4204be3d",
+   "addr": "0x4204c395",
    "func": "S7Fingerprint::handle()",
    "addr_exact": true
   },
@@ -1039,7 +1077,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x4205087c",
+   "addr": "0x42050ecc",
    "func": "time_sync_service()",
    "addr_exact": true
   },
@@ -1058,7 +1096,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x420510fe",
+   "addr": "0x4205174e",
    "func": "web_api_set_json(char const*, char const*, unsigned long)",
    "addr_exact": true
   },
@@ -1077,7 +1115,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x42051353",
+   "addr": "0x420519a3",
    "func": "web_api_reboot_json()",
    "addr_exact": true
   },
@@ -1096,7 +1134,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x420514e5",
+   "addr": "0x42051b35",
    "func": "web_api_proto_set_json(char const*, char const*)",
    "addr_exact": true
   },
@@ -1115,7 +1153,7 @@
     "eng": "Core lifecycle / fault / project event.",
     "cyber": "Context for the timeline; rarely attributable to a remote peer."
    },
-   "addr": "0x42052058",
+   "addr": "0x420526a8",
    "func": "web_config_apply(std::function<bool (char const*, char*, unsigned int)> const&, char const*, bool)",
    "addr_exact": true
   }

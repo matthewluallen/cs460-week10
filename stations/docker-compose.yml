@@ -87,8 +87,9 @@ services:
       - "8090:8090"              # the phone sensor page + QR + MQTT-over-WebSocket (make PUBLIC)
       - "1883:1883"              # MQTT/TCP — the twin (plc) subscribes here
     # Phones reach :8090 over the Codespace public forward and publish their sensors; the plc
-    # station's entrypoint runs `mqtt connect 10.20.30.40` once the twin is up, so the controller
-    # subscribes to phone/+/… here and maps them to NETWORK points (never to the IN1–IN8 terminals).
+    # station's entrypoint runs `mqtt connect 10.20.30.40` once the twin is up (the firmware saves
+    # it for later boots), so the controller subscribes to phone/+/… here and keeps every value as a
+    # network-only phone point (never on the IN1–IN8 terminals).
 
   capture:
     build:

@@ -129,19 +129,10 @@ static bool sp_publish(const char* msgtype) {
     return mqtt_runtime_publish(t, buf, n, 1, false) >= 0;
 }
 
-void mqtt_sparkplug_begin(const char* host, uint16_t port, const char* group, const char* node) {
-    strncpy(s_broker, host ? host : "", sizeof(s_broker) - 1);
-    s_port = port ? port : 1883;
-    if (group && group[0]) strncpy(s_group, group, sizeof(s_group) - 1);
-    if (node && node[0])   strncpy(s_node,  node,  sizeof(s_node) - 1);
-    // Safety: never attempt to connect to the unconfigured placeholder broker.
-    // A blocking connect() to an unreachable host on the display-owning loop is
-    // what blanks the LCD; require a real broker before enabling.
-    if (!s_broker[0] || !strcmp(s_broker, "mqtt.local")) {
-        s_enabled = false;
-        Serial.println("[PROTO] MQTT/Sparkplug: no broker set (MQTT_BROKER_HOST is the placeholder) — not connecting.");
-        return;
-    }
+static bool s_pending = false;   // a broker is configured; start the client once the runtime is idle
+
+// Start the client for the configured broker. Loop task only; the runtime must be idle.
+static void sp_start() {
     char willTopic[64]; topic(willTopic, sizeof(willTopic), "NDEATH");
     char cid[40]; snprintf(cid, sizeof(cid), "stamplc-%s", s_node);
     // Legacy Sparkplug application profile remains separately unqualified.
@@ -153,9 +144,43 @@ void mqtt_sparkplug_begin(const char* host, uint16_t port, const char* group, co
                   s_broker, s_port, s_group, s_node);
 }
 
+void mqtt_sparkplug_begin(const char* host, uint16_t port, const char* group, const char* node) {
+    // Never dial a placeholder: an unreachable default broker keeps a client retrying for
+    // ever (socket, task and ~27 KB of heap) for nothing. An empty host means "no broker".
+    if (!host || !host[0] || !strcmp(host, "mqtt.local")) {
+        Serial.println("[PROTO] MQTT/Sparkplug: no broker configured - not dialing (mqtt connect <host> sets one).");
+        return;
+    }
+    strncpy(s_broker, host, sizeof(s_broker) - 1); s_broker[sizeof(s_broker) - 1] = 0;
+    s_port = port ? port : 1883;
+    if (group && group[0]) { strncpy(s_group, group, sizeof(s_group) - 1); s_group[sizeof(s_group) - 1] = 0; }
+    if (node && node[0])   { strncpy(s_node,  node,  sizeof(s_node) - 1);  s_node[sizeof(s_node) - 1] = 0; }
+    // Reconfigure cleanly: a previous client (another broker, or the same one) is stopped
+    // and destroyed off the loop task; the new client starts from poll() once it is gone.
+    s_enabled = false;
+    if (!mqtt_runtime_idle()) {
+        mqtt_runtime_stop();
+        s_pending = true;
+        Serial.printf("[PROTO] MQTT/Sparkplug: stopping the previous client, then connecting to %s:%u\n", s_broker, s_port);
+        return;
+    }
+    s_pending = false;
+    sp_start();
+}
+
+void mqtt_sparkplug_end() {
+    s_pending = false;
+    s_enabled = false;
+    mqtt_runtime_stop();
+}
+
+const char* mqtt_sparkplug_broker() { return s_broker; }
+bool mqtt_sparkplug_pending() { return s_pending; }
+
 bool mqtt_sparkplug_connected() { return s_enabled && mqtt_runtime_status().connected; }
 
 void mqtt_sparkplug_poll() {
+    if (s_pending && mqtt_runtime_idle()) { s_pending = false; sp_start(); }
     if (!s_enabled) return;
     mqtt_runtime_poll();
     const auto state = mqtt_runtime_status();
@@ -164,7 +189,7 @@ void mqtt_sparkplug_poll() {
         s_connection = state.connections;
         char sub[64]; snprintf(sub, sizeof(sub), "spBv1.0/%s/DCMD/%s/#", s_group, s_node);
         mqtt_runtime_subscribe(sub, 2);
-        mqtt_sensors_subscribe();          // phone/+/{light,accel,orient} -> %IW
+        mqtt_sensors_subscribe();          // phone/+/<topic> -> network-only phone points
         sp_publish("DBIRTH");
         diagnostic_log_printf(diagnostics::Origin::Mqtt,"[PROTO] MQTT3.1.1 session connected; resumed=%d\n", state.session_present);
     }
