@@ -143,7 +143,7 @@ const ATTACKS = [
       emb3d:{id:'TID-311',title:'Default Credentials'},
       cwe:[{id:'CWE-798',title:'Hard-coded Credentials'},{id:'CWE-1392',title:'Use of Default Credentials'}],
       capec:{id:'CAPEC-70',title:'Try Common or Default Usernames and Passwords'},
-      attack:{id:'T0812',title:'Default Credentials · Lateral Movement'},
+      attack:{id:'T1694.001',title:'Insecure Credentials: Default Credentials (formerly T0812) · Lateral Movement'},
       caldera:null,
       d3fend:{id:'D3-MFA',title:'Multi-factor Authentication',url:D3('Multi-factorAuthentication')},
       atlas:null
@@ -173,7 +173,7 @@ const ATTACKS = [
       emb3d:{id:'TID-310',title:'Remotely Accessible Unauthenticated Services'},
       cwe:{id:'CWE-306',title:'Missing Authentication for Critical Function'},
       capec:{id:'CAPEC-1',title:'Accessing Functionality Not Constrained by ACLs'},
-      attack:[{id:'T0855',title:'Unauthorized Command Message'},{id:'T0835',title:'Manipulate I/O Image'}],
+      attack:[{id:'T1692.001',title:'Unauthorized Message: Command Message (formerly T0855 Unauthorized Command Message)'},{id:'T0835',title:'Manipulate I/O Image'}],
       caldera:{id:'modbus',title:'caldera-ot · modbus plugin'},
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
       atlas:null
@@ -188,7 +188,7 @@ const ATTACKS = [
       emb3d:[{id:'TID-406',title:'Unauthorized Messages or Connections'},{id:'TID-407',title:'Missing Message Replay Protection'}],
       cwe:[{id:'CWE-345',title:'Insufficient Verification of Data Authenticity'},{id:'CWE-940',title:'Improper Verification of Source'}],
       capec:{id:'CAPEC-594',title:'Traffic Injection'},
-      attack:{id:'T0856',title:'Spoof Reporting Message'},
+      attack:{id:'T1692.002',title:'Unauthorized Message: Reporting Message (formerly T0856 Spoof Reporting Message)'},
       caldera:{id:'modbus',title:'caldera-ot · modbus plugin'},
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
       atlas:null
@@ -203,7 +203,7 @@ const ATTACKS = [
       emb3d:{id:'TID-310',title:'Remotely Accessible Unauthenticated Services'},
       cwe:[{id:'CWE-306',title:'Missing Authentication for Critical Function'},{id:'CWE-862',title:'Missing Authorization'}],
       capec:{id:'CAPEC-1',title:'Accessing Functionality Not Constrained by ACLs'},
-      attack:{id:'T0855',title:'Unauthorized Command Message'},
+      attack:{id:'T1692.001',title:'Unauthorized Message: Command Message'},
       caldera:null,
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
       atlas:null
@@ -248,7 +248,7 @@ const ATTACKS = [
       emb3d:[{id:'TID-406',title:'Unauthorized Messages or Connections'},{id:'TID-310',title:'Remotely Accessible Unauthenticated Services'}],
       cwe:[{id:'CWE-345',title:'Insufficient Verification of Data Authenticity'},{id:'CWE-306',title:'Missing Authentication'}],
       capec:{id:'CAPEC-594',title:'Traffic Injection'},
-      attack:[{id:'T0855',title:'Unauthorized Command Message'},{id:'T0835',title:'Manipulate I/O Image'}],
+      attack:[{id:'T1692.001',title:'Unauthorized Message: Command Message'},{id:'T0835',title:'Manipulate I/O Image'}],
       caldera:null,
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
       atlas:null

@@ -48,7 +48,7 @@ def _verdict(s, cex_vars, fmt=None):
 # the profile; the violation predicate is the same across profiles (that is the point).
 
 def ota_signature(profile):
-    """CWE-347/494 · ATT&CK T0857 (System Firmware) · D3FEND Message Authentication.
+    """CWE-347/494 · ATT&CK T1693.001 (Modify Firmware: System Firmware; formerly T0857) · D3FEND Message Authentication.
     Secure/verified: accept an OTA image iff its HMAC verifies. Violation: an unsigned image accepted."""
     accepted, hmac_ok = z3.Bools("accepted hmac_ok")
     s = z3.Solver()
@@ -88,7 +88,7 @@ def force_overflow(profile):
     return _verdict(s, [L])
 
 def modbus_authz(profile):
-    """CWE-306 · ATT&CK T0855 (Unauthorized Command) / T0831 (Manipulation of Control).
+    """CWE-306 · ATT&CK T1692.001 (Unauthorized Message: Command Message; formerly T0855) / T0831 (Manipulation of Control).
     Secure: a coil/register write executes only in REMOTE mode (2). Violation: a write executes outside REMOTE."""
     mode = z3.Int("mode")                            # 0 RUN, 1 PROGRAM, 2 REMOTE
     wrote = z3.Bool("write_executed")
@@ -137,10 +137,10 @@ def supply_chain_attestation(profile):
     return _verdict(s, [deployed, hash_ok, prov_ok])
 
 CONTROLS = [
-    ("ota_signature", "CWE-347/494", "T0857", ota_signature),
+    ("ota_signature", "CWE-347/494", "T1693.001", ota_signature),
     ("y2038",         "CWE-197/190", "T0830", y2038_time),
     ("force_overflow","CWE-787/120", "T0835", force_overflow),
-    ("modbus_authz",  "CWE-306",     "T0855", modbus_authz),
+    ("modbus_authz",  "CWE-306",     "T1692.001", modbus_authz),
     ("login_lockout", "CWE-307",     "T0859", login_lockout),
     ("attestation",   "CWE-494/506", "T0862", supply_chain_attestation),
 ]

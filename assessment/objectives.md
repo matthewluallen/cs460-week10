@@ -75,7 +75,7 @@ hardware bill of materials.
 - **Observable:** the edited project loads clean and compiles to IR; the ST↔ladder pairing holds.
 - **Anchor:** `verify-lab.py P4` (compiles the example projects via the Studio compiler and
   checks IR + pairing; this is the `studio-regression` check) · prediction graded by rubric.
-- **Mapping:** ATT&CK **T0833** (Modify Control Logic) context · CWE-306 (missing auth on a critical function, taught in the rung) · CIE: logic is code and gets reviewed.
+- **Mapping:** ATT&CK **T0889** (Modify Program) + **T0843** (Program Download) context (Modify Control Logic, formerly T0833, is deprecated in ATT&CK for ICS v19) · CWE-306 (missing auth on a critical function, taught in the rung) · CIE: logic is code and gets reviewed.
 
 ### Part 5 — Wire & run (input → logic → output) `[both]`
 **SWBAT** drive one input through the ladder to one output and **observe** the physical relay
@@ -84,7 +84,7 @@ change, then **demonstrate** the fail-safe interlock.
   `di2_estop_in` drops the motor (relay0→0) and latches the fault lamp (relay3→1).
 - **Anchor:** `verify-lab.py P5` (forces the inputs and polls `io` for the relay state on the
   running target — identical on hardware and twin).
-- **Mapping:** ATT&CK **T0831** (Manipulation of Control), **T0855** (Unauthorized Command Message) · CIE: the output is the ground truth.
+- **Mapping:** ATT&CK **T0831** (Manipulation of Control), **T1692.001** (Unauthorized Message: Command Message; formerly T0855) · CIE: the output is the ground truth.
 
 ### Part 6 — Firmware & the unsigned update `[both]`
 **SWBAT** **prove** that the OTA endpoint accepts an unsigned/unauthenticated image and
@@ -93,7 +93,7 @@ change, then **demonstrate** the fail-safe interlock.
   unsigned image; the student names signature verification as the absent control.
 - **Anchor:** `verify-lab.py P6` (confirms the OTA endpoint and the unsigned-accept path on
   the vulnerable build).
-- **Mapping:** ATT&CK **T0857** (System Firmware), **T0845** (Program Upload) · CWE-347 (Improper Verification of Cryptographic Signature) · CIE: an update path is a trust path.
+- **Mapping:** ATT&CK **T1693.001** (Modify Firmware: System Firmware; formerly T0857), **T0845** (Program Upload) · CWE-347 (Improper Verification of Cryptographic Signature) · CIE: an update path is a trust path.
 
 ### Part 7 — Supply-chain kill switch `[twin]`
 **SWBAT** **detonate** a dormant OTA payload through a compromised update source, **trace**
@@ -142,7 +142,7 @@ WRITE/FORCE log row — as the signature of an unaudited (memory-corruption) wri
 **SWBAT** mount an **availability** attack (withhold a sensor the PLC trusts) and an
 **integrity** attack (spoof its value), then **build a plausibility gate** and **prove** the
 legitimate reading still passes.
-- **Mapping:** ATT&CK **T0856** (Spoof Reporting Message), **T0814** (Denial of Service),
+- **Mapping:** ATT&CK **T1692.002** (Unauthorized Message: Reporting Message; formerly T0856 Spoof Reporting Message), **T0814** (Denial of Service),
   **T0815** (Denial of View); ATLAS **AML.T0043** · CIE: every sensor value is a claim, not a fact.
 
 ---
