@@ -104,8 +104,19 @@ You keep one short **finding** per part in your course notebook (a local text fi
 fine). A finding states: **what the evidence shows, what it does *not* establish, your
 uncertainty, and which next observation would decide a competing explanation** — plus
 your sources and your individual contribution. A clean tool run is not a grade; the
-reasoning is. See the assignment on Canvas for the rubric and the top-5 CVE / HBOM
-tables to complete.
+reasoning is.
+
+The **measurable learning objectives** and the **rubric** live in the repo under
+[`assessment/`](assessment/) — each objective is tagged where it can be shown (physical PLC,
+twin, or offline) and mapped to a MITRE ATT&CK-for-ICS technique and a CWE. Each part also has
+a machine-checkable anchor you (and your grader) can run on either target:
+
+```bash
+./qemu/run.sh                     # boot the twin (or plug in a StampLC)
+python assessment/verify-lab.py   # PASS/FAIL/SKIP per part — the "mechanics" half of the rubric
+```
+
+See the assignment on Canvas for the top-5 CVE / HBOM tables to complete.
 
 ## The firmware twin — your test bench (no hardware)
 

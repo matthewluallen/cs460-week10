@@ -83,3 +83,25 @@ jobs:
         run: ./qemu/fetch-qemu.sh
       - name: Smoke-test the twin
         run: python qemu/smoke-test.py
+
+  lab-verify:
+    # Runs the per-part assessment anchors (assessment/verify-lab.py) against the twin, so
+    # the gradeable checks students rely on are proven to pass on a clean build. Same checks
+    # run on a physical StampLC over USB (SERIAL_PORT=...). Part 9 needs the secure build and
+    # is exercised separately; P2/P4/P7 SKIP here (no SBOM outputs / Playwright / malicious image).
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Fetch the QEMU twin for this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./qemu/fetch-qemu.sh
+      - name: Verify lab parts on the twin
+        run: python assessment/verify-lab.py --boot-twin P1 P3 P5 P6 P8
