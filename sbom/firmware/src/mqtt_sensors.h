@@ -10,8 +10,8 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
-#include <WString.h>
 #include "mqtt_sensors_core.h"
+class String;   // Arduino's String; declared, not included, so host builds of plc_core.cpp need no WString.h
 
 // Parse one phone/<id>/<topic> message (MQTT delivery path, loop task).
 void mqtt_sensors_ingest(const char* topic, const uint8_t* payload, size_t len);

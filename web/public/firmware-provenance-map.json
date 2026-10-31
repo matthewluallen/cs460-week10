@@ -1,6 +1,6 @@
 {
  "meta": {
-  "generated_utc": "2026-10-31T15:22:00Z",
+  "generated_utc": "2026-10-31T15:27:47Z",
   "source": "sbom/firmware/src/*.cpp plc_log() call sites",
   "elf": {
    "enriched": true,
