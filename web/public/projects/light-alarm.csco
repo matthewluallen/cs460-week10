@@ -1,0 +1,23 @@
+{
+  "schema": "tbd.logic-project/v1",
+  "id": "light-alarm",
+  "name": "Light sensor -> alarm (CH1, deadband)",
+  "revision": 1,
+  "program": {
+    "scan_ms": 50,
+    "nets": [
+      {"id":"N1","label":"Dark alarm with a deadband: CH1 above 3000 mV sets it; it holds until CH1 falls below 2400 mV","expr":{"t":"par","id":"e1","kids":[{"t":"cmp","id":"e2","op":"GT","idx":0,"k":3000},{"t":"series","id":"e3","kids":[{"t":"c","id":"e4","io":"QX","idx":2,"neg":false},{"t":"cmp","id":"e5","op":"GE","idx":0,"k":2400}]}]},"coil":{"io":"QX","idx":2,"neg":false}}
+    ]
+  },
+  "symbols": {
+    "IW0": {"name":"light_mv","comment":"IO expansion CH1 mV from the photoresistor divider; high = dark","unit":"mV"},
+    "QX2": {"name":"light_alarm","comment":"RELAY 3 (base relay 2) -> buzzer + LED; the command, not a contact reading"}
+  },
+  "settings": {
+    "bindings": {"digital_inputs":[0,1,2,3,4,5,6,7],"digital_outputs":[0,1,2,3],"word_inputs":["process1","parameter","parameter","parameter","parameter","parameter","parameter","parameter"]},
+    "parameters": [0,0,0,0,0,0,0,0],
+    "io_expansion": {"address":32,"revision":1},
+    "process_bindings": {"schema":1,"inputs":[{"role":"light_mv","driver":"stamplc-io-candidate","field":"ch1_mv","bus":1,"mux":0,"channel":-1,"address":32,"part":32,"revision":1,"serial":null},null,null]}
+  },
+  "experiment": {"control_route":"baseline","notes":"Pairs with Circuit 'Light sensor -> alarm': RP1 + 10 kOhm divider into IO expansion CH1. Room ~2.2 V, covered >= 4 V. Sets > 3000 mV, clears < 2400 mV. Module 0x20 rev 1 must match; a missing CH1 source blocks RUN."}
+}

@@ -178,8 +178,8 @@ const CIRCUITS=[
 /* ------------------------------------------------------------------ d */
 {id:'d',key:'light-alarm',name:'Light sensor → alarm',
   title:'Light sensor → alarm (analog CH1)',subtitle:'photoresistor divider → IO expansion CH1 → %IW0 (mV) → compare rung → RELAY 3 (relay2) → buzzer + LED',
-  project:{file:'io-expansion',name:'IO expansion level alarm',reads:['%IW0 = CH1 mV (process binding)'],writes:['%QX0 → set its output binding to Base relay 2 (RELAY 3)'],
-    note:'The example binds CH1 → %IW0 and compares > 1000 mV; its %QX0 drives the expansion relay. For this bench, point %QX0 at Base relay 2 (RELAY 3) in Project settings, and add a deadband (set > 3000 mV, clear < 2400 mV).'},
+  project:{file:'light-alarm',name:'Light sensor → alarm',reads:['%IW0 light_mv = CH1 mV (process binding)'],writes:['%QX2 light_alarm → RELAY 3 (relay2)'],
+    note:'Ready to load: CH1 → %IW0; the alarm sets above 3000 mV and holds until CH1 falls below 2400 mV (a deadband, so a hovering hand does not chatter the buzzer). Load it, RUN, then cover RP1.'},
   ctl:CTL,used:{RELAY3:1},expansion:{x:518,y:330,w:100,h:322,used:{'CH1.IN+':1,'CH1.ISO':1}},
   analogPending:true,
   parts:[
