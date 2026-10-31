@@ -9,15 +9,9 @@ that any particular module is connected or that an output physically changed.
 The same tool observes either build. It records the reported `firmware_profile`
 and ELF hash when available; it never changes `ENABLE_CWE_DEMOS`, selects a profile,
 or infers the secure build from a banner. Preserve the vulnerable **and** secure
-builds for the comparison in [the operating guide](../../docs/OPERATING-MODES-AND-ACCESS.md).
+builds for the Part-9 comparison.
 
-For the authorized installation and both-profile acceptance work, follow the
-[local-agent USB handoff](../../docs/CLAUDE-USB-HANDOFF.md). Its
-[candidate manifest](../../docs/USB-BENCH-CANDIDATE.json) pins the exact previously
-tested images. `prepare_usb_install.py` verifies those downloaded artifact inputs
-offline and prepares a sparse-write argument plan only after checking an existing
-full backup and matching partition layout. It never opens USB or runs the plan;
-`capture.py` remains the separate normal-console observation tool described below.
+`capture.py` is the normal-console observation tool described below; it only reads.
 
 ## Before opening the port
 

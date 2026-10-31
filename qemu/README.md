@@ -1,18 +1,8 @@
 # QEMU twin — run the firmware with no hardware
 
-The quick start below uses the **historical classroom image**. For newly built
-generic-runtime artifacts, use the separate lifecycle and plant gates described in
-[the current QEMU guide](../docs/QEMU-Twin.md). Both `m5stamplc` and
-`m5stamplc_secure` remain required; `ENABLE_CWE_DEMOS` remains the teaching switch.
-The loaded application and its plant model are independent of that build choice.
-
-The [reservoir experiment](plants/reservoir.plant.json) ships with a
-[prepared application](plants/reservoir.csco) and a deterministic source model. Its
-host-side qualification checks (`test_plant_model.py`, `model_probe.py`, `plant_smoke.py`,
-and the offline `replay_plant.py`) run from the firmware-development repo, not this
-student checkout — see [the current QEMU guide](../docs/QEMU-Twin.md). The final plant
-gate also uses the firmware's `execution json` endpoint. These checks use the pinned
-Linux x86_64 model; they do not qualify physical expansion modules.
+The quick start below runs the committed classroom image. Both `m5stamplc` and
+`m5stamplc_secure` are required; `ENABLE_CWE_DEMOS` is the teaching switch. See
+[the QEMU twin guide](../docs/QEMU-Twin.md) for the exact-artifact physics and replay.
 
 ## Historical classroom quick start
 

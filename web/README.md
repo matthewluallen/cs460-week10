@@ -12,9 +12,7 @@ team's StampLC through the gateway.
 
 ## Portable projects in Logic Studio
 
-Use [Logic Studio](public/logic_studio.html) with the
-[generic runtime guide](../docs/GENERIC-RUNTIME.md) and
-[operating modes and host permissions guide](../docs/OPERATING-MODES-AND-ACCESS.md).
+Use [Logic Studio](public/logic_studio.html).
 The [reboot RUN project](public/projects/reboot-run-indicator.csco) and
 [matching Studio ST](public/projects/reboot-run-indicator.st) demonstrate an explicit
 startup request. Reboot defaults to PROGRAM; a new project load always stays PROGRAM.

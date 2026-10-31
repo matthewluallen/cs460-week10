@@ -99,30 +99,6 @@ Logic Studio's **Bus monitor** and Part 1's I²C analyzer (`bus-analysis/i2c-ana
 share one lane-timeline engine, so the same capture decodes identically in either — the
 ladder editor and the bus analyzer are two views of the one device.
 
-### Generic application workflow under review
-
-The private generic-runtime draft separates the firmware from application logic,
-tag names, mappings and defaults. In Studio, **Open project → inspect and validate →
-PROGRAM → Load application → Read installed application → RUN**. Both vulnerable
-and secure firmware use this same contract. A newly loaded application stays stopped.
-Reboot defaults to PROGRAM; an intentionally added startup ST declaration or ladder
-rung can request RUN on a later reboot after readiness checks.
-
-- [Prepared projects and deployment contract](docs/GENERIC-RUNTIME.md)
-- [RUN, PROGRAM, REMOTE, startup and optional per-host point permissions](docs/OPERATING-MODES-AND-ACCESS.md)
-- [Expansion-module unit-test coverage and its limits](sbom/firmware/tests/EXPANSION-COVERAGE.md)
-- [PLC capability review and implementation priorities](docs/PLC-CAPABILITY-ROADMAP.md)
-- [Approved implementation sequence and acceptance requirements](docs/APPROVED-IMPLEMENTATION-PLAN.md)
-- [Initial read-only capture from a normally booted local board](tools/bench/README.md)
-- [Local USB installation and bench handoff for Claude](docs/CLAUDE-USB-HANDOFF.md), with the [pinned two-profile candidate](docs/USB-BENCH-CANDIDATE.json)
-- [Execution timing, watchdog results and historical first-fault evidence](docs/EXECUTION-DIAGNOSTICS.md)
-- [Exact-artifact QEMU physics, loadable plant models and replay](docs/QEMU-Twin.md)
-
-This draft does not replace the published classroom binaries or the earlier
-fixed-application exercises until the reviewed student export is released. Use the
-exact firmware/project combination named by the exercise; the legacy Team Console
-and prepared generic-project loader have different deployment contracts.
-
 ## How you'll be graded
 
 You keep one short **finding** per part in your course notebook (a local text file is

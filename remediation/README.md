@@ -132,15 +132,15 @@ was not a hidden firmware patch. A compensating control can reduce reachability 
 consequences while the underlying weakness remains. Name the boundary that enforces
 it: device, network, gateway, host, or a supervised operating procedure.
 
-The optional [host point policy](../docs/OPERATING-MODES-AND-ACCESS.md) is available
+The optional host point policy is available
 in **both** profiles and is disabled by default. When enabled it defaults to denial
 for unlisted host/point/operation combinations and enforces independent `r`, `w`
 and `rw` permissions on supported paths. It is an application-layer exposure
 control, not peer authentication, encrypted transport or a replacement for the
 underlying remediation. Trusted USB/RS-485 paths are outside IP rules; forwarded
 serial access needs a policy at the gateway. Unscoped network management and
-diagnostics are blocked while this policy is enabled. Check the operating guide's
-transport matrix before selecting a probe.
+diagnostics are blocked while this policy is enabled. Check which transport each probe
+uses before selecting one.
 
 For C, choose and record the same project as its comparison baseline. Do not
 silently compare A with ACL disabled to C with ACL enabled and attribute every
@@ -262,12 +262,9 @@ corruption, and the secure build's bounds-checked copy stops it — the same eff
 not a claim. (Count the `check(...)` calls in `qemu/smoke-test.py` yourself rather than
 quoting a fixed number.)
 
-The workflow boots a **committed historical teaching image**.
-It preserves evidence for that earlier classroom release; it does not boot the two
-newly compiled generic-runtime images. New-image twin and physical-bench results must
-identify the exact image, project, reset state and observations separately. The twin's
-embedded course-process physics also needs separation from the generic hardware
-model; its implementation is not verified by these source changes.
+The workflow boots the **committed teaching image**. Any newly compiled image you test must
+identify its exact image, project, reset state and observations separately — a build label is
+not a boot. Twin evidence is model evidence; a physical-bench run is separate.
 
 The current trusted USB/console route supports project mode changes and loading in
 both profiles. That is a deployment trust assumption, not proof that shared gateways

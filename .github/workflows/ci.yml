@@ -38,14 +38,6 @@ jobs:
       - name: capture tests
         working-directory: tools/bench
         run: python -m unittest -v test_capture
-      - name: prepare_usb_install tests (only when the generic-runtime is present)
-        working-directory: tools/bench
-        run: |
-          if [ -f ../../qemu/generic-project-smoke.py ]; then
-            python -m unittest -v test_prepare_usb_install
-          else
-            echo "skip: qemu/generic-project-smoke.py not in this checkout (generic-runtime path)"
-          fi
 
   studio-regression:
     # Headless Playwright check of the Logic Studio: every example project loads clean,
