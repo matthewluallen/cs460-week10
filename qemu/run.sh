@@ -70,6 +70,7 @@ SERIAL_SOCK="${SERIAL_SOCK:-/tmp/plc-serial}"; QMP_SOCK="${QMP_SOCK:-/tmp/plc-qm
 # shellcheck source=twin-status.sh
 . "$HERE/twin-status.sh"
 EXPLICIT=0; { [ $# -ge 1 ] || [ -n "${FLASH_IMG:-}" ]; } && EXPLICIT=1
+[ -n "${FLASH_IMG:-}" ] && WHICH="$(_twin_profile_of "$IMG")"
 if twin_detect "$SERIAL_SOCK" 15; then
   if [ "${RESTART:-0}" = "1" ]; then
     echo "RESTART=1: stopping the running twin (pid $TWIN_PID, $TWIN_WHICH)…"
@@ -86,10 +87,19 @@ if twin_detect "$SERIAL_SOCK" 15; then
     echo "(or stop it first:  ./qemu/twin-status.sh stop )"
     exit 3
   fi
-elif [ "$TWIN_STATE" = "starting" ]; then
-  echo "A twin (pid $TWIN_PID) is still starting and has not reported running yet."
-  echo "Wait a few seconds and re-run, or check it with ./qemu/twin-status.sh (stop: ./qemu/twin-status.sh stop)."
-  exit 3
+elif [ "$TWIN_STATE" = "starting" ] || [ "$TWIN_STATE" = "orphaned" ]; then
+  if [ "${RESTART:-0}" = "1" ]; then
+    echo "RESTART=1: replacing the unusable twin (pid $TWIN_PID, $TWIN_STATE)…"
+    twin_stop "$SERIAL_SOCK"
+  elif [ "$TWIN_STATE" = "starting" ]; then
+    echo "A twin (pid $TWIN_PID) is still starting and has not reported running yet."
+    echo "Wait a few seconds and re-run, or check it with ./qemu/twin-status.sh (replace it: RESTART=1 ./qemu/run.sh)."
+    exit 3
+  else
+    echo "A twin process (pid $TWIN_PID) is alive but its console socket $SERIAL_SOCK was deleted,"
+    echo "so nothing new can attach to it. Replace it with:   RESTART=1 ./qemu/run.sh $PROFILE"
+    exit 3
+  fi
 fi
 
 echo "booting the $WHICH:  $(basename "$IMG")"

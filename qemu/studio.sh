@@ -39,10 +39,19 @@ if twin_detect "$SERIAL_SOCK" 15; then
   else
     echo "twin already running — reusing it, not booting ($TWIN_WHICH, pid $TWIN_PID)."
   fi
-elif [ "$TWIN_STATE" = "starting" ]; then
-  echo "A twin (pid $TWIN_PID) is still starting; it has not reported running in 15 s."
-  echo "Re-run in a moment, or check: ./qemu/twin-status.sh   (stop: ./qemu/twin-status.sh stop)"
-  exit 3
+elif [ "$TWIN_STATE" = "starting" ] || [ "$TWIN_STATE" = "orphaned" ]; then
+  if [ "${RESTART:-0}" = "1" ]; then
+    echo "RESTART=1: replacing the unusable twin (pid $TWIN_PID, $TWIN_STATE)…"
+    twin_stop "$SERIAL_SOCK"
+  elif [ "$TWIN_STATE" = "starting" ]; then
+    echo "A twin (pid $TWIN_PID) is still starting; it has not reported running in 15 s."
+    echo "Re-run in a moment, or check: ./qemu/twin-status.sh   (replace it: RESTART=1 ./qemu/studio.sh)"
+    exit 3
+  else
+    echo "A twin process (pid $TWIN_PID) is alive but its console socket $SERIAL_SOCK was deleted,"
+    echo "so the Studio cannot attach to it. Replace it with:   RESTART=1 ./qemu/studio.sh $PROFILE"
+    exit 3
+  fi
 fi
 
 if ! twin_detect "$SERIAL_SOCK" 0; then

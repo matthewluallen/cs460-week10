@@ -86,7 +86,8 @@ twin_image_for() {
 }
 
 # twin_detect SOCK [WAIT_SECONDS]
-#   sets TWIN_STATE = running | starting | stale | stopped,  TWIN_PID, TWIN_IMG, TWIN_WHICH
+#   sets TWIN_STATE = running | starting | orphaned | stale | stopped,
+#        TWIN_PID, TWIN_IMG, TWIN_WHICH
 #   returns 0 when a live twin is serving SOCK (after waiting up to WAIT_SECONDS if it is
 #   still starting), 1 otherwise.
 twin_detect() {
@@ -99,7 +100,12 @@ twin_detect() {
     while :; do
       if _twin_alive "$pid" "$sock"; then TWIN_STATE="running"; return 0; fi
       kill -0 "$pid" 2>/dev/null || { TWIN_STATE="stopped"; TWIN_PID=""; break; }
-      [ "$i" -ge $((wait * 5)) ] && { TWIN_STATE="starting"; return 1; }
+      if [ "$i" -ge $((wait * 5)) ]; then
+        # still alive but not usable: socket present = still starting; socket gone = orphaned
+        # (its console file was deleted, so nothing new can attach to it)
+        if [ -S "$sock" ]; then TWIN_STATE="starting"; else TWIN_STATE="orphaned"; fi
+        return 1
+      fi
       i=$((i + 1)); sleep 0.2
     done
   fi
@@ -151,6 +157,9 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       fi
       case "$TWIN_STATE" in
         starting) echo "twin: STARTING  pid $TWIN_PID  $TWIN_WHICH — emulator not ready yet"; exit 0 ;;
+        orphaned) echo "twin: ORPHANED  pid $TWIN_PID is alive but its console socket $SOCK is gone"
+                  echo "      nothing new can attach to it — replace it: RESTART=1 ./qemu/studio.sh  (or: ./qemu/twin-status.sh stop)"
+                  exit 1 ;;
         stale)    echo "twin: STOPPED (stale socket $SOCK left by an earlier twin; the next boot clears it)"; exit 1 ;;
         *)        echo "twin: STOPPED — boot it with ./qemu/studio.sh (or ./qemu/run.sh)"; exit 1 ;;
       esac ;;

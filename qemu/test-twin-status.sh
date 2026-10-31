@@ -44,7 +44,7 @@ check '[ $rc -eq 1 ] && grep -q STOPPED <<<"$out"' "status reports STOPPED (exit
 
 echo "2. cold boot with run.sh"
 setsid nohup ./qemu/run.sh >/tmp/tts-run1.log 2>&1 < /dev/null &
-check 'wait_running' "twin boots and its console answers"
+check 'wait_running' "twin boots and reports running"
 check '[ "$(twins)" = 1 ]' "exactly one twin process"
 PID1=$(twinpid)
 
@@ -81,11 +81,17 @@ out=$(console_says "status"); show "$(head -6 <<<"$out")"
 check 'grep -qi "mode" <<<"$out"' "console via the bridge answers 'status'"
 
 echo "9. verify-lab --boot-twin with the twin and Studio already running"
-out=$(timeout 400 python3 assessment/verify-lab.py --boot-twin P1 P3 P5 P6 P8 2>&1); rc=$?; show "$out"
+# (P5 is left out here: the student twin image ships without the Part 4/5 motor program until the
+#  student loads it from the Studio — step 9b checks that P5 says so; step 13 runs P5 on the factory image.)
+out=$(timeout 400 python3 assessment/verify-lab.py --boot-twin P1 P3 P6 P8 2>&1); rc=$?; show "$out"
 check 'grep -q "reusing it" <<<"$out"' "verifier reused the running twin"
 check 'grep -q "via the Studio bridge" <<<"$out"' "verifier attached through the bridge (not a dead second socket client)"
 check '[ $rc -eq 0 ]' "verifier exit 0 (no FAIL)"
 check '[ "$(twinpid)" = "$PID1" ]' "verifier left the student's twin running"
+
+echo "9b. P5 on a twin without the motor program explains what to do"
+out=$(timeout 120 python3 assessment/verify-lab.py P5 2>&1); show "$out"
+check 'grep -q "Logic Studio" <<<"$out" || grep -q "PASS\] P5" <<<"$out"' "P5 passes, or names the missing program and the fix"
 
 echo "10. RESTART=1 reboots; the open Studio server reconnects"
 setsid nohup env RESTART=1 ./qemu/run.sh >/tmp/tts-run2.log 2>&1 < /dev/null &
@@ -103,6 +109,15 @@ out=$(./qemu/twin-status.sh 2>&1); rc=$?; show "$out"
 check '[ -S "$SOCK" ] && [ $rc -eq 1 ] && grep -q stale <<<"$out"' "stale socket detected as STOPPED"
 setsid nohup ./qemu/run.sh >/tmp/tts-run3.log 2>&1 < /dev/null &
 check 'wait_running' "run.sh boots fresh over the stale socket"
+
+echo "11b. a live twin whose socket file was deleted is reported, and RESTART=1 replaces it"
+rm -f "$SOCK"
+out=$(timeout 40 ./qemu/run.sh 2>&1); rc=$?; show "$out"
+check '[ $rc -eq 3 ] && grep -q "was deleted" <<<"$out"' "run.sh reports the orphaned twin instead of booting a second"
+PID3=$(twinpid)
+setsid nohup env RESTART=1 ./qemu/run.sh >/tmp/tts-run4.log 2>&1 < /dev/null &
+for _ in $(seq 1 100); do p=$(twinpid); [ -n "$p" ] && [ "$p" != "$PID3" ] && break; sleep 0.2; done
+check 'wait_running && [ "$(twinpid)" != "$PID3" ] && [ "$(twins)" = 1 ]' "RESTART=1 replaced it with one fresh twin"
 
 echo "12. stop"
 out=$(./qemu/twin-status.sh stop 2>&1); show "$out"

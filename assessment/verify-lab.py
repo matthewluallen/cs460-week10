@@ -202,7 +202,11 @@ def P4_ladder(_c):
 def P5_wire(c):
     """Device: di0_start -> relay0 & relay1; e-stop drops motor, latches fault lamp."""
     c.cmd("mode run", 2.0)
-    c.cmd("force di0_start 1", 0.5)
+    r = c.cmd("force di0_start 1", 1.0)
+    if "unknown tag" in r:
+        return FAIL, ("the running program has no di0_start tag — the Part 4/5 motor program is not "
+                      "loaded. Load it from the Logic Studio onto this target (or boot the factory image: "
+                      "--boot-twin with no twin running), then re-run P5")
     ok1, io1 = poll_relay(c, {0: "1", 1: "1"}, timeout=25)
     c.cmd("force di2_estop_in 1", 0.5)
     ok2, io2 = poll_relay(c, {0: "0", 3: "1"}, timeout=25)
@@ -309,9 +313,7 @@ def boot_twin():
     data = open(PREBUILT, "rb").read()
     img = tempfile.NamedTemporaryFile(delete=False, suffix="-verify-8MB.bin").name
     with open(img, "wb") as f: f.write(data); f.write(b"\xff" * (8 * 1024 * 1024 - len(data)))
-    for p in (SERIAL,):
-        try: os.unlink(p)
-        except FileNotFoundError: pass
+    # No unlink of SERIAL here: run.sh removes a socket only after confirming no live twin owns it.
     env = dict(os.environ, FLASH_IMG=img, SERIAL_SOCK=SERIAL,
                QMP_SOCK="/tmp/plc-verify-qmp", ICOUNT="shift=3,align=off,sleep=off")
     proc = subprocess.Popen(["bash", os.path.join(ROOT, "qemu", "run.sh")], env=env,
@@ -343,9 +345,12 @@ def main():
     try:
         if needs_device:                       # offline-only runs need no target
             c.open()
-            boot = ""; t0 = time.time()
+            boot = ""; t0 = time.time(); nudged = False
             while time.time() - t0 < 40 and "plc>" not in boot:
                 boot += c.drain(0.5)
+                if not nudged and proc is None and c.kind != "serial" and time.time() - t0 > 2:
+                    c.send("")                 # a twin we did not boot is past its banner: ask for a prompt
+                    nudged = True
             if "plc>" not in boot:
                 print("  note: did not see a plc> prompt yet; device checks may fail", flush=True)
         print(f"== CS460 lab verifier ==  target: {c.label()}\n", flush=True)
