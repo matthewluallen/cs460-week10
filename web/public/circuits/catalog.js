@@ -181,7 +181,6 @@ const CIRCUITS=[
   project:{file:'light-alarm',name:'Light sensor → alarm',reads:['%IW0 light_mv = CH1 mV (process binding)'],writes:['%QX2 light_alarm → RELAY 3 (relay2)'],
     note:'Ready to load: CH1 → %IW0; the alarm sets above 3000 mV and holds until CH1 falls below 2400 mV (a deadband, so a hovering hand does not chatter the buzzer). Load it, RUN, then cover RP1.'},
   ctl:CTL,used:{RELAY3:1},expansion:{x:518,y:330,w:100,h:322,used:{'CH1.IN+':1,'CH1.ISO':1}},
-  analogPending:true,
   parts:[
     {id:'RP1',type:'ldr',at:[820,140],span:4,dir:'v',label:{x:776,y:200,t:'RP1  LIGHT',s:'photoresistor',s2:'≈1 kΩ bright · ≈10 kΩ room',anchor:'end'}},
     {id:'R3',type:'resistor',at:[820,300],span:2,value:'10 kΩ'},
@@ -209,7 +208,7 @@ const CIRCUITS=[
   path:{kind:'analog',sensor:'RP1',iw:0,relay:3,contact:'NO',load:'BZ1',loadName:'BZ1 + H1',ma:53,rung:'%IW0 > 3000 mV · < 2400 mV clears'},
   teach:{idea:'The analog signal chain (resistance → volts → I²C → mV → threshold) and alarm hygiene: a deadband stops chatter, an on-delay ignores a passing hand, a range check catches a broken wire.',
     predict:'Write down %IW0 in room light and covered. How many alarm transitions do you expect in 10 s of hovering near the threshold, with and without the deadband?',
-    run:'Physical board with the expansion fitted: cover, hover, uncover; then unplug the 10 kΩ lead. On the twin, use circuit e for now.',
+    run:'Physical board with the expansion fitted: cover, hover, uncover; then unplug the 10 kΩ lead. On the twin, the LIGHT ON RP1 buttons put the same divider voltages on CH1.',
     reconcile:'Count RELAY 3 transitions. What did the cut wire read as, and which rung caught it?',
     mustNot:['that mV equals lux (the divider is uncalibrated and nonlinear)','that a steady reading means a healthy sensor','that an alarm that never fires proves it is bright'],
     consequence:'US water treatment, 2021 (CISA AA21-042A): a chemical setpoint raised more than 100-fold over remote access. Thresholds and setpoints are attack targets (T0836, T0838).'}

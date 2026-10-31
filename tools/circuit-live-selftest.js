@@ -6,11 +6,12 @@
 //         /field?bit=N&v=1 and the release v=0, outputs are read from GET /field, hops 3–5 read OBSERVED;
 //   USB:  a press sends `force IXn 1`, the release `unforce IXn`, hops 1–4 read BYPASSED, leaving the
 //         tab releases every force it set;
+//         the light circuit posts /field?ch1_mv=<divider mV> and releases it (ch1_mv=physics) on leaving;
 //   none: nothing is lit and nothing is sent.
 // The fake bridge is a test double for these assertions only; nothing it returns is ever shown as live data.
 const {chromium}=require('playwright'),http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
 const ROOT=path.join(__dirname,'../web/public');
-const field={di:0,relays:0},log=[],forced={};let sockets=[];
+const field={di:0,relays:0,ch1:1000,ch1src:'physics'},log=[],forced={};let sockets=[];
 function firmware(){ // stand-in scan: relay1 follows input 1 (the pushbutton project); relay0 seals in on IN1
   const inp=i=>forced[i]!=null?forced[i]:(field.di>>i)&1;let r=field.relays;
   r=(r&~2)|(inp(1)?2:0);if(inp(0)&&inp(2))r|=1;if(!inp(2))r&=~1;field.relays=r;}
@@ -19,8 +20,9 @@ function ioReply(){firmware();const toks=[];for(let i=0;i<8;i++)toks.push(String
 function wsSend(sock,text){const b=Buffer.from(text);let h;if(b.length<126)h=Buffer.from([0x81,b.length]);else{h=Buffer.alloc(4);h[0]=0x81;h[1]=126;h.writeUInt16BE(b.length,2);}sock.write(Buffer.concat([h,b]));}
 function wsFrames(buf,cb){let o=0;while(o+2<=buf.length){let len=buf[o+1]&127,p=o+2;if(len===126){len=buf.readUInt16BE(p);p+=2;}const mask=buf.slice(p,p+4);p+=4;if(p+len>buf.length)break;const d=Buffer.alloc(len);for(let i=0;i<len;i++)d[i]=buf[p+i]^mask[i%4];cb(d.toString());o=p+len;}return buf.slice(o);}
 const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x');
-  if(u.pathname==='/field'){if(q.method==='POST'){log.push('POST '+u.search);if(u.searchParams.has('di'))field.di=+u.searchParams.get('di')&255;else{const b=+u.searchParams.get('bit'),v=+u.searchParams.get('v');field.di=v?field.di|(1<<b):field.di&~(1<<b);}}
-    firmware();r.writeHead(200,{'content-type':'application/json'});return r.end(JSON.stringify({ok:true,di:field.di,relays:field.relays}));}
+  if(u.pathname==='/field'){if(q.method==='POST'){log.push('POST '+u.search);if(u.searchParams.has('ch1_mv')){const m=u.searchParams.get('ch1_mv');if(m==='physics'){field.ch1=1000;field.ch1src='physics';}else{field.ch1=+m;field.ch1src='field';}}
+      else if(u.searchParams.has('di'))field.di=+u.searchParams.get('di')&255;else{const b=+u.searchParams.get('bit'),v=+u.searchParams.get('v');field.di=v?field.di|(1<<b):field.di&~(1<<b);}}
+    firmware();r.writeHead(200,{'content-type':'application/json'});return r.end(JSON.stringify({ok:true,di:field.di,relays:field.relays,analog:{ch1_mv:field.ch1,ch1_source:field.ch1src,ch2_mv:0,ch2_source:'physics'}}));}
   if(u.pathname==='/modbus'){const fc=+u.searchParams.get('fc'),addr=+u.searchParams.get('addr'),n=+u.searchParams.get('count');let values=Array(n).fill(0);
     if(fc===1&&addr===100)values=values.map((_,i)=>(field.di>>i)&1);if(fc===3&&addr===50)values=[0,981,12];r.writeHead(200,{'content-type':'application/json'});return r.end(JSON.stringify({ok:true,values}));}
   let p=u.pathname==='/'?'/logic_studio.html':u.pathname;try{const b=fs.readFileSync(path.join(ROOT,p));r.writeHead(200,{'content-type':p.endsWith('.js')?'application/javascript':p.endsWith('.csco')||p.endsWith('.json')?'application/json':'text/html'});r.end(b);}catch(e){r.writeHead(404);r.end('nf');}});
@@ -66,6 +68,16 @@ const dom=(pg,fn,arg)=>pg.waitForFunction(fn,arg,{timeout:6000}).then(()=>true,(
   ok(await dom(pg,()=>/%IW2 = 981/.test(document.getElementById('cwStage').textContent)),'phone block: %IW2 read from Modbus reg 51');
   const ptags=await pg.evaluate(()=>[...document.querySelectorAll('#cwPath .cw-hop-tag')].map(e=>e.textContent));
   ok(ptags[3]==='BYPASSED','phone path: opto · 0x59 in · I²C read BYPASSED');
+  // analog circuit: the twin has no photoresistor; the light presets put the divider voltage on CH1 at the chip
+  await pg.evaluate(()=>CircuitWorkspace.select('d'));
+  ok(await until(()=>log.includes('POST ?ch1_mv=2225')),'light alarm: Room light (≈10 kΩ) → POST /field?ch1_mv=2225 at the chip');
+  await pg.evaluate(()=>CircuitWorkspace.light('covered'));
+  ok(await until(()=>log.includes('POST ?ch1_mv=3814')),'Covered (≈60 kΩ) → POST /field?ch1_mv=3814');
+  ok(await dom(pg,()=>/CH1 = 3814 mV/.test(document.getElementById('cwStage').textContent)),'light card shows CH1 = 3814 mV read back from the chip');
+  const atags=await pg.evaluate(()=>[...document.querySelectorAll('#cwPath .cw-hop-tag')].map(e=>e.textContent));
+  ok(atags[0]==='MODELLED'&&atags[1]==='MODELLED'&&atags[2]==='OBSERVED','analog hops: light + divider MODELLED, CH1 register OBSERVED ('+atags.slice(0,4).join(',')+')');
+  await pg.evaluate(()=>CircuitWorkspace.select('a'));
+  ok(await until(()=>log.includes('POST ?ch1_mv=physics')),'leaving the light circuit hands CH1 back to the twin’s process model');
   // race: reconnect and press at once — the press must land AFTER the circuit's rest byte, never be undone by it
   await pg.evaluate(()=>{AppView.set('logic');disconnect();});await pg.waitForTimeout(400);log.length=0;
   await pg.evaluate(()=>{connectTwin(twinDefaultUrl());});await pg.waitForFunction(()=>conn===true);

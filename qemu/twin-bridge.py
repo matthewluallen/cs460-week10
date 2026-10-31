@@ -52,8 +52,10 @@ Security model (this server can move a process, so it is locked to its own page)
   * Modbus WRITES (FC5/FC6) and /field writes need POST: a cross-site <img src> GET carries no
     Origin, so GET can only ever read;
   * no Access-Control-Allow-Origin: other sites cannot read process values through it either;
-  * /field exposes exactly two QMP properties of the twin's AW9523 expander (`di` read/write,
-    `relays` read) — never raw QMP, which could reset, pause or reconfigure the emulator.
+  * /field exposes a fixed list of QMP properties: the twin's AW9523 expander (`di` read/write,
+    `relays` read) and the IO-expansion field channels (`ch1_mv`/`ch2_mv` read/write, 0-12000 mV
+    or "physics"; `ch1_source`/`ch2_source` read) — never raw QMP, which could reset, pause or
+    reconfigure the emulator.
   * POST /bus/capture?seconds=N (1-10) records the student's OWN running twin's I2C bus: it sends a
     fixed sequence of QMP commands — `logfile <fixed path>`, `trace-event-set-state` for the
     whitelisted I2C observe event only, then (after N s) the same event off and `logfile /dev/null`
@@ -100,6 +102,18 @@ def _deny(conn, code, why):
 QMP_SOCK = os.environ.get("QMP_SOCK", "/tmp/plc-qmp")
 _qmp_lock = threading.Lock()
 _FIELD_PATH = "/machine/soc/aw9523"
+_IOEXP_PATH = "/machine/soc/ioexp"                   # IO expansion pack @0x20: CH1/CH2 field inputs
+
+
+def _field_analog():
+    """CH1/CH2 of the twin's IO expansion: the voltage register the firmware reads and who drives
+    it ("field" = set here, as a wired sensor would; "physics" = the twin's process model)."""
+    try:
+        v = _qmp([("qom-get", {"path": _IOEXP_PATH, "property": p})
+                  for p in ("ch1_mv", "ch1_source", "ch2_mv", "ch2_source")])
+        return {"ch1_mv": v[0], "ch1_source": v[1], "ch2_mv": v[2], "ch2_source": v[3]}
+    except RuntimeError:
+        return None                              # an older twin build without settable channels
 
 def _qmp(cmds, timeout=3.0):
     """Run a list of (execute, arguments) on the twin's QMP socket; return the list of returns."""
@@ -479,12 +493,29 @@ def _serve_modbus(conn, path):
 
 def _serve_field(conn, method, path):
     """Chip-level I/O for the circuit views: the twin's AW9523 `di` byte (the 8 opto inputs as the
-    expander sees them) and `relays` byte. GET reads both. POST ?bit=N&v=0|1 sets one input bit
-    (read-modify-write under a lock) or POST ?di=<0-255> sets the whole byte. The firmware then
-    reads the change over the emulated I2C bus on its next scan, exactly as if a wire had moved."""
+    expander sees them) and `relays` byte, plus the IO expansion's analog CH1/CH2. GET reads them.
+    POST ?bit=N&v=0|1 sets one input bit (read-modify-write under a lock), POST ?di=<0-255> sets
+    the whole byte, POST ?ch1_mv=<0-12000>|physics (or ch2_mv) puts a field voltage on that
+    channel or hands it back to the twin's process model. The firmware then reads the change over
+    the emulated I2C bus, exactly as if a wire had moved."""
     qs = _up.parse_qs(_up.urlparse(path).query)
     try:
-        if method == "POST":
+        if method == "POST" and ("ch1_mv" in qs or "ch2_mv" in qs):
+            sets = []
+            for ch in ("ch1_mv", "ch2_mv"):
+                if ch not in qs:
+                    continue
+                raw = qs[ch][0].strip().lower()
+                mv = -1 if raw == "physics" else int(raw)
+                if mv != -1 and not 0 <= mv <= 12000:
+                    raise ValueError("%s must be 0-12000 (mV) or 'physics'" % ch)
+                sets.append(("qom-set", {"path": _IOEXP_PATH, "property": ch, "value": mv}))
+            try:
+                _qmp(sets)
+            except RuntimeError as e:
+                raise RuntimeError("this twin build cannot set IO-expansion channels (%s); update it: "
+                                   "./qemu/twin-status.sh stop && ./qemu/fetch-qemu.sh" % e)
+        elif method == "POST":
             if "di" in qs:
                 di = int(qs["di"][0]) & 0xFF
             elif "bit" in qs:
@@ -494,14 +525,19 @@ def _serve_field(conn, method, path):
                 cur = _qmp([("qom-get", {"path": _FIELD_PATH, "property": "di"})])[0]
                 di = (cur | (1 << bit)) if v else (cur & ~(1 << bit) & 0xFF)
             else:
-                raise ValueError("POST /field needs ?bit=N&v=0|1 or ?di=<byte>")
+                raise ValueError("POST /field needs ?bit=N&v=0|1, ?di=<byte> or ?ch1_mv=<mV>|physics")
             _qmp([("qom-set", {"path": _FIELD_PATH, "property": "di", "value": di})])
         di, relays = _qmp([("qom-get", {"path": _FIELD_PATH, "property": "di"}),
                            ("qom-get", {"path": _FIELD_PATH, "property": "relays"})])
-        if method == "POST":
+        if method == "POST" and not ("ch1_mv" in qs or "ch2_mv" in qs):
             _bus_note_field(di)                    # an open bus capture draws it as IN1..IN4
         result = {"ok": True, "di": di, "relays": relays,
                   "path": "QMP qom-get/qom-set %s (twin only; a physical board has no QMP)" % _FIELD_PATH}
+        analog = _field_analog()
+        if analog is not None:
+            result["analog"] = analog
+        else:
+            result["analog_note"] = "this twin build has no settable CH1/CH2; ./qemu/fetch-qemu.sh updates it"
     except FileNotFoundError:
         result = {"ok": False, "error": "no QMP socket at %s (is this a twin? a physical board has none)" % QMP_SOCK}
     except Exception as e:

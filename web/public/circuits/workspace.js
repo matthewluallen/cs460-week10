@@ -21,14 +21,14 @@ const $=id=>document.getElementById(id),esc=SK.esc,txt=SK.txt;
 const VBW=1600;
 
 /* ================================================================= state */
-const ST={cur:'a',view:'bench',trace:true,sub:'wire',phoneSel:'orient',active:false,
+const ST={cur:'a',view:'bench',trace:true,sub:'wire',phoneSel:'orient',light:'room',ch1Set:false,active:false,
   sw:{},held:{},conn:'none',sock:null,
-  field:{ok:null,di:null,relays:null,at:0,err:'',busy:false,next:0},
+  field:{ok:null,di:null,relays:null,analog:null,analogNote:'',at:0,err:'',busy:false,next:0},
   io:{di:null,forced:null,cmd:null,act:null,at:0,last:0},
   mirror:{di:null,at:0,next:0},regs:{v:{},at:0,next:0},bus:{r59:0,w59:0},
   ourForce:{},restKey:'',restP:null,epoch:0,renderKey:'',msg:'',msgAt:0,hopPulse:null};
-try{const s=JSON.parse(localStorage.getItem('cw-state')||'{}');if(s.cur&&CC.byId(s.cur))ST.cur=s.cur;if(s.view)ST.view=s.view;if(typeof s.trace==='boolean')ST.trace=s.trace;if(s.phoneSel)ST.phoneSel=s.phoneSel;}catch(e){}
-function save(){try{localStorage.setItem('cw-state',JSON.stringify({cur:ST.cur,view:ST.view,trace:ST.trace,phoneSel:ST.phoneSel}));}catch(e){}}
+try{const s=JSON.parse(localStorage.getItem('cw-state')||'{}');if(s.cur&&CC.byId(s.cur))ST.cur=s.cur;if(s.view)ST.view=s.view;if(typeof s.trace==='boolean')ST.trace=s.trace;if(s.phoneSel)ST.phoneSel=s.phoneSel;if(s.light)ST.light=s.light;}catch(e){}
+function save(){try{localStorage.setItem('cw-state',JSON.stringify({cur:ST.cur,view:ST.view,trace:ST.trace,phoneSel:ST.phoneSel,light:ST.light}));}catch(e){}}
 const circuit=()=>CC.byId(ST.cur)||CC.CIRCUITS[0];
 function themeName(){const t=document.documentElement.getAttribute('data-theme');if(t==='light'||t==='dark')return t;return matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}
 function connKind(){try{if(typeof wsSock!=='undefined'&&wsSock&&wsSock.readyState===1)return 'twin';}catch(e){}try{if(typeof port!=='undefined'&&port&&typeof conn!=='undefined'&&conn)return 'usb';}catch(e){}return 'none';}
@@ -140,6 +140,7 @@ function renderBench(c,v,T){
   for(const x of c.crossings||[])s+=txt(x.x,x.y,x.t,{size:12.5,fill:T.sub,anchor:x.anchor||'start'});
   for(const n of c.notes||[])s+=SK.noteCard(n,T);
   s+=readoutCard(c,v,T);
+  if(isAnalog(c))s+=lightCard(c,v,T);
   if(c.legend)s+=SK.legend(c.legend.x,c.legend.y,c.legend.fns,T);
   return s+`</svg>`;}
 
@@ -193,6 +194,38 @@ function phoneValue(sel,v){
   const sv=raw>32767?raw-65536:raw;
   return{text:`${sel.point} = ${sv}`,sub:`${src} · ${sel.scaleNote||sel.unit}${sel.scale>1?' → '+(sv/sel.scale).toFixed(1)+' '+sel.unit:''}`,tag:'OBSERVED'};}
 
+/* ---------------------------------------------------------------- light on RP1 (analog circuit) */
+/* The twin has no photoresistor. These presets stand in for the light level: the divider
+ * arithmetic gives the CH1 voltage, and POST /field?ch1_mv= puts it on the twin's IO-expansion
+ * channel at the chip, where the firmware reads it over I2C @0x20 like a wired sensor. */
+const LIGHT=[{id:'bright',name:'Bright lamp',r:1000},{id:'room',name:'Room light',r:10000},
+  {id:'hover',name:'Hand hovering',r:15000},{id:'covered',name:'Covered',r:60000}];
+const lightMv=r=>Math.round(4450*r/(r+10000));          // 4.45 V field supply, 10 kΩ to +
+const lightSel=()=>LIGHT.find(x=>x.id===ST.light)||LIGHT[1];
+const fmtR=r=>r>=1000?(r/1000)+' kΩ':r+' Ω';
+const isAnalog=c=>!!(c.path&&c.path.kind==='analog');
+function lightCard(c,v,T){const x=1240,y=318,W=304,sel=lightSel(),a=ST.field.analog,tw=v.conn==='twin';let s=`<g transform="translate(${x},${y})">`;
+  s+=`<rect width="${W}" height="312" rx="16" fill="${T.card}" stroke="${T.cardStroke}" stroke-width="1.4"/>`;
+  s+=txt(16,28,'LIGHT ON RP1',{size:15,weight:900,fill:T.ink})+txt(16,46,tw?'twin: sets CH1 at the chip (QMP)':'board: shade the real photoresistor',{size:12.5,fill:T.sub});
+  s+=`<line x1="12" y1="58" x2="${W-12}" y2="58" stroke="${T.cardRule}"/>`;
+  LIGHT.forEach((L,i)=>{const yy=66+i*31,on=L.id===sel.id,mv=lightMv(L.r),alarm=mv>3000;
+    s+=`<g class="sk-ctl" role="radio" tabindex="${on?0:-1}" aria-checked="${on}" data-light="${L.id}" aria-label="${esc(L.name+', photoresistor about '+fmtR(L.r)+', '+mv+' millivolts on CH1')}">`+
+      `<rect x="10" y="${yy}" width="${W-20}" height="27" rx="7" fill="${on?T.accentFill:'transparent'}" stroke="${on?T.accent:'none'}"/><rect x="8" y="${yy-2}" width="${W-16}" height="31" rx="8" class="sk-focus"/>`+
+      txt(22,yy+18,L.name,{size:13,weight:on?800:600,fill:T.ink})+txt(150,yy+18,'≈'+fmtR(L.r),{size:12.5,fill:T.sub})+
+      txt(W-20,yy+18,mv+' mV',{anchor:'end',size:12.5,weight:800,fill:alarm?T.warnInk:T.ink,mono:1})+`</g>`;});
+  const py=66+4*31+6;s+=`<line x1="12" y1="${py}" x2="${W-12}" y2="${py}" stroke="${T.cardRule}"/>`;
+  s+=txt(16,py+20,'WHAT THE CONTROLLER SEES',{size:12.5,weight:800,fill:T.mut,ls:'.4'});
+  const iw=v.monitorIW&&Array.isArray(v.monitorIW.IW)?v.monitorIW.IW[0]:null;
+  let big='CH1 = —',sub2=v.conn==='none'?'not connected':'no reading yet',tag=null;
+  if(tw&&v.fieldFresh&&a){big=`CH1 = ${a.ch1_mv} mV`;sub2='chip register · '+(a.ch1_source==='field'?'set by the buttons':'the twin’s tank model');tag='OBSERVED';}
+  else if(tw&&v.fieldFresh&&ST.field.analogNote){big='CH1 = n/a';sub2='this twin build cannot set CH1 — update it';tag='PENDING';}
+  else if(v.conn==='usb'&&iw!=null){big=`%IW0 = ${iw} mV`;sub2='Studio monitor (the real CH1)';tag='OBSERVED';}
+  else if(v.conn==='usb'){sub2='start Monitor in Logic to read %IW0';}
+  s+=txt(16,py+52,big,{size:26,weight:800,fill:tag==='OBSERVED'?T.ink:T.mut,mono:1})+txt(16,py+72,sub2,{size:12.5,fill:T.sub});
+  if(tag)s+=SK.tag(tag,W-16-SK.tagWidth(tag),py+34,T);
+  s+=txt(16,py+94,(tw&&iw!=null?`%IW0 = ${iw} mV · `:'')+'alarm sets > 3000 · clears < 2400 mV',{size:12.5,fill:T.cardInk});
+  return s+`</g>`;}
+
 /* ---------------------------------------------------------------- live readout card */
 function readoutRows(c,v){const rows=[];const L=v.live;
   rows.push({l:'Field supply + / −',val:'4.45 V',tag:'NOMINAL'});
@@ -204,8 +237,9 @@ function readoutRows(c,v){const rows=[];const L=v.live;
     if(L){const chip=v.relSrc==='chip'?v.relay[n-1]:null,cm=v.cmd?v.cmd[n-1]:null,ac=v.act?v.act[n-1]:null;
       val=cm!=null?`cmd ${cm}·act ${ac}`:(chip!=null?'chip '+chip:'—');}   // cmd/act from io; else the 0x59 output register
     rows.push({l:`RELAY ${n} (relay${n-1})`,val,tag:L&&val!=='—'?'OBSERVED':null});}
-  if(c.analogPending){let val='—',tag=null;
-    if(v.conn==='twin'){val='twin update pending';tag='PENDING';}
+  if(isAnalog(c)){let val='—',tag=null;const a=ST.field.analog;
+    if(v.conn==='twin'&&v.fieldFresh&&a){val=a.ch1_mv+' mV · '+(a.ch1_source==='field'?'light':'tank model');tag='OBSERVED';}
+    else if(v.conn==='twin'&&v.fieldFresh&&ST.field.analogNote){val='update the twin';tag='PENDING';}
     else if(L&&v.monitorIW&&Array.isArray(v.monitorIW.IW)){val=v.monitorIW.IW[0]+' mV';tag='OBSERVED';}
     rows.push({l:'CH1 → %IW0 (divider)',val,tag});}
   if(c.phone){const sel=CC.PHONE_MAP.find(x=>x.id===ST.phoneSel)||CC.PHONE_MAP[1];const pv=phoneValue(sel,v);rows.push({l:`phone · ${sel.name}`,val:pv.text.replace(/^.* = /,''),tag:pv.tag});}
@@ -376,11 +410,11 @@ function hops(c,v){const P=c.path;if(!P)return[];const L=v.live,k=v.conn;const o
     H('MQTT → point map',pv.text.replace(/^.* = /,sel.point?sel.point+' = ':''),pv.tag||'PENDING','wifi',pv.sub);
     H('opto · 0x59 in · I²C read','not used','BYPASSED','wifi','a network value never crosses the input bus');
     H('rung',sel.thr?sel.thr.text:'compare rung','INFERRED',`relay${P.relay}`,'deadband compare in your ladder');
-  }else{const twin=k==='twin';const iw=v.monitorIW&&Array.isArray(v.monitorIW.IW)?v.monitorIW.IW[0]:null;
-    H('light on RP1','cover / uncover',twin?'PENDING':'INFERRED','part-RP1',twin?'analog input on the twin: coming with the twin update':'the real photoresistor on your bench');
-    H('divider → CH1','V = 4.45·RP1/(RP1+10k)','MODELLED','part-R3','arithmetic, not a reading');
-    H('X1 ADC · I²C 0x20',twin?'pending':'—',twin?'PENDING':'INFERRED','part-R3',twin?'the twin’s CH1 is its built-in tank model, not this circuit':'the firmware polls @0x20');
-    H('%IW0 (mV)',iw!=null?String(iw):'—',twin?'PENDING':(iw!=null?'OBSERVED':'INFERRED'),'part-R3',twin?'use circuit e (phone) on the twin now':'Studio monitor (start Monitor)');
+  }else{const twin=k==='twin';const iw=v.monitorIW&&Array.isArray(v.monitorIW.IW)?v.monitorIW.IW[0]:null;const a=ST.field.analog,sel=lightSel(),tw=twin&&v.fieldFresh&&a;
+    H('light on RP1',twin?`${sel.name} · ≈${fmtR(sel.r)}`:'cover / uncover',twin?'MODELLED':'INFERRED','part-RP1',twin?'a chosen light level: the twin has no photoresistor':'the real photoresistor on your bench');
+    H('divider → CH1','V = 4.45·RP1/(RP1+10k)'+(twin?' = '+lightMv(sel.r)+' mV':''),'MODELLED','part-R3','arithmetic, not a reading');
+    H('X1 ADC · I²C 0x20',tw?`CH1 = ${a.ch1_mv} mV`:'—',tw?'OBSERVED':(twin&&ST.field.analogNote?'PENDING':'INFERRED'),'part-R3',tw?'QMP read of the expansion’s CH1 register; the firmware polls it @0x20':(twin&&ST.field.analogNote?'this twin build cannot set CH1: ./qemu/fetch-qemu.sh':'the firmware polls @0x20'));
+    H('%IW0 (mV)',iw!=null?String(iw):'—',iw!=null?'OBSERVED':'INFERRED','part-R3','Studio monitor (start Monitor in Logic)');
     H('rung',P.rung,'INFERRED',`relay${P.relay}`,'deadband + on-delay in your ladder');}
   H(`${qx} = ${cmd==null?'—':cmd}`,L?'io cmd':'—',cmd!=null?'OBSERVED':'INFERRED',`relay${P.relay}`,'the commanded output image');
   H('I²C write 0x59',L?(v.relSrc==='chip'?`0x59 out bit${P.relay-1} = ${relayBit}`:(v.act?`act = ${v.act[P.relay-1]}`:'—')):'—',v.busW?'OBSERVED':(relayBit!=null?'OBSERVED':'INFERRED'),`relay${P.relay}`,v.relSrc==='chip'?'QMP read of the expander output register':'expander pin readback (not contact feedback)');
@@ -390,7 +424,7 @@ function hops(c,v){const P=c.path;if(!P)return[];const L=v.live,k=v.conn;const o
 function renderPath(c,v){const el=$('cwPath');if(!el)return;const hs=hops(c,v),T=themeName();
   const forcedPath=c.path&&c.path.kind==='wired'&&(v.conn==='usb'||(v.conn==='twin'&&!v.fieldFresh));
   const title=c.path?(c.path.kind==='phone'?'phone sensor → '+c.path.loadName:c.path.kind==='analog'?'RP1 light → '+c.path.loadName:(c.path.sw+' → '+c.path.loadName)):'';
-  let note=!v.live?'Not connected — hops show what each step will prove once the twin (or a board) is connected.':forcedPath?'Driven with force: hops 1–4 read BYPASSED — force writes the input image after the I²C read, so the opto, expander and bus are not exercised. A real switch on the board (IN reads 1, not forced) turns them INFERRED.':c.path.kind==='phone'?'A network value: the opto, expander and I²C read are never on this path.':c.path.kind==='analog'&&v.conn==='twin'?'Analog input on the twin: coming with the twin update — use the phone version (circuit e) now.':'Twin: inputs are set at the chip (QMP), so hops 3–5 are observed; the opto and the contact are drawn, not measured.';
+  let note=!v.live?'Not connected — hops show what each step will prove once the twin (or a board) is connected.':forcedPath?'Driven with force: hops 1–4 read BYPASSED — force writes the input image after the I²C read, so the opto, expander and bus are not exercised. A real switch on the board (IN reads 1, not forced) turns them INFERRED.':c.path.kind==='phone'?'A network value: the opto, expander and I²C read are never on this path.':c.path.kind==='analog'&&v.conn==='twin'?'Analog input on the twin: the light buttons put the divider voltage on CH1 at the chip (QMP); the firmware reads it over I²C @0x20. The photoresistor and divider are modelled, the CH1 register is observed.':'Twin: inputs are set at the chip (QMP), so hops 3–5 are observed; the opto and the contact are drawn, not measured.';
   el.innerHTML=`<div class="cw-path-h"><span class="cw-path-t">Signal path · ${esc(title)}</span><span class="cw-path-n">${esc(note)}</span></div><ol class="cw-hops">`+hs.map((h,i)=>{const t=h.tag;
     return `<li><button type="button" class="cw-hop${t?' t-'+t.toLowerCase():' t-idle'}" data-target="${esc(h.target)}" title="${esc(h.why||'')}"><span class="cw-hop-n">${i+1}</span><span class="cw-hop-t">${esc(h.t)}</span><span class="cw-hop-v">${esc(h.val||'')}</span>${t?`<span class="cw-hop-tag">${esc(t)}</span>`:'<span class="cw-hop-idle">idle</span>'}</button></li>`;}).join('')+`</ol>`;}
 
@@ -410,14 +444,15 @@ function guideText(c,v){
   if(!v.live)return['wait','Connected — waiting for the first readback (field / io).'];
   if(v.conn==='usb')return['force','Physical board over USB: the drawn switches send force IXn (a software override of the input image). Your real snap switches still work — an input that reads 1 without “F” came through the wire. Leaving this view releases every force it set.'];
   if(v.fieldErr)return['force','Twin without the chip endpoint (/field: '+v.fieldErr+'). Falling back to force: hops 1–4 are bypassed.'];
-  if(c.analogPending&&v.conn==='twin')return['mode','Analog input on the twin: coming with the twin update — use the phone version (circuit e) now. The relay outputs below are live; the twin’s CH1 is its built-in tank model, not this photoresistor, so it is not shown as one.'];
+  if(isAnalog(c)&&v.conn==='twin'&&ST.field.analogNote)return['mode','This twin build cannot set CH1 yet, so its CH1 is the built-in tank model, not this photoresistor. Update the twin: ./qemu/twin-status.sh stop && ./qemu/fetch-qemu.sh, then ./qemu/studio.sh.'];
   if(v.mode&&v.mode!=='RUN'&&v.mode!=='REMOTE')return['mode','Twin live. The controller is in '+v.mode+': outputs stay off until you load the paired program and select RUN.'];
+  if(isAnalog(c))return['live','Twin live: the light buttons put the divider voltage on CH1 at the chip; the firmware reads it over I²C @0x20. Load light-alarm and RUN, then go from Room light to Covered and back through Hand hovering.'];
   return['live','Twin live: switches set the AW9523 input bit at the chip; the firmware reads it over I²C on its next scan.'];}
 function render(force){const c=circuit();ST.conn=connKind();const v=buildVm(c);const T=SK.THEMES[themeName()];
-  const key=JSON.stringify([ST.cur,ST.view,ST.trace,ST.sub,ST.phoneSel,T.name,v.live,v.conn,v.in,v.relay,v.inForced,v.cmd,v.act,v.mode,ST.sw,ST.held,v.mirror,v.regs&&[50,51,52].map(r=>v.regs[r]),v.monitorIW&&v.monitorIW.IW,v.busR,v.busW,v.fieldErr]);
+  const key=JSON.stringify([ST.cur,ST.view,ST.trace,ST.sub,ST.phoneSel,T.name,v.live,v.conn,v.in,v.relay,v.inForced,v.cmd,v.act,v.mode,ST.sw,ST.held,v.mirror,v.regs&&[50,51,52].map(r=>v.regs[r]),v.monitorIW&&v.monitorIW.IW,v.busR,v.busW,v.fieldErr,ST.light,ST.field.analog&&[ST.field.analog.ch1_mv,ST.field.analog.ch1_source],ST.field.analogNote]);
   if(!force&&key===ST.renderKey)return;ST.renderKey=key;
   const stage=$('cwStage');if(!stage)return;
-  const focusId=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('[data-ctl],[data-phone]');const fsel=focusId?(focusId.dataset.ctl?`[data-ctl="${focusId.dataset.ctl}"]`:`[data-phone="${focusId.dataset.phone}"]`):null;
+  const focusId=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('[data-ctl],[data-phone],[data-light]');const fsel=focusId?(focusId.dataset.ctl?`[data-ctl="${focusId.dataset.ctl}"]`:focusId.dataset.light?`[data-light="${focusId.dataset.light}"]`:`[data-phone="${focusId.dataset.phone}"]`):null;
   const gal=$('cwParts');
   if(ST.sub==='parts'){stage.innerHTML='';if(gal)gal.innerHTML=renderGallery(T);return;}
   if(gal&&gal.innerHTML)gal.innerHTML='';
@@ -437,7 +472,17 @@ function pulse(target){const stage=$('cwStage');if(!stage)return;let el=stage.qu
 
 /* ================================================================= driving inputs */
 function note(m){ST.msg=m;ST.msgAt=performance.now();render(true);}
-async function postField(q){const r=await fetch('/field?'+q,{method:'POST',cache:'no-store',signal:AbortSignal.timeout(3000)});if(!r.ok)throw Error('http '+r.status);const j=await r.json();if(!j.ok)throw Error(j.error||'refused');ST.field.ok=true;ST.field.di=j.di;ST.field.relays=j.relays;ST.field.at=performance.now();return j;}
+async function postField(q){const r=await fetch('/field?'+q,{method:'POST',cache:'no-store',signal:AbortSignal.timeout(3000)});if(!r.ok)throw Error('http '+r.status);const j=await r.json();if(!j.ok)throw Error(j.error||'refused');ST.field.ok=true;ST.field.di=j.di;ST.field.relays=j.relays;ST.field.analog=j.analog||null;ST.field.analogNote=j.analog_note||'';ST.field.at=performance.now();return j;}
+async function setLight(id){if(!LIGHT.some(x=>x.id===id))return;ST.light=id;save();ST.conn=connKind();const sel=lightSel(),mv=lightMv(sel.r);
+  if(ST.conn==='twin'){try{const j=await postField('ch1_mv='+mv);ST.ch1Set=true;
+      if(!j.analog)note('This twin build cannot set CH1 — update it: ./qemu/twin-status.sh stop && ./qemu/fetch-qemu.sh');
+      else{try{log&&log(`Circuit d: ${sel.name} → RP1 ≈ ${fmtR(sel.r)} → ${mv} mV on CH1 at the chip (QMP); the firmware reads it over I²C @0x20.`,'ok');}catch(e){}}}
+    catch(e){note('CH1: '+e.message);}}
+  else if(ST.conn==='usb')note('Physical board: shade or light the real photoresistor — these buttons drive only the twin.');
+  else note('Not connected — Connect twin to put this light level on CH1.');
+  render(true);}
+function releaseCh1(){if(!ST.ch1Set)return;ST.ch1Set=false;
+  try{fetch('/field?ch1_mv=physics',{method:'POST',cache:'no-store',keepalive:true}).catch(()=>{});}catch(e){}}
 function busy(){try{return typeof busBusy!=='undefined'&&busBusy;}catch(e){return false;}}
 function send(cmd){if(busy())return false;try{return typeof rawSend==='function'&&rawSend(cmd);}catch(e){return false;}}
 async function drive(p,val){const c=circuit();const n=+p.in.slice(2)-1;ST.conn=connKind();
@@ -450,20 +495,20 @@ function press(id){const c=circuit(),p=c.parts.find(x=>x.id===id);if(!p||!p.cont
   if(p.mode==='momentary'){if(ST.held[id])return;ST.held[id]=true;ST.sw[id]=true;drive(p,1);}
   else{ST.sw[id]=!ST.sw[id];drive(p,ST.sw[id]?1:0);}render(true);}
 function release(id){const c=circuit(),p=c.parts.find(x=>x.id===id);if(!p||p.mode!=='momentary'||!ST.held[id])return;ST.held[id]=false;ST.sw[id]=false;drive(p,0);render(true);}
-function releaseAll(){Object.keys(ST.held).forEach(id=>{if(ST.held[id])release(id);});
+function releaseAll(){releaseCh1();Object.keys(ST.held).forEach(id=>{if(ST.held[id])release(id);});
   Object.keys(ST.ourForce).forEach(n=>{if(ST.ourForce[n]){send('unforce IX'+n);ST.ourForce[n]=false;}});}
 /* twin only: put the chip's input byte in this circuit's rest state (e.g. the NC E-stop closed → IN3 = 1)
  * once per connection and circuit. Every drive awaits it, so a press can never be overwritten by it. */
 function ensureRest(c){const key=ST.epoch+'|'+c.id;if(ST.restKey===key)return ST.restP||Promise.resolve();
   if(ST.conn!=='twin'||ST.field.ok===false)return Promise.resolve();ST.restKey=key;const di=c.restDi||0;
-  ST.restP=postField('di='+di).then(()=>{if(!Object.values(ST.held).some(Boolean))resetSwitches(c);
+  ST.restP=postField('di='+di).then(()=>isAnalog(c)?postField('ch1_mv='+lightMv(lightSel().r)).then(j=>{if(j.analog)ST.ch1Set=true;}).catch(()=>{}):null).then(()=>{if(!Object.values(ST.held).some(Boolean))resetSwitches(c);
       try{log&&log(`Circuit ${c.id}: twin field inputs set to this circuit’s rest state at the chip (di = 0x${di.toString(16).padStart(2,'0')}${di?': '+c.parts.filter(p=>p.control&&p.rest).map(p=>p.in+' = 1').join(', '):''}).`,'ok');}catch(e){}})
     .catch(e=>{ST.field.ok=false;ST.field.err=e.message;});
   return ST.restP;}
 
 /* ================================================================= polling (only while the Wire & run view is visible) */
 async function pollField(){if(ST.field.busy)return;ST.field.busy=true;try{const r=await fetch('/field',{cache:'no-store',signal:AbortSignal.timeout(2500)});const j=await r.json();
-  if(j&&j.ok){ST.field.ok=true;ST.field.err='';ST.field.di=j.di;ST.field.relays=j.relays;ST.field.at=performance.now();}else{ST.field.ok=false;ST.field.err=(j&&j.error)||'unavailable';ST.field.next=performance.now()+3000;}}
+  if(j&&j.ok){ST.field.ok=true;ST.field.err='';ST.field.di=j.di;ST.field.relays=j.relays;ST.field.analog=j.analog||null;ST.field.analogNote=j.analog_note||'';ST.field.at=performance.now();}else{ST.field.ok=false;ST.field.err=(j&&j.error)||'unavailable';ST.field.next=performance.now()+3000;}}
   catch(e){ST.field.ok=false;ST.field.err=e.message||'unreachable';ST.field.next=performance.now()+3000;}finally{ST.field.busy=false;}}
 async function pollModbus(){const now=performance.now();if(now<ST.mirror.next)return;ST.mirror.next=now+1000;try{const d=await window.mbFetch('fc=1&addr=100&count=8');if(d&&d.ok){ST.mirror.di=d.values;ST.mirror.at=performance.now();}}catch(e){ST.mirror.next=now+4000;}
   if(circuit().phone){try{const r=await window.mbFetch('fc=3&addr=50&count=3');if(r&&r.ok){ST.regs.v={50:r.values[0],51:r.values[1],52:r.values[2]};ST.regs.at=performance.now();}}catch(e){}}}
@@ -472,7 +517,7 @@ function onIo(line){let m=/^DI\s*:\s*(.*)$/.exec(line);
   m=/^relay([0-3])\s+cmd=([01])\s+act=([01])/.exec(line);if(m){ST.io.cmd=ST.io.cmd||[0,0,0,0];ST.io.act=ST.io.act||[0,0,0,0];ST.io.cmd[+m[1]]=+m[2];ST.io.act[+m[1]]=+m[3];ST.io.at=performance.now();}}
 let ticker=null;
 function tick(){if(!ST.active||document.hidden)return;const prev=ST.conn;ST.conn=connKind();const now=performance.now();
-  if(ST.conn!==prev){ST.epoch++;ST.field={ok:null,di:null,relays:null,at:0,err:'',busy:false,next:0};ST.io={di:null,forced:null,cmd:null,act:null,at:0,last:0};ST.ourForce={};ST.restKey='';ST.restP=null;if(!Object.values(ST.held).some(Boolean))resetSwitches(circuit());}
+  if(ST.conn!==prev){ST.epoch++;ST.field={ok:null,di:null,relays:null,analog:null,analogNote:'',at:0,err:'',busy:false,next:0};ST.ch1Set=false;ST.io={di:null,forced:null,cmd:null,act:null,at:0,last:0};ST.ourForce={};ST.restKey='';ST.restP=null;if(!Object.values(ST.held).some(Boolean))resetSwitches(circuit());}
   if(ST.conn==='twin'){const c=circuit();if(ST.restKey!==ST.epoch+'|'+c.id&&ST.field.ok!==false)ensureRest(c);else if(now>=ST.field.next)pollField();if(now-ST.io.last>1000){ST.io.last=now;send('io');}pollModbus();}
   else if(ST.conn==='usb'){if(now-ST.io.last>500){ST.io.last=now;send('io');}}
   render();}
@@ -493,14 +538,19 @@ function init(){const stage=$('cwStage');if(!stage)return;
   stage.addEventListener('pointerdown',e=>{const g=e.target.closest('[data-ctl]');if(!g)return;e.preventDefault();try{g.focus({preventScroll:true});}catch(_){}press(g.dataset.ctl);});
   window.addEventListener('pointerup',()=>{Object.keys(ST.held).forEach(id=>{if(ST.held[id])release(id);});});
   window.addEventListener('pointercancel',()=>{Object.keys(ST.held).forEach(id=>{if(ST.held[id])release(id);});});
-  stage.addEventListener('keydown',e=>{const g=e.target.closest('[data-ctl],[data-phone]');if(!g)return;
+  stage.addEventListener('keydown',e=>{const g=e.target.closest('[data-ctl],[data-phone],[data-light]');if(!g)return;
+    if(g.dataset.light){const ids=LIGHT.map(x=>x.id),i=ids.indexOf(ST.light);
+      const go=id=>{ST.light=id;render(true);const n=stage.querySelector(`[data-light="${id}"]`);if(n)n.focus({preventScroll:true});setLight(id);};
+      if(e.key===' '||e.key==='Enter'){e.preventDefault();go(g.dataset.light);}
+      else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();go(ids[(i+(e.key==='ArrowDown'?1:ids.length-1))%ids.length]);}return;}
     if(g.dataset.phone){const ids=CC.PHONE_MAP.map(x=>x.id),i=ids.indexOf(ST.phoneSel);
       if(e.key===' '||e.key==='Enter'){e.preventDefault();ST.phoneSel=g.dataset.phone;save();render(true);}
       else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();ST.phoneSel=ids[(i+(e.key==='ArrowDown'?1:ids.length-1))%ids.length];save();render(true);}return;}
     if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();press(g.dataset.ctl);}});
   stage.addEventListener('keyup',e=>{const g=e.target.closest('[data-ctl]');if(g&&(e.key===' '||e.key==='Enter'))release(g.dataset.ctl);});
   stage.addEventListener('focusout',e=>{const g=e.target.closest&&e.target.closest('[data-ctl]');if(g&&ST.held[g.dataset.ctl]&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest(`[data-ctl="${g.dataset.ctl}"]`)))setTimeout(()=>{const a=document.activeElement;if(!(a&&a.closest&&a.closest(`[data-ctl="${g.dataset.ctl}"]`)))release(g.dataset.ctl);},0);});
-  stage.addEventListener('click',e=>{const r=e.target.closest('[data-phone]');if(r){ST.phoneSel=r.dataset.phone;save();render(true);}});
+  stage.addEventListener('click',e=>{const r=e.target.closest('[data-phone]');if(r){ST.phoneSel=r.dataset.phone;save();render(true);}
+    const l=e.target.closest('[data-light]');if(l)setLight(l.dataset.light);});
   $('cwPath').addEventListener('click',e=>{const b=e.target.closest('[data-target]');if(b)pulse(b.dataset.target);});
   try{if(typeof lineListeners!=='undefined'&&!lineListeners.includes(onIo))lineListeners.push(onIo);}catch(e){}
   const prevBus=window.__flowBusEvent;window.__flowBusEvent=function(line){try{prevBus&&prevBus(line);}catch(e){}const m=/^@BUS\s+\d+\s+([RW])\s+0x59/i.exec(line);if(m){if(m[1].toUpperCase()==='R')ST.bus.r59=performance.now();else ST.bus.w59=performance.now();}};
@@ -510,7 +560,7 @@ function init(){const stage=$('cwStage');if(!stage)return;
   if(window.AppView)window.AppView.register(v=>{const act=v==='circuit';if(act&&!ST.active){ST.active=true;ST.restKey='';ST.restP=null;render(true);if(!ticker)ticker=setInterval(tick,250);}
     else if(!act&&ST.active){ST.active=false;releaseAll();if(ticker){clearInterval(ticker);ticker=null;}}});}
 window.CircuitWorkspace={select:id=>{selectCircuit(id);},setView:v=>{ST.view=v;render(true);},setTrace:t=>{ST.trace=!!t;render(true);},setSub,render:()=>render(true),state:ST,
-  press:id=>press(id),release:id=>release(id),phone:id=>{ST.phoneSel=id;render(true);},
+  press:id=>press(id),release:id=>release(id),phone:id=>{ST.phoneSel=id;render(true);},light:id=>setLight(id),
   open:id=>{if(window.AppView)window.AppView.set('circuit');setSub('wire');if(id)selectCircuit(id);}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
