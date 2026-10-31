@@ -47,7 +47,7 @@ OTA_HOST=<plc-ip>:80 HMI_HOST=<plc-ip>:8080 NTP_HOST=<your-host-ip> \
 | P2 SBOM | no (offline) | an SPDX and a CycloneDX SBOM both exist from one tree (SKIP until you run `sbom/run_sbom.sh`) |
 | P3 HBOM | yes | `i2cscan` shows the six internal I²C devices + PORT.A 0x77 |
 | P4 Ladder | no (offline) | the example projects compile to IR and keep the ST↔ladder pairing (needs `npm i playwright`, else SKIP) |
-| P5 Wire & run | yes | `di0_start`→relay0&1; e-stop drops the motor and latches the fault lamp |
+| P5 Wire & run | yes | factory motor program: `start_pb`→relay0&1 and seal-in; `stop_pb` drops; `estop_ok`=0 drops the motor and latches relay3; restoring `estop_ok` neither restarts nor clears; `reset_pb` clears with the motor off; `start_pb` runs again |
 | P6 Unsigned OTA | yes | the OTA endpoint is present and advertises an unauthenticated upload |
 | P7 Supply-chain | twin, manual | SKIPs (needs the published malicious image; detonation is an interactive step) |
 | P8 NTP / Y2038 | yes | benign sync is clean; an armed rogue server wraps the clock to ~1902 |

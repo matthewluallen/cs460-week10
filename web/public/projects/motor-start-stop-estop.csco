@@ -1,0 +1,32 @@
+{
+  "schema": "tbd.logic-project/v1",
+  "id": "motor-start-stop-estop",
+  "name": "Motor start/stop + E-stop (fail-safe)",
+  "revision": 1,
+  "program": {
+    "scan_ms": 50,
+    "nets": [
+      {"id":"N1","label":"Reset pulse: one scan on a NEW press of reset_pb (a held or stuck reset does nothing)","expr":{"t":"rtrig","id":"e1","inst":0,"in":{"t":"c","id":"e2","io":"IX","idx":3,"neg":false}},"coil":{"io":"MX","idx":0,"neg":false}},
+      {"id":"N2","label":"Fault latch: estop_ok = 0 sets it; only a reset pulse while estop_ok = 1 clears it","expr":{"t":"par","id":"e3","kids":[{"t":"c","id":"e4","io":"IX","idx":2,"neg":true},{"t":"series","id":"e5","kids":[{"t":"c","id":"e6","io":"QX","idx":3,"neg":false},{"t":"c","id":"e7","io":"MX","idx":0,"neg":true}]}]},"coil":{"io":"QX","idx":3,"neg":false}},
+      {"id":"N3","label":"Motor: a new Start press seals in; Stop, E-stop or the fault latch drops it","expr":{"t":"series","id":"e8","kids":[{"t":"par","id":"e9","kids":[{"t":"series","id":"e10","kids":[{"t":"c","id":"e11","io":"IX","idx":0,"neg":false},{"t":"c","id":"e12","io":"MX","idx":1,"neg":false}]},{"t":"c","id":"e13","io":"QX","idx":0,"neg":false}]},{"t":"c","id":"e14","io":"IX","idx":1,"neg":true},{"t":"c","id":"e15","io":"IX","idx":2,"neg":false},{"t":"c","id":"e16","io":"QX","idx":3,"neg":true}]},"coil":{"io":"QX","idx":0,"neg":false}},
+      {"id":"N4","label":"Remember start_pb was released, so a held Start never restarts the motor","expr":{"t":"c","id":"e17","io":"IX","idx":0,"neg":true},"coil":{"io":"MX","idx":1,"neg":false}},
+      {"id":"N5","label":"Run light follows the motor","expr":{"t":"c","id":"e18","io":"QX","idx":0,"neg":false},"coil":{"io":"QX","idx":1,"neg":false}}
+    ]
+  },
+  "symbols": {
+    "IX0": {"name":"start_pb","comment":"IN1 (di0): Start push button, N.O. momentary; 1 = pressed"},
+    "IX1": {"name":"stop_pb","comment":"IN2 (di1): Stop push button, N.O. momentary; 1 = pressed (no N.C. button in kit)"},
+    "IX2": {"name":"estop_ok","comment":"IN3 (di2): E-stop slide switch wired N.C.; 1 = healthy, 0 = tripped or wire cut"},
+    "IX3": {"name":"reset_pb","comment":"IN4 (di3): Fault reset push button, N.O. momentary; 1 = pressed"},
+    "QX0": {"name":"motor","comment":"RELAY 1 (relay0) N.O.: motor interposing relay coil; seals in"},
+    "QX1": {"name":"run_light","comment":"RELAY 2 (relay1) N.O.: green run light; follows motor"},
+    "QX3": {"name":"fault_lamp","comment":"RELAY 4 (relay3) N.O.: red fault lamp; it IS the latched E-stop fault"},
+    "MX0": {"name":"reset_edge","comment":"One-scan pulse on a new reset_pb press"},
+    "MX1": {"name":"start_released","comment":"1 when start_pb was released last scan; Start needs a new press"}
+  },
+  "settings": {
+    "bindings": {"digital_inputs":[0,1,2,3,4,5,6,7],"digital_outputs":[0,1,2,3],"word_inputs":["parameter","parameter","parameter","parameter","parameter","parameter","parameter","parameter"]},
+    "parameters": [0,0,0,0,0,0,0,0]
+  },
+  "experiment": {"control_route":"baseline","notes":"Factory default. E-stop is N.C. (0 = trip, fault latches, no auto-restart). Stop is N.O. because the kit has no N.C. push button: a cut Stop wire cannot stop the motor. Twin DI boot as 0: drive estop_ok 1."}
+}

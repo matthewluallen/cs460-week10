@@ -56,8 +56,8 @@ nodes.append({"id": "uitab0", "type": "ui_tab", "name": "Plant HMI", "icon": "da
 nodes.append({"id": "g_proc",  "type": "ui_group", "name": "Process",          "tab": "uitab0", "order": 1, "disp": True, "width": 6, "collapse": False})
 nodes.append({"id": "g_stat",  "type": "ui_group", "name": "Controller status","tab": "uitab0", "order": 2, "disp": True, "width": 6, "collapse": False})
 nodes.append({"id": "g_relay", "type": "ui_group", "name": "Relays & outputs",  "tab": "uitab0", "order": 3, "disp": True, "width": 6, "collapse": False})
-nodes.append({"id": "g_in",    "type": "ui_group", "name": "Inputs (incl. phone buttons)", "tab": "uitab0", "order": 4, "disp": True, "width": 6, "collapse": False})
-nodes.append({"id": "g_phone", "type": "ui_group", "name": "Phone sensors -> %IW", "tab": "uitab0", "order": 5, "disp": True, "width": 6, "collapse": False})
+nodes.append({"id": "g_in",    "type": "ui_group", "name": "Wired inputs IN1-IN8", "tab": "uitab0", "order": 4, "disp": True, "width": 6, "collapse": False})
+nodes.append({"id": "g_phone", "type": "ui_group", "name": "Phone points (network-only)", "tab": "uitab0", "order": 5, "disp": True, "width": 6, "collapse": False})
 
 def mbread(nid, name, dtype, adr, qty, y, wires):
     return {"id": nid, "type": "modbus-read", "name": name, "topic": "", "showStatusActivities": False,
@@ -82,8 +82,9 @@ def text(nid, group, order, label, y):
             "label": label, "format": "{{msg.payload}}", "layout": "row-spread", "className": "", "style": False,
             "font": "", "fontSize": 16, "color": "#ffffff", "x": 650, "y": y, "wires": []}
 
-# ---- Holding registers 0..52 -> process + status + phone ----
-nodes.append(mbread("rd_hr", "Read HR 0..52", "HoldingRegister", 0, 53, 120, [["fn_proc", "fn_stat", "fn_phone"], []]))
+# ---- Holding registers 0..32 -> process + status; 140..165 -> network-only phone points ----
+nodes.append(mbread("rd_hr", "Read HR 0..32", "HoldingRegister", 0, 33, 120, [["fn_proc", "fn_stat"], []]))
+nodes.append(mbread("rd_phone", "Read HR 140..165 (phone)", "HoldingRegister", 140, 26, 560, [["fn_phone"], []]))
 
 nodes.append(func("fn_proc", "process", (
     "const r = msg.payload;\n"
@@ -111,15 +112,19 @@ nodes.append(text("ui_scan", "g_stat", 3, "Scan max", 360))
 nodes.append(text("ui_flt",  "g_stat", 4, "Faults", 420))
 nodes.append(text("ui_frc",  "g_stat", 5, "Forces active", 480))
 
-nodes.append(func("fn_phone", "phone -> IW", (
-    "const r = msg.payload;\n"
-    "// plc_core writes regs 50/51/52 only while a phone is live (mqtt_sensors_fresh).\n"
-    "// Plausibility-gate each one so the HMI shows 0 ('no phone') instead of stale junk.\n"
-    "const g = (v, lo, hi) => (v >= lo && v <= hi) ? v : 0;\n"
-    "const lux  = {payload: g(r[50]||0, 0, 2000)};     // ambient light (lux)\n"
-    "const acc  = {payload: g((r[51]||0)/100, 0, 40)}; // |a| m/s^2 (stored x100)\n"
-    "const tilt = {payload: g(r[52]||0, -180, 180)};   // tilt beta (deg, signed)\n"
-    "return [lux, acc, tilt];"), 3, 560, [["ui_lux"], ["ui_acc"], ["ui_tilt"]]))
+nodes.append(func("fn_phone", "phone points", (
+    "const r = msg.payload;  // index 0 = register 140 (sbom/firmware/point_map.json phone_points)\n"
+    "// Every phone point has its own 8 s freshness bit (reg 159 = points 0-15, reg 160 = 16+).\n"
+    "// A stale value FREEZES at its last sample, so show 0 unless the point is fresh.\n"
+    "const n = v => (v==null ? 0 : v);\n"
+    "const s16 = v => (n(v) & 0x8000) ? n(v) - 0x10000 : n(v);\n"
+    "const fresh = (n(r[20]) << 16 | n(r[19])) >>> 0;\n"
+    "const f = i => ((fresh >>> i) & 1) === 1;\n"
+    "const lux  = {payload: f(0) ? n(r[0]) : 0};          // phone_light_lux (reg 140)\n"
+    "const acc  = {payload: f(1) ? n(r[1]) / 100 : 0};    // phone_accel_x100 (reg 141)\n"
+    "const tilt = {payload: f(6) ? s16(r[6]) : 0};        // phone_tilt_b (reg 146)\n"
+    "const btn  = {payload: {BTN1: f(15) && n(r[17]) === 1, BTN2: f(16) && n(r[18]) === 1}}; // regs 157/158\n"
+    "return [lux, acc, tilt, btn];"), 4, 560, [["ui_lux"], ["ui_acc"], ["ui_tilt"], ["ui_pbtn"]]))
 nodes.append(gauge("ui_lux",  "g_phone", 1, "Light", "lux",   0, 1000, 540))
 nodes.append(gauge("ui_acc",  "g_phone", 2, "Accel", "m/s²", 0, 30, 620))
 nodes.append(gauge("ui_tilt", "g_phone", 3, "Tilt β", "°", -90, 90, 700,
@@ -159,13 +164,14 @@ nodes.append({"id": "ui_relays", "type": "ui_template", "group": "g_relay", "nam
               "fwdInMessages": True, "resendOnRefresh": True, "templateScope": "local",
               "className": "", "x": 650, "y": 760, "wires": [[]]})
 
-# ---- Coils 100..107 -> digital inputs incl. phone buttons (%IX6/%IX7) ----
+# ---- Coils 100..107 -> the wired inputs IN1..IN8 (DI0..DI7). Phone buttons are NOT here:
+# they are network-only phone points (regs 157/158), shown in the phone group. ----
 nodes.append(mbread("rd_di", "Read DI 100..107", "Coil", 100, 8, 860, [["fn_di"], []]))
 nodes.append(func("fn_di", "DI mirror -> leds", (
-    "const c = msg.payload;  // DI_MIRROR_BASE=100; index 0..7 = DI0..DI7\n"
+    "const c = msg.payload;  // DI_MIRROR_BASE=100; index 0..7 = DI0..DI7 = IN1..IN8\n"
+    "// names: the factory motor program's tags (motor-start-stop-estop)\n"
     "msg.payload = {\n"
-    "  START:!!c[0], STOP:!!c[1], ESTOP_IN:!!c[2],\n"
-    "  BTN1:!!c[6], BTN2:!!c[7]   // phone momentary buttons -> %IX6/%IX7\n"
+    "  START:!!c[0], STOP:!!c[1], ESTOP_OK:!!c[2], RESET:!!c[3]\n"
     "};\nreturn msg;"), 1, 860, [["ui_di"]]))
 di_tpl = (
     "<style>\n"
@@ -176,12 +182,23 @@ di_tpl = (
     ".di.phone.on .dot{background:#b084ff;box-shadow:0 0 10px #b084ff}\n"
     "</style>\n"
     "<div class=\"drow\">\n"
-    "  <div class=\"di\" ng-class=\"{on:msg.payload.START}\"><div class=\"dot\"></div>DI0 START</div>\n"
-    "  <div class=\"di\" ng-class=\"{on:msg.payload.STOP}\"><div class=\"dot\"></div>DI1 STOP</div>\n"
-    "  <div class=\"di\" ng-class=\"{on:msg.payload.ESTOP_IN}\"><div class=\"dot\"></div>DI2 ESTOP</div>\n"
-    "  <div class=\"di phone\" ng-class=\"{on:msg.payload.BTN1}\"><div class=\"dot\"></div>%IX6 BTN1</div>\n"
-    "  <div class=\"di phone\" ng-class=\"{on:msg.payload.BTN2}\"><div class=\"dot\"></div>%IX7 BTN2</div>\n"
+    "  <div class=\"di\" ng-class=\"{on:msg.payload.START}\"><div class=\"dot\"></div>IN1 start_pb</div>\n"
+    "  <div class=\"di\" ng-class=\"{on:msg.payload.STOP}\"><div class=\"dot\"></div>IN2 stop_pb</div>\n"
+    "  <div class=\"di\" ng-class=\"{on:msg.payload.ESTOP_OK}\"><div class=\"dot\"></div>IN3 estop_ok (NC: lit = healthy)</div>\n"
+    "  <div class=\"di\" ng-class=\"{on:msg.payload.RESET}\"><div class=\"dot\"></div>IN4 reset_pb</div>\n"
     "</div>")
+pbtn_tpl = (
+    "<style>.drow{display:flex;gap:10px}.di{flex:1 1 70px;text-align:center;padding:8px 4px;border-radius:8px;"
+    "background:#1b2330;color:#9fb0c3;font:600 12px system-ui}.di .dot{width:14px;height:14px;border-radius:50%;"
+    "margin:0 auto 6px;background:#30405a}.di.on{color:#eaf6ff}.di.on .dot{background:#b084ff;box-shadow:0 0 10px #b084ff}</style>\n"
+    "<div class=\"drow\">\n"
+    "  <div class=\"di\" ng-class=\"{on:msg.payload.BTN1}\"><div class=\"dot\"></div>phone_btn1 (reg 157)</div>\n"
+    "  <div class=\"di\" ng-class=\"{on:msg.payload.BTN2}\"><div class=\"dot\"></div>phone_btn2 (reg 158)</div>\n"
+    "</div>")
+nodes.append({"id": "ui_pbtn", "type": "ui_template", "group": "g_phone", "name": "Phone buttons",
+              "order": 4, "width": 6, "height": 2, "format": pbtn_tpl, "storeOutMessages": True,
+              "fwdInMessages": True, "resendOnRefresh": True, "templateScope": "local",
+              "className": "", "x": 650, "y": 780, "wires": [[]]})
 nodes.append({"id": "ui_di", "type": "ui_template", "group": "g_in", "name": "Input LEDs",
               "order": 1, "width": 6, "height": 2, "format": di_tpl, "storeOutMessages": True,
               "fwdInMessages": True, "resendOnRefresh": True, "templateScope": "local",

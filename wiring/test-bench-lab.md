@@ -34,6 +34,10 @@ is identical.)
 
 ## A. Build and load the one-rung program
 
+> The twin boots with the **factory motor program** installed (Motor start/stop + E-stop —
+> section D). Loading your rung **replaces** it in your twin's flash; you can load the factory
+> program back from *Example projects* at any time.
+
 1. In Logic Studio, build one rung: a **normally-open contact on `%IX1`** driving the
    **coil `%QX1`** (Relay 1). (`%IX1` is digital input 1; `%QX1` is Relay 1.)
 2. Click **Load application**. Loading requires the controller to be in **PROGRAM**
@@ -123,10 +127,52 @@ plc> io
 - **Reconcile.** Explain, in terms of the contact type, which LED followed the button.
   Then: what single rung would make **both** LEDs turn on together?
 
+## D. The factory program — motor start/stop + fail-safe E-stop
+
+The program the factory and twin images ship installed is
+[`motor-start-stop-estop.csco`](../web/public/projects/motor-start-stop-estop.csco) (*Example
+projects → Motor start/stop + E-stop*). Its tags are what `force` accepts:
+
+| Board terminal (firmware) | Tag | Snap-kit part | 1 means |
+|---|---|---|---|
+| IN1 (di0) | `start_pb` | press switch, N.O. momentary | pressed |
+| IN2 (di1) | `stop_pb` | press switch, N.O. momentary (the kit has no N.C. push button) | pressed |
+| IN3 (di2) | `estop_ok` | slide switch wired **N.C.**: ON = healthy | healthy; **0 = tripped or wire cut** |
+| IN4 (di3) | `reset_pb` | press switch, N.O. momentary | pressed |
+| RELAY 1 (relay0) N.O. | `motor` | snap-kit relay coil → motor on its own battery | running |
+| RELAY 2 (relay1) N.O. | `run_light` | green LED | follows the motor |
+| RELAY 4 (relay3) N.O. | `fault_lamp` | red LED: the latched E-stop fault | fault latched |
+
+**Start-up state of the predesigned circuit.** Place the E-stop slide switch **ON** (IN3 = 1)
+and leave the three push buttons released (IN1, IN2, IN4 = 0). The twin's inputs all read 0 at
+boot, so until something drives IN3 the program sees a **tripped E-stop** and, in RUN, latches
+the fault lamp — that is the honest reading of an N.C. loop with nothing connected. If the lamp
+is already lit, press Reset once. On the console the same start-up is `force estop_ok 1`.
+
+**Predict → Run → Reconcile** (read `io` after each step; predict relay0, relay1, relay3 first):
+
+| Step | Action | Expected relay0 / relay1 / relay3 |
+|---|---|---|
+| 1 | Start pressed, then released | 1 / 1 / 0 — the motor seals in |
+| 2 | Stop pressed | 0 / 0 / 0 |
+| 3 | Start again, then E-stop slide OFF (`force estop_ok 0`) | 0 / 0 / **1** — fault latched |
+| 4 | E-stop slide back ON | 0 / 0 / **1** — no restart, fault still latched |
+| 5 | Reset pressed | 0 / 0 / 0 — fault cleared, motor **stays off** |
+| 6 | Start pressed | 1 / 1 / 0 |
+
+Reconcile each row against `io`. Then answer: why must step 4 *not* restart the motor? What
+does a cut wire on IN3 do, and what would a cut wire on IN2 (the N.O. Stop) do? `verify-lab.py
+P5` asserts exactly these rows.
+
+> Forcing `estop_ok` to 1 defeats the E-stop in software. A real E-stop also opens the motor
+> supply directly (a second, hard-wired channel), so no program, force or unauthenticated
+> Modbus write can keep the motor running.
+
 ## What you can rely on (and what you can't)
 
 - Force the input by its **logical operand**: `force IX1 1` (the Test bench button does
-  this for you). `force di1` is **not** a valid tag — the firmware forces `%IX`/`%QX`.
+  this for you), or by a **tag name of the loaded program** (`force start_pb 1` with the
+  factory program). `force di1` is **not** a valid tag — tags come from the loaded program.
 - You must be in **PROGRAM** mode to load a program; **RUN** to execute it.
 - An LED only lights if your **ladder** drives its relay. The bench proves your *logic*,
   not your wiring — and `io`'s `cmd/act` is the readback a remote student can cite

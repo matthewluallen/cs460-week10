@@ -7,7 +7,7 @@
 #include <atomic>
 #include <string.h>
 namespace {
-constexpr size_t MAX_PAYLOAD=1024,MAX_TOPIC=191;
+constexpr size_t MAX_PAYLOAD=1024,MAX_TOPIC=191,QueueDepth=8;
 struct Message {char topic[MAX_TOPIC+1];uint8_t data[MAX_PAYLOAD];size_t length;};
 esp_mqtt_client_handle_t client=nullptr;
 QueueHandle_t incoming=nullptr;
@@ -41,7 +41,9 @@ void event(void*,esp_event_base_t,int32_t id,void* data){
 bool mqtt_runtime_begin(const char* host,uint16_t port,const char* id,const char* will_topic,const uint8_t* will,size_t will_len,MqttMessageHandler callback){
     if(plc_project_host_acl_enabled())return false;
     if(client||!host||!host[0]||strlen(host)>63||!id||!id[0]||strlen(id)>63||!will_topic||strlen(will_topic)>MAX_TOPIC||will_len>MAX_PAYLOAD||(!will&&will_len)||!port)return false;
-    incoming=xQueueCreate(4,sizeof(Message));if(!incoming)return false;
+    // Depth 8: a phone publishes several topics at once (accel+gyro+orient...). Drops are
+    // counted (mqtt status: mqtt_dropped) and each phone point simply waits for its next sample.
+    incoming=xQueueCreate(QueueDepth,sizeof(Message));if(!incoming)return false;
     handler=callback;
     esp_mqtt_client_config_t config{};
     config.broker.address.hostname=host;config.broker.address.port=port;config.broker.address.transport=MQTT_TRANSPORT_OVER_TCP;
@@ -78,7 +80,7 @@ bool mqtt_runtime_begin(const char* host,uint16_t port,const char* id,const char
     }
     return true;
 }
-void mqtt_runtime_poll(){if(!incoming)return;Message m;for(unsigned i=0;i<4&&xQueueReceive(incoming,&m,0)==pdTRUE;i++)if(handler&&!plc_project_host_acl_enabled())handler(m.topic,m.data,m.length);}
+void mqtt_runtime_poll(){if(!incoming)return;Message m;for(unsigned i=0;i<QueueDepth&&xQueueReceive(incoming,&m,0)==pdTRUE;i++)if(handler&&!plc_project_host_acl_enabled())handler(m.topic,m.data,m.length);}
 MqttStatus mqtt_runtime_status(){return {client!=nullptr,connected.load(),present.load(),connections.load(),disconnections.load(),delivered.load(),received.load(),dropped.load(),errors.load(),last_id.load()};}
 int mqtt_runtime_publish(const char* topic,const uint8_t* data,size_t size,int qos,bool retain){
     {

@@ -41,7 +41,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
      await p.evaluate(cmd=>{try{send(cmd);}catch(e){}},c); await sleep(400);
    }
    // also write the coils directly so the live read reflects energized outputs
-   await p.evaluate(async()=>{ try{ await fetch('/modbus?fc=5&addr=1&value=1'); await fetch('/modbus?fc=5&addr=2&value=1'); }catch(e){} });
+   await p.evaluate(async()=>{ try{ await fetch('/modbus?fc=5&addr=1&value=1',{method:'POST'}); await fetch('/modbus?fc=5&addr=2&value=1',{method:'POST'}); }catch(e){} });
    await sleep(2000);
  };
 

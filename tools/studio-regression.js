@@ -4,6 +4,9 @@
 // For every example project it asserts: loads clean (no page errors), compiles
 // to device IR, deploymentText builds, and the ST<->ladder highlight pairing
 // holds (ladder and ST elements share data-eid). Baseline 2026-10-30: all green.
+// It also checks that sbom/firmware/factory/default-project.json is exactly the Studio's
+// compile of projects/motor-start-stop-estop.csco (the factory/twin default program) and
+// that the Studio's phone word sources match sbom/firmware/point_map.json.
 // Requires: npm i playwright (and a chromium). Run from web/public or repo root.
 const {chromium}=require('playwright'), fs=require('fs'), path=require('path');
 const ROOT=fs.existsSync('logic_studio.html')?'.':'web/public';
@@ -12,7 +15,7 @@ const ROOT=fs.existsSync('logic_studio.html')?'.':'web/public';
  const port=srv.address().port;const b=await chromium.launch({args:['--no-sandbox']});const pg=await b.newPage({viewport:{width:1440,height:900}});
  await pg.goto('http://127.0.0.1:'+port+'/logic_studio.html',{waitUntil:'networkidle'});
  await pg.evaluate(()=>{ if(typeof closeModal==='function')closeModal(); });
- const examples=['pushbutton','two-led-nonc','indicator','interlocked-pair','io-expansion','reboot-run-indicator','reservoir-pid'];
+ const examples=['motor-start-stop-estop','pushbutton','two-led-nonc','indicator','interlocked-pair','io-expansion','reboot-run-indicator','reservoir-pid'];
  const results=[];
  for(const name of examples){
    const text=fs.readFileSync(path.join(ROOT,'projects',name+'.csco'),'utf8');
@@ -36,6 +39,20 @@ const ROOT=fs.existsSync('logic_studio.html')?'.':'web/public';
    r.name=name; r.pageerrors=errs.slice(0,2);
    results.push(r);
  }
+ // Factory default + phone points: the payload seeded into the factory/twin NVS must be the
+ // Studio's own compile of the example, and the Studio's phone word sources must match the
+ // firmware point map (sbom/firmware/point_map.json phone_points).
+ const repo=path.resolve(ROOT,'..','..');
+ const factory=fs.readFileSync(path.join(repo,'sbom','firmware','factory','default-project.json'),'utf8');
+ const pointMap=JSON.parse(fs.readFileSync(path.join(repo,'sbom','firmware','point_map.json'),'utf8'));
+ const motor=fs.readFileSync(path.join(ROOT,'projects','motor-start-stop-estop.csco'),'utf8');
+ const extra=await pg.evaluate(([text,want,phone])=>{
+   const {project}=StudioProject.parseProject(text);
+   return {factory_payload: StudioProject.deploymentText(project)===want,
+           phone_sources: JSON.stringify(StudioProject.PHONE_POINTS)===JSON.stringify(phone)};
+ },[motor,factory,pointMap.phone_points.points.map(p=>p.name)]);
+ results.push({name:'factory+phone-map',load:'ok',ir:extra.factory_payload?'ok (factory payload matches)':'FAIL:factory payload stale',
+   dtext:extra.phone_sources?1:'FAIL:phone sources differ from point_map.json',sharedEids:1,pageerrors:[]});
  console.log(JSON.stringify(results,null,0).replace(/},/g,'},\n'));
  await b.close();srv.close();
  // CI gate: a regression must fail the build, not just print. Each example must load

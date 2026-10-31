@@ -7,8 +7,12 @@ the Week-10 lab depends on, so a firmware/image/twin regression is caught in CI:
 
   1. boot         firmware reaches the `plc>` console
   2. i2cscan      six internal devices (0x20 0x32 0x40 0x43 0x48 0x59) + Wire1 0x77
-  3. control      RUN + force di0_start -> relay0 AND relay1 energise
-  4. interlock    force di2_estop_in -> motor drops, relay3 (fault lamp) latches
+  3. control      the factory motor program (motor-start-stop-estop): estop_ok held 1 (NC
+                  E-stop healthy; the twin's DI byte boots 0 = tripped), start_pb -> relay0
+                  (motor) AND relay1 (run light); releasing start_pb keeps them on (seal-in)
+  4. interlock    estop_ok 0 -> motor drops, relay3 (fault lamp) latches; estop_ok back to 1
+                  does NOT restart the motor or clear the fault; reset_pb clears the fault
+                  and the motor stays off
   5. ota          the W5500 HTTP OTA endpoint on :80 advertises /api/upload
   6. hmi          the HMI JSON API on :8080 serves live points
   7. bus/sigrok   the virtual I2C tap decodes to the same 0x59/0x43 transactions
@@ -148,20 +152,45 @@ def main():
         check("i2cscan.internal", len(internal) == 6, f"{len(internal)}/6: {internal}")
         check("i2cscan.wire1_0x77", has_wire1, "BME688 on PORT.A")
 
-        # 3. control: RUN + force di0_start -> relay0 & relay1
+        # 3. control: the factory motor program. A NC E-stop reads 0 unless something holds it
+        #    closed (the twin's DI byte boots 0), so drive estop_ok = 1 first, release the
+        #    buttons, enter RUN and pulse reset_pb to clear a fault latched while IN3 read 0.
+        tag = cmd(sock, "force estop_ok 1", 0.8)
+        check("control.factory_program", "unknown tag" not in tag,
+              "estop_ok tag present (motor-start-stop-estop installed from the image's NVS)")
+        for t in ("start_pb", "stop_pb", "reset_pb"):
+            cmd(sock, f"force {t} 0", 0.4)
         cmd(sock, "mode run", 2.0)
-        cmd(sock, "force di0_start 1", 0.5)
+        cmd(sock, "force reset_pb 1", 0.8); cmd(sock, "force reset_pb 0", 0.8)
+        _, io0 = poll_relay(sock, {0: "0", 3: "0"}, timeout=20)
+        check("control.idle_motor_off", relay(io0,0) == "0" and relay(io0,3) == "0",
+              f"after reset: relay0={relay(io0,0)} relay3={relay(io0,3)}")
+        cmd(sock, "force start_pb 1", 0.5)
         _, io1 = poll_relay(sock, {0: "1", 1: "1"}, timeout=25)
-        check("control.di0->relay0", relay(io1,0) == "1", f"relay0 act={relay(io1,0)}")
-        check("control.di0->relay1", relay(io1,1) == "1", f"relay1 act={relay(io1,1)}")
+        check("control.start->relay0", relay(io1,0) == "1", f"relay0 act={relay(io1,0)}")
+        check("control.start->relay1", relay(io1,1) == "1", f"relay1 act={relay(io1,1)}")
+        cmd(sock, "force start_pb 0", 2.0)                      # release: seal-in must hold
+        io1b = cmd(sock, "io", 1.2)
+        check("control.seal_in", relay(io1b,0) == "1" and relay(io1b,1) == "1",
+              f"start released: relay0={relay(io1b,0)} relay1={relay(io1b,1)}")
 
-        # 4. interlock: force e-stop -> motor drops, relay3 (fault lamp) latches
-        cmd(sock, "force di2_estop_in 1", 0.5)
+        # 4. interlock: E-stop trip -> motor drops, fault lamp latches; no auto-restart.
+        cmd(sock, "force estop_ok 0", 0.5)
         _, io2 = poll_relay(sock, {0: "0", 3: "1"}, timeout=25)
         check("interlock.estop_drops_motor", relay(io2,0) == "0", f"relay0 act={relay(io2,0)}")
         check("interlock.estop_fault_lamp", relay(io2,3) == "1", f"relay3 act={relay(io2,3)}")
-        cmd(sock, "unforce di0_start", 1.0)
-        cmd(sock, "unforce di2_estop_in", 1.0)
+        cmd(sock, "force estop_ok 1", 3.0)                      # E-stop restored
+        io3 = cmd(sock, "io", 1.2)
+        check("interlock.no_auto_restart", relay(io3,0) == "0" and relay(io3,3) == "1",
+              f"estop restored: relay0={relay(io3,0)} (must stay 0) relay3={relay(io3,3)} (must stay 1)")
+        cmd(sock, "force reset_pb 1", 0.5)
+        _, io4 = poll_relay(sock, {3: "0"}, timeout=20)
+        cmd(sock, "force reset_pb 0", 1.5)
+        io4b = cmd(sock, "io", 1.2)
+        check("interlock.reset_clears_fault", relay(io4,3) == "0" and relay(io4b,0) == "0",
+              f"after reset: relay3={relay(io4,3)} relay0={relay(io4b,0)} (motor stays off)")
+        for t in ("start_pb", "stop_pb", "estop_ok", "reset_pb"):
+            cmd(sock, f"unforce {t}", 0.5)                      # never leave a safety input forced
 
         # 5/6. HTTP OTA (:80) + HMI (:8080)
         s80, b80 = http_get("http://127.0.0.1:80/")
@@ -200,7 +229,8 @@ def main():
         #    (plc_force_coil was never called). Payload from tools/derive-force-offset.py;
         #    stable while the ForceImage struct is unchanged (CI catches a layout change here).
         OVF = "00"*32 + "0200000000000000" + "0200000000000000"
-        cmd(sock, "unforce di0_start", 0.8)                 # relay0 logic-OFF baseline
+        # relay0 logic-OFF baseline: the motor was stopped above and, with estop_ok released,
+        # the twin's IN3 reads 0 again so the program holds the motor off.
         base_ok = relay(cmd(sock, "io", 1.2), 0) == "0"
         _, b_tag = http_get("http://127.0.0.1:8080/api/tag?data=" + OVF)
         forced_ok, _ = poll_relay(sock, {0: "1"}, timeout=15)

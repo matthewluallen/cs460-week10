@@ -125,11 +125,29 @@ def main():
         try: os.unlink(state)
         except FileNotFoundError: pass
 
+    # --- positive control: the factory motor program runs on THIS build ---
+    # Without it a "relay0 stays OFF" result below could just mean outputs were inhibited
+    # (PROGRAM mode, no project). The NC E-stop reads 0 unless driven (the twin's DI byte
+    # boots 0), so hold estop_ok = 1, pulse reset_pb, then start/stop the motor.
+    tag = cmd(sock, "force estop_ok 1", 0.8)
+    for t in ("start_pb", "stop_pb", "reset_pb"):
+        cmd(sock, f"force {t} 0", 0.4)
+    cmd(sock, "mode run", 1.5)
+    cmd(sock, "force reset_pb 1", 0.8); cmd(sock, "force reset_pb 0", 0.8)
+    cmd(sock, "force start_pb 1", 1.5); cmd(sock, "force start_pb 0", 1.0)
+    ran = relay(cmd(sock, "io", 1.2), 0) == "1"
+    cmd(sock, "force stop_pb 1", 1.5)
+    stopped = relay(cmd(sock, "io", 1.2), 0) == "0"
+    for t in ("start_pb", "stop_pb", "estop_ok", "reset_pb"):
+        cmd(sock, f"unforce {t}", 0.4)
+    check("control.motor_program_runs", "unknown tag" not in tag and ran and stopped,
+          "positive control: start_pb seals relay0 in and stop_pb drops it on the secure build "
+          "(no estop_ok tag = the factory motor program is not installed: rebuild with ./qemu/build-twin.sh secure)")
+
     # --- Part 9: CWE-787 /api/tag overflow into the force image ---
     # Secure build clamps the copy into a separate 32-byte buffer: relay0 stays OFF.
     OVF = "00"*32 + "0200000000000000" + "0200000000000000"
     cmd(sock, "mode run", 1.5)
-    cmd(sock, "unforce di0_start", 0.8)
     base_off = relay(cmd(sock, "io", 1.2), 0) == "0"
     http(f"http://{HMI}/api/tag?data=" + OVF)
     time.sleep(2.0)
@@ -139,7 +157,7 @@ def main():
 
     sock.close()
     npass = sum(results); n = len(results)
-    print(f"\n== {npass}/{n} Part 6-8 attacks correctly refused on the secure build ==", flush=True)
+    print(f"\n== {npass}/{n} checks passed (Part 6-9 attacks refused + the motor-program positive control) ==", flush=True)
     print("Reconcile: a refusal here is behavioral proof of the fix. The 'cwe'/'svcinfo'", flush=True)
     print("text still lists the weaknesses in BOTH builds — that text is a teaching", flush=True)
     print("reference, not evidence the weakness is live.", flush=True)

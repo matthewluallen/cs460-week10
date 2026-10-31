@@ -199,21 +199,69 @@ def P4_ladder(_c):
                        cwd=ROOT, capture_output=True, text=True)
     return (PASS if r.returncode == 0 else FAIL), (r.stdout.strip().splitlines() or ["(no output)"])[-1]
 
+# The factory default program (web/public/projects/motor-start-stop-estop.csco, seeded into
+# the factory and twin images). Tag names are what `force <tag>` accepts:
+#   start_pb  = IN1/di0  N.O. momentary          motor      = RELAY 1/relay0
+#   stop_pb   = IN2/di1  N.O. momentary          run_light  = RELAY 2/relay1
+#   estop_ok  = IN3/di2  N.C. slide, 1 = healthy fault_lamp = RELAY 4/relay3 (the latched fault)
+#   reset_pb  = IN4/di3  N.O. momentary
+MOTOR_INPUTS = ("start_pb", "stop_pb", "estop_ok", "reset_pb")
+
+def steady(c, want, dur=2.5):
+    """Every `io` sample over `dur` seconds matches `want` (proves a state HOLDS, not just occurs)."""
+    end = time.time() + dur; last = ""; seen = 0
+    while time.time() < end:
+        last = c.cmd("io", 0.8); seen += 1
+        if not all(relay(last, n) == v for n, v in want.items()):
+            return False, last
+    return seen > 0, last
+
 def P5_wire(c):
-    """Device: di0_start -> relay0 & relay1; e-stop drops motor, latches fault lamp."""
-    c.cmd("mode run", 2.0)
-    r = c.cmd("force di0_start 1", 1.0)
+    """Device: the fail-safe motor program — seal-in, stop, E-stop trip latches the fault, no
+    restart when the E-stop is restored, reset clears the fault without restarting, start runs."""
+    r = c.cmd("force estop_ok 1", 1.0)
     if "unknown tag" in r:
-        return FAIL, ("the running program has no di0_start tag — the Part 4/5 motor program is not "
-                      "loaded. Load it from the Logic Studio onto this target (or boot the factory image: "
-                      "--boot-twin with no twin running), then re-run P5")
-    ok1, io1 = poll_relay(c, {0: "1", 1: "1"}, timeout=25)
-    c.cmd("force di2_estop_in 1", 0.5)
-    ok2, io2 = poll_relay(c, {0: "0", 3: "1"}, timeout=25)
-    c.cmd("unforce di0_start", 1.0); c.cmd("unforce di2_estop_in", 1.0)
-    ok = ok1 and ok2
-    return (PASS if ok else FAIL), (f"di0->relay0={relay(io1,0)},relay1={relay(io1,1)}; "
-                                    f"estop->relay0={relay(io2,0)},relay3(fault)={relay(io2,3)}")
+        return FAIL, ("the running program has no estop_ok tag — the factory motor program "
+                      "(motor-start-stop-estop) is not installed on this target. In the Logic Studio: "
+                      "Example projects -> Motor start/stop + E-stop, Load application (PROGRAM), then re-run P5 "
+                      "(or boot the factory image: --boot-twin with no twin running)")
+    # A NC E-stop reads 0 when nothing holds it closed — and the twin's DI byte boots as 0 —
+    # so the check first drives estop_ok = 1 (the slide switch ON), releases every button,
+    # then pulses Reset to clear a fault that latched while IN3 read 0.
+    for t in ("start_pb", "stop_pb", "reset_pb"):
+        c.cmd(f"force {t} 0", 0.4)
+    c.cmd("mode run", 2.0)
+    ev = []
+    def expect(label, cmds, want, hold=False, timeout=20):
+        for x in cmds:
+            c.cmd(x, 0.5)
+        ok, io = (steady(c, want) if hold else poll_relay(c, want, timeout))
+        ev.append(f"{label}={'ok' if ok else 'NO'}(" + ",".join(f"r{n}={relay(io, n)}" for n in sorted(want)) + ")")
+        return ok
+    try:
+        ok = all([
+            expect("reset_ready", ["force reset_pb 1"], {0: "0", 3: "0"}),
+            expect("idle_off", ["force reset_pb 0"], {0: "0", 1: "0", 3: "0"}, hold=True),
+            expect("start", ["force start_pb 1"], {0: "1", 1: "1"}),
+            expect("seal_in", ["force start_pb 0"], {0: "1", 1: "1"}, hold=True),
+            expect("stop", ["force stop_pb 1"], {0: "0", 1: "0"}),
+            expect("stays_stopped", ["force stop_pb 0"], {0: "0"}, hold=True),
+            expect("restart", ["force start_pb 1"], {0: "1", 1: "1"}),
+            expect("running", ["force start_pb 0"], {0: "1"}, hold=True),
+            expect("estop_trip", ["force estop_ok 0"], {0: "0", 1: "0", 3: "1"}),
+            expect("estop_restored_no_restart_fault_held", ["force estop_ok 1"], {0: "0", 3: "1"}, hold=True),
+            expect("reset_clears_fault", ["force reset_pb 1"], {3: "0"}),
+            expect("reset_motor_stays_off", ["force reset_pb 0"], {0: "0", 3: "0"}, hold=True),
+            expect("start_again", ["force start_pb 1"], {0: "1", 1: "1"}),
+            expect("start_again_sealed", ["force start_pb 0"], {0: "1"}, hold=True),
+            expect("stop_end", ["force stop_pb 1"], {0: "0"}),
+        ])
+    finally:
+        # Never leave a safety input forced. On the twin, releasing estop_ok lets IN3 read 0
+        # again (nothing is wired), so the fault lamp latches — that is the honest state.
+        for t in MOTOR_INPUTS:
+            c.cmd(f"unforce {t}", 0.4)
+    return (PASS if ok else FAIL), "; ".join(ev)
 
 def P6_ota(c):
     """Device: the OTA endpoint is present and advertises an unauthenticated upload path."""
@@ -259,7 +307,7 @@ def P9_secure(c):
     """Device (SECURE build): the overflow force is blocked and the clock no longer wraps.
     Uses only safe reads (no firmware POST). On a vulnerable target it SKIPs with guidance."""
     OVF = "00" * 32 + "0200000000000000" + "0200000000000000"
-    c.cmd("unforce di0_start", 0.8)
+    c.cmd("unforce start_pb", 0.8)
     base0 = relay(c.cmd("io", 1.2), 0) == "0"
     http("http://" + HMI_HOST + "/api/tag?data=" + OVF)
     forced, _ = poll_relay(c, {0: "1"}, timeout=8)
@@ -291,7 +339,7 @@ CHECKS = {
     "P2": (P2_sbom,   False, "SBOM — SPDX vs CycloneDX"),
     "P3": (P3_hbom,   True,  "HBOM — i2cscan reconciliation"),
     "P4": (P4_ladder, False, "Ladder — compiles to IR, pairing holds"),
-    "P5": (P5_wire,   True,  "Wire & run — input->logic->output + interlock"),
+    "P5": (P5_wire,   True,  "Wire & run — fail-safe motor: seal-in, stop, E-stop latch, reset"),
     "P6": (P6_ota,    True,  "Unsigned OTA — endpoint accepts"),
     "P7": (P7_supply, False, "Supply-chain kill switch (twin, manual)"),
     "P8": (P8_ntp,    True,  "NTP AiTM / Y2038 wrap"),

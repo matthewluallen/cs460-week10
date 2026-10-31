@@ -24,6 +24,15 @@ single-client serial socket would connect but get nothing — the "stuck console
 now owns the one serial connection and fans it out, so that can't happen.) You only need
 `./qemu/run.sh` directly to boot a *different* profile (`secure`, `malicious`) by itself.
 
+**The Studio server only obeys its own page.** `studio.sh` serves the Studio and bridges it to the
+twin, so it can move the (emulated) process. It listens on localhost (Codespaces forwards that), a
+browser request must come from the Studio's own page (checked by Origin on the console WebSocket and
+on every write), Modbus writes need POST (so a link or image on another site can't flip a coil), and
+other sites can't read values through it. Circuit views set the twin's inputs **at the chip** through
+`/field` — exactly two expander properties, never raw QMP. `python3 qemu/test-bridge-security.py`
+checks all of this (CI runs it). A real attacker on the *plant network* is a different story — the
+twin's own Modbus port is unauthenticated on the vulnerable build on purpose (Parts 1 and 6).
+
 **Already running? Nothing is booted twice.** `studio.sh`, `run.sh` and
 `assessment/verify-lab.py --boot-twin` all check first. A twin counts as running when its
 `qemu-system-xtensa` process is alive on the console socket **and** QEMU's control (QMP) socket
