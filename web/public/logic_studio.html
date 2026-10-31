@@ -563,6 +563,7 @@ body:not(.wf-collapsed) #bToggleWf::before{content:"\2713"}
 .hc-b{padding:2px 13px 13px}
 .hsrc{margin-left:auto;font:600 9px/1 var(--mono);letter-spacing:.08em;color:var(--warn);background:rgba(243,165,58,.12);border:1px solid rgba(243,165,58,.38);border-radius:999px;padding:3px 8px;text-transform:none}
 .hcc{display:flex;gap:12px;align-items:flex-start}
+.stamplc-svg{width:288px;flex:none;cursor:default}.stamplc-svg svg{display:block;width:100%;height:auto}
 .stamplc{width:190px;flex:none;border-radius:11px;padding:7px;position:relative;background:linear-gradient(180deg,#2b313c,#1c222c);border:1px solid #39424f;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 12px 28px -16px #000}
 .term{display:flex;gap:3px;justify-content:center;padding:2px}
 .term i{flex:1;height:11px;border-radius:2px;background:linear-gradient(180deg,#1f9d57,#157a41);border:1px solid #0d5e30}
@@ -682,18 +683,15 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
     <div class="hcard">
       <div class="hc-h"><span class="tk"></span>Controller &middot; panel<span class="hsrc" id="heroPanelSrc">emulated</span></div>
       <div class="hc-b hcc">
-        <div class="stamplc">
-          <div class="term term-t"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          <div class="face"><div class="rgb" id="heroRgb"></div><div class="lcd"><canvas id="heroLcd" width="960" height="540"></canvas></div>
-            <div class="keys"><button class="key" id="hkA">A</button><button class="key" id="hkB">B</button><button class="key" id="hkC">C</button></div></div>
-          <div class="term term-b"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="usbc"></div>
-        </div>
+        <div class="stamplc-svg" id="heroDevice" role="group" aria-label="StampLC controller: screen, IN1–IN8 inputs, RELAY 1–4"></div>
+        <div hidden><div class="rgb" id="heroRgb"></div><canvas id="heroLcd" width="960" height="540"></canvas>
+          <button class="key" id="hkA">A</button><button class="key" id="hkB">B</button><button class="key" id="hkC">C</button></div>
         <div class="hmeta">
           <div class="hname" id="heroName">No project</div>
           <div class="hsub">M5 StamPLC &middot; ESP32-S3</div>
           <div class="hmode" id="heroModeBadge"><span class="d"></span><span id="heroMode">Unknown</span></div>
           <div class="hconn" id="heroConn">USB disconnected</div>
-          <div class="hhint">A&middot;B&middot;C drive the on-device LCD &mdash; live when connected, emulated otherwise.</div>
+          <div class="hhint">A&middot;B&middot;C drive the on-device LCD. On the twin this is its real screen; on a board, a mirror of it.</div>
         </div>
       </div>
     </div>
@@ -943,8 +941,9 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
  const C={BG:'#0E1116',SURF:'#1B2027',LINE:'#2b333d',WHITE:'#EAECEE',MUTED:'#7A828C',ACC:'#3B6DF5',OK:'#39D353',WARN:'#F5A524',FAULT:'#F0463C',VIO:'#B36BFF'};
  const cv=document.getElementById('heroLcd'); if(!cv)return; const ctx=cv.getContext('2d'); ctx.scale(4,4);
  const H={scr:'HOME',busFocus:null,busFocusName:'',menu:0,target:1,iocur:0,DI:[0,0,0,0,0,0,0,0],RLY:[0,0,0,0],ioexp:0x20,scanN:0,age:'--',volts:0,forces:0,
-          busRing:[],busCount:0,busWinStart:performance.now(),busEps:0,streamReq:false,lastDraw:0};
- const ELEMS=[];for(let i=0;i<8;i++)ELEMS.push({b:'BASE',id:'DI'+i,k:'DI',i});for(let i=0;i<4;i++)ELEMS.push({b:'BASE',id:'RLY'+i,k:'RLY',i});for(let i=0;i<2;i++)ELEMS.push({b:'IO-EXP',id:'SSR'+i,k:'SSR',i});for(let i=0;i<2;i++)ELEMS.push({b:'IO-EXP',id:'AIN'+i,k:'AIN',i});
+          busRing:[],busCount:0,busWinStart:performance.now(),busEps:0,streamReq:false,lastDraw:0,
+          real:null,realAt:0,realAge:null,realErr:'',realBusy:false,hooked:false,ip:null};
+ const ELEMS=[];for(let i=0;i<8;i++)ELEMS.push({b:'BASE',id:'DI'+i,k:'DI',i});for(let i=0;i<4;i++)ELEMS.push({b:'BASE',id:'RLY'+i,k:'RLY',i});ELEMS.push({b:'IO-EXP',id:'MECH',k:'MECH',i:0});for(let i=0;i<2;i++)ELEMS.push({b:'IO-EXP',id:'SSR'+i,k:'SSR',i});for(let i=0;i<2;i++)ELEMS.push({b:'IO-EXP',id:'AIN'+i,k:'AIN',i});
  const mInt=()=>{const m=(typeof controllerStatus!=='undefined'&&controllerStatus)?controllerStatus.mode:null;return m==='RUN'?1:m==='REMOTE'?2:m==='PROGRAM'?0:0;};
  const mKnown=()=>(typeof controllerStatus!=='undefined'&&controllerStatus&&controllerStatus.mode&&typeof conn!=='undefined'&&conn);
  const mC=m=>m===1?C.OK:m===2?C.WARN:C.FAULT, mS=m=>m===1?'RUN':m===2?'REM':'PROG', mL=m=>m===1?'RUN':m===2?'REMOTE':'PROGRAM';
@@ -954,10 +953,70 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
  const circ=(x,y,r,c)=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=c;ctx.fill();};
  const clr=()=>{ctx.fillStyle=C.BG;ctx.fillRect(0,0,240,135);};
  function chin(a,b,c){const m=mInt();ctx.fillStyle=C.SURF;ctx.fillRect(0,121,240,14);circ(7,128,3,mC(m));T(mS(m),13,124,1,C.WHITE);T(H.volts.toFixed(1)+'V',52,124,1,C.MUTED);if(H.forces>0)T(H.forces+'F',92,124,1,C.VIO);const h='A:'+a+' B:'+b+' C:'+c;T(h,236-TW(h,1),124,1,C.ACC);}
- function home(){const m=mInt();clr();T('M5 StamPLC',6,4,1,C.MUTED);T('no-net',234-TW('no-net',1),4,1,C.MUTED);dRR(4,20,104,52,5,C.LINE);T(mS(m),12,28,4,mC(m));T('mode',14,60,1,C.MUTED);T('SCAN DI',120,20,1,C.MUTED);for(let i=0;i<8;i++)fRR(120+i*15,32,11,11,2,H.DI[i]?C.OK:C.SURF);T('DRV CMD',120,50,1,C.MUTED);for(let i=0;i<4;i++)fRR(120+i*15,62,11,11,2,H.RLY[i]?C.OK:C.SURF);T('+IO-EXP @0x20',120,80,1,C.ACC);ctx.fillStyle=C.BG;ctx.fillRect(4,88,232,9);T('DI scan #'+H.scanN+' '+H.age,6,88,1,C.MUTED);const items=['MODE','I/O','FORCE','INFO'];let x=6;for(let i=0;i<4;i++){const on=i===H.menu,w=TW(items[i],1)+10;if(on)fRR(x,98,w,16,4,C.ACC);T(items[i],x+5,101,1,on?C.BG:C.MUTED);x+=w+6;}chin('next','open','-');}
+ function home(){const m=mInt();clr();T('M5 StamPLC',6,4,1,C.MUTED);{const ip=H.ip||'no-net';T(ip,234-TW(ip,1),4,1,C.MUTED);}dRR(4,20,104,52,5,C.LINE);T(mS(m),12,28,4,mC(m));T('mode',14,60,1,C.MUTED);T('SCAN DI',120,20,1,C.MUTED);for(let i=0;i<8;i++)fRR(120+i*15,32,11,11,2,H.DI[i]?C.OK:C.SURF);T('DRV CMD',120,50,1,C.MUTED);for(let i=0;i<4;i++)fRR(120+i*15,62,11,11,2,H.RLY[i]?C.OK:C.SURF);T('+IO-EXP @0x20',120,80,1,C.ACC);if(H.forces>0)T(H.forces+' FORCED',8,80,1,C.VIO);ctx.fillStyle=C.BG;ctx.fillRect(4,88,232,9);T('DI scan #'+H.scanN+' '+H.age,6,88,1,C.MUTED);const items=['MODE','I/O','GROVE','FORCE','INFO'];let x=6;for(let i=0;i<5;i++){const on=i===H.menu,w=TW(items[i],1)+10;if(on)fRR(x,98,w,16,4,C.ACC);T(items[i],x+5,101,1,on?C.BG:C.MUTED);x+=w+6;}chin('next','open','-');}
  function modeScr(){const m=mInt();clr();T('PROCESSOR MODE',6,6,2,C.WHITE);for(let i=0;i<3;i++){const y=36+i*24,sel=i===H.target;if(sel)dRR(4,y-3,150,22,4,C.ACC);T((i===m?'•':' ')+' '+mL(i),12,y,2,sel?mC(i):C.MUTED);}if(H.target===2)T('network gets authority',6,108,1,C.WARN);chin('next','APPLY','back');}
  function ioScr(){clr();T('I/O: scan DI; output requests',6,6,1,C.MUTED);let top=H.iocur-3;if(top<0)top=0;if(top>ELEMS.length-6)top=ELEMS.length-6;if(top<0)top=0;for(let r=0;r<6&&top+r<ELEMS.length;r++){const i=top+r,e=ELEMS[i],y=22+r*15,sel=i===H.iocur;if(sel)fRR(2,y-1,236,15,3,C.SURF);T(e.b+' '+e.id,8,y,1,sel?C.WHITE:C.MUTED);if(e.k==='AIN')T('-- mV',150,y,1,C.MUTED);else{const on=e.k==='DI'?H.DI[e.i]:e.k==='RLY'?H.RLY[e.i]:0;T(on?'ON':'off',150,y,1,on?C.OK:C.MUTED);}if(sel)T('▶',226,y,1,C.ACC);}ctx.fillStyle=C.BG;ctx.fillRect(4,111,232,9);T('DI scan #'+H.scanN+' '+H.age,6,111,1,C.MUTED);chin('next','act','back');}
- function drawLcd(){if(H.scr==='HOME')home();else if(H.scr==='MODE')modeScr();else if(H.scr==='IO')ioScr();else{clr();T(H.scr==='FORCE'?'ACTIVE FORCES':'SYSTEM INFO',6,6,2,H.scr==='FORCE'?C.VIO:C.ACC);chin('-','-','back');}}
+ function groveScr(){clr();T('GROVE SENSORS',6,6,2,C.WHITE);T('PORT.A bus  (mirror: readings come from',6,26,1,C.MUTED);T('the console: devices samples)',6,38,1,C.MUTED);chin('-','-','back');}
+ function forceScr(){clr();T('ACTIVE FORCES',6,6,2,C.VIO);if(H.forces>0)T(H.forces+' active (console: forces)',10,32,1,C.VIO);else T('none',10,32,1,C.MUTED);chin('-','CLEAR ALL','back');}
+ function infoScr(){const m=mInt();clr();T('IDENTITY / HEALTH',6,6,2,C.WHITE);T('IP   '+(H.ip||'no-net'),8,45,1,C.MUTED);T('mode '+mL(m)+'  scan '+(H.scanUs!=null?H.scanUs:'--')+'us',8,58,1,C.MUTED);T('in '+H.volts.toFixed(2)+'V',8,71,1,C.MUTED);T('IO-EXP @0x20',8,84,1,C.ACC);chin('-','LOG','back');}
+ function logScr(){clr();T('EVENT LOG',6,6,2,C.WHITE);T('write provenance - newest first',6,24,1,C.MUTED);T('(mirror: console  log)',6,36,1,C.MUTED);chin('-','-','back');}
+ // The twin streams its REAL screen: the frame the firmware pushed to the ST7789, served as GET /lcd.
+ // A physical board streams no frame, so there (and offline) this canvas is a mirror of the firmware's
+ // screen layout drawn from the console readback - labelled as such wherever it is shown.
+ const isTwin=()=>{try{return typeof wsSock!=='undefined'&&wsSock&&wsSock.readyState===1;}catch(e){return false;}};
+ const realFresh=()=>isTwin()&&H.real&&performance.now()-H.realAt<4000;
+ async function pullReal(){if(H.realBusy||document.hidden)return;if(!isTwin()){if(H.real&&H.real.close)try{H.real.close();}catch(e){}H.real=null;H.realErr='';return;}H.realBusy=true;
+   try{const r=await fetch('/lcd',{cache:'no-store',signal:AbortSignal.timeout(2500)});
+     if(!r.ok){let j={};try{j=await r.json();}catch(e){}H.realErr=j.error||('HTTP '+r.status);}
+     else{const bmp=await createImageBitmap(await r.blob());if(H.real&&H.real.close)try{H.real.close();}catch(e){}H.real=bmp;H.realAt=performance.now();H.realAge=+(r.headers.get('X-Frame-Age-Ms')||0);H.realErr='';}}
+   catch(e){H.realErr=e.message||'unreachable';}finally{H.realBusy=false;}}
+ setInterval(pullReal,1000);
+ window.heroLcdSource=function(){const c=(typeof conn!=='undefined')&&conn;
+   if(realFresh())return{kind:'real',short:'real screen · twin',label:'Real screen: the frame the firmware pushed to the twin’s ST7789 panel ('+Math.round(H.realAge||0)+' ms old, about one frame a second).'};
+   if(isTwin())return{kind:'mirror',short:'mirror · twin',label:'Mirror of the firmware screens (the twin’s screen dump is not available'+(H.realErr?': '+H.realErr:'')+').'};
+   if(c)return{kind:'mirror',short:'mirror · board',label:'Mirror of the firmware screens, drawn from the console readback. A physical board streams no screen frame; look at its own display for the real one.'};
+   return{kind:'emulated',short:'not connected',label:'Not connected: the firmware’s screen layout, idle.'};};
+ // feed the mirror from the console readback (io / status / diag)
+ function heroLine(line){let m=/^DI\s*:\s*(.*)$/.exec(line);
+   if(m){const t=m[1].trim().split(/\s+/);if(t.length>=8){H.DI=t.slice(0,8).map(x=>x[0]==='1'?1:0);H.ioAt=performance.now();}return;}
+   m=/^\s*relay([0-3])\s+cmd=([01])/.exec(line);if(m){H.RLY[+m[1]]=+m[2];return;}
+   m=/\bvin=([0-9.]+)V/.exec(line);if(m)H.volts=+m[1];
+   m=/\bforces=(\d+)/.exec(line);if(m)H.forces=+m[1];
+   m=/\[ETH\][^\n]*\bip=([0-9.]+)/.exec(line);if(m)H.ip=m[1];}
+ function hook(){if(H.hooked)return;try{if(typeof lineListeners!=='undefined'){lineListeners.push(heroLine);H.hooked=true;}}catch(e){}}
+ function drawLcd(){hook();if(realFresh()){ctx.imageSmoothingEnabled=false;ctx.drawImage(H.real,0,0,240,135);return;}
+   if(H.scr==='HOME')home();else if(H.scr==='MODE')modeScr();else if(H.scr==='IO')ioScr();else if(H.scr==='GROVE')groveScr();else if(H.scr==='FORCE')forceScr();else if(H.scr==='LOG')logScr();else infoScr();}
+ // ---- the controller drawing: the same snap-kit StampLC as the Circuit tab, with this screen in it.
+ // Inputs/relays: on the twin from GET /field (the expander's own registers, no console traffic); on a
+ // board from the io readback when one has arrived. The ids get their own prefix so this hidden-or-shown
+ // drawing never captures the Circuit tab's gradient/filter references.
+ let devKey='',devUrl='',devField={di:null,relays:null,at:0},devBusy=false,devLcdAt=0,devScratch=null;
+ const themeNow=()=>{const t=document.documentElement.getAttribute('data-theme');if(t==='light'||t==='dark')return t;return window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';};
+ const bitsOf=(b,n)=>Array.from({length:n},(_,i)=>(b>>i)&1);
+ const devShown=()=>{const el=document.getElementById('heroDevice');return !!(el&&el.offsetParent!==null);};
+ async function pullField(){if(devBusy||!isTwin()||document.hidden||!devShown())return;devBusy=true;
+   try{const r=await fetch('/field',{cache:'no-store',signal:AbortSignal.timeout(2500)});const j=await r.json();if(j&&j.ok)devField={di:j.di,relays:j.relays,at:performance.now()};}catch(e){}finally{devBusy=false;}}
+ setInterval(pullField,1000);
+ function devVm(){const c=(typeof conn!=='undefined')&&conn,now=performance.now();let inb=Array(8).fill(null),rel=Array(4).fill(null),live=false;
+   if(isTwin()&&devField.at&&now-devField.at<3000){inb=bitsOf(devField.di,8);rel=bitsOf(devField.relays,4);live=true;}
+   else if(c&&H.ioAt&&now-H.ioAt<5000){inb=H.DI.slice();rel=H.RLY.slice();live=true;}
+   return{live,conn:isTwin()?'twin':(c?'usb':'none'),in:inb,relay:rel,inForced:Array(8).fill(0),mode:mKnown()?mL(mInt()):null};}
+ function renderDevice(force){const SK=window.SnapKit,el=document.getElementById('heroDevice');if(!SK||!el||!devShown())return;
+   const vm=devVm(),T=SK.THEMES[themeNow()],src=window.heroLcdSource(),key=JSON.stringify([vm.live,vm.conn,vm.in,vm.relay,vm.mode,T.name,src.short]);
+   if(!force&&key===devKey)return;devKey=key;
+   if(!devUrl)refreshDeviceLcd(true);
+   let svg=SK.defs(T)+SK.stamplc({x:8,y:12,used:{RELAY1:1,RELAY2:1,RELAY3:1,RELAY4:1},lcd:{href:devUrl,label:src.short}},vm,T);
+   svg=svg.replace(/id="sk/g,'id="hdsk').replace(/#sk/g,'#hdsk');
+   el.innerHTML='<svg viewBox="0 0 500 392" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="StampLC controller">'+svg+'</svg>';}
+ function refreshDeviceLcd(force){const now=performance.now();if(!force&&(now-devLcdAt<500||!devShown()))return;devLcdAt=now;
+   try{if(!devScratch){devScratch=document.createElement('canvas');devScratch.width=480;devScratch.height=270;}
+     const g=devScratch.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(cv,0,0,480,270);devUrl=devScratch.toDataURL('image/png');
+     const el=document.getElementById('heroDevice');if(el)el.querySelectorAll('[data-lcd-mirror]').forEach(im=>im.setAttribute('href',devUrl));}catch(e){}}
+ {const el=document.getElementById('heroDevice');
+  if(el){el.addEventListener('click',e=>{const k=e.target.closest('[data-lcd-key]');if(k){press(k.dataset.lcdKey);return;}if(e.target.closest('[data-lcd-open]')&&window.enlargeLcd)window.enlargeLcd();});
+   el.addEventListener('keydown',e=>{if(e.key!==' '&&e.key!=='Enter')return;const k=e.target.closest('[data-lcd-key]'),o=e.target.closest('[data-lcd-open]');
+     if(k){e.preventDefault();if(!e.repeat)press(k.dataset.lcdKey);}else if(o){e.preventDefault();if(window.enlargeLcd)window.enlargeLcd();}});}
+  new MutationObserver(()=>renderDevice(true)).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});}
  // --- live scope ---
  const sc=document.getElementById('heroScope'), sx=sc.getContext('2d');
  function drawScope(){const W=sc.width,Hh=sc.height;sx.clearRect(0,0,W,Hh);const lanes=[{y:Hh*0.3,c:C.ACC},{y:Hh*0.6,c:C.WARN},{y:Hh*0.85,c:C.OK}];
@@ -1008,7 +1067,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
    document.getElementById('heroConn').textContent=connNow?'● USB JTAG · live':'USB disconnected';
    document.getElementById('heroConn').style.color=connNow?'var(--live)':'var(--muted)';
    const pn=(typeof PROJECT!=='undefined'&&PROJECT)?(PROJECT.name||'Project'):'No project'; const hn=document.getElementById('heroName'); if(hn)hn.textContent=pn;
-   document.getElementById('heroPanelSrc').textContent=connNow?'live mirror · device':'emulated';
+   document.getElementById('heroPanelSrc').textContent=window.heroLcdSource().short;
    {const ss=document.getElementById('heroSigSrc'); const L=window.__liveBus||{wanted:false,active:false};
     const src=(typeof wsSock!=='undefined'&&wsSock)?'twin':'StampLC';
     if(H.busFocus!=null){ ss.textContent='focus 0x'+H.busFocus.toString(16)+(H.busFocusName?' '+H.busFocusName:'')+' ✕'; ss.title='click to clear bus focus'; }
@@ -1032,12 +1091,22 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
    const sl=document.getElementById('hsLive'); if(sl){sl.textContent=L.wanted?'● live @BUS':'go live ▸';sl.classList.toggle('on',!!(L.wanted&&connNow&&H.busRing.length));}
  };
  // buttons: drive real device when connected, always navigate the local panel
- function localNav(k){ if(k==='a'){if(H.scr==='HOME')H.menu=(H.menu+1)%4;else if(H.scr==='MODE')H.target=(H.target+1)%3;else if(H.scr==='IO')H.iocur=(H.iocur+1)%ELEMS.length;} else if(k==='b'){if(H.scr==='HOME')H.scr=['MODE','IO','FORCE','INFO'][H.menu];else H.scr='HOME';} else {if(H.scr!=='HOME')H.scr='HOME';} }
- function press(k){ try{ if((typeof conn!=='undefined')&&conn&&typeof send==='function') send('btn '+k); }catch(e){} localNav(k); }
+ function localNav(k){const S=H.scr; // mirrors display_ui.cpp handle()
+   if(S==='HOME'){if(k==='a')H.menu=(H.menu+1)%5;else if(k==='b'){H.scr=['MODE','IO','GROVE','FORCE','INFO'][H.menu];if(H.scr==='MODE')H.target=mInt();if(H.scr==='IO')H.iocur=0;}}
+   else if(S==='MODE'){if(k==='a')H.target=(H.target+1)%3;else if(k==='b'||k==='c')H.scr='HOME';}
+   else if(S==='IO'){if(k==='a')H.iocur=(H.iocur+1)%ELEMS.length;else if(k==='c')H.scr='HOME';}
+   else if(S==='GROVE'||S==='FORCE'){if(k==='c')H.scr='HOME';}
+   else if(S==='INFO'){if(k==='b')H.scr='LOG';else if(k==='c')H.scr='HOME';}
+   else if(S==='LOG'){if(k==='c')H.scr='INFO';} }
+ // A panel button: sent to the device when connected (the mirror only follows if the device took it, so
+ // it never drifts from the real screen); offline it just steps the mirror.
+ async function press(k){ if((typeof conn!=='undefined')&&conn&&typeof send==='function'){ let ok=false; try{ ok=await send('btn '+k); }catch(e){} if(!ok)return false; }
+   localNav(k); setTimeout(pullReal,350); return true; }
+ window.heroPress=press;
  document.getElementById('hkA').onclick=()=>press('a'); document.getElementById('hkB').onclick=()=>press('b'); document.getElementById('hkC').onclick=()=>press('c');
  // animation loop
  function tick(){ const now=performance.now(); if(now-H.busWinStart>=1000){ H.busEps=H.busCount; H.busCount=0; H.busWinStart=now; const be=document.getElementById('hBus'); if(be)be.textContent=((typeof conn!=='undefined'&&conn)?H.busEps:'—'); }
-   drawLcd(); drawScope(); requestAnimationFrame(tick); }
+   drawLcd(); drawScope(); refreshDeviceLcd(false); if(now-(tick.dev||0)>500){tick.dev=now;renderDevice(false);} requestAnimationFrame(tick); }
  drawLcd(); tick();
 })();
 </script>
@@ -1076,7 +1145,8 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
   function enlargeLcd(){
     if(typeof showModal!=='function')return;
     showModal(`<h3>StampLC screen</h3><div class="body">
-      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 10px">A live, readable view of the on-device LCD. <b>A · B · C</b> drive the real device buttons — step through its menus just like on the bench.</p>
+      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 6px">A readable view of the controller’s screen. <b>A · B · C</b> drive the device buttons — step through its menus just like on the bench.</p>
+      <p id="lcdBigSrc" role="status" style="font-size:12.5px;color:var(--ink2);margin:0 0 10px"></p>
       <div style="background:#0b0e13;border:1px solid #000;border-radius:10px;padding:14px;max-width:660px;margin:0 auto">
         <canvas id="lcdBig" width="960" height="540" style="display:block;width:100%;border:2px solid #05070a;border-radius:6px;background:#0E1116;image-rendering:pixelated"></canvas>
         <div style="display:flex;gap:10px;margin-top:12px">
@@ -1089,7 +1159,9 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
     </div>`);
     const big=document.getElementById('lcdBig'), src=document.getElementById('heroLcd');
     if(big&&src){ const bc=big.getContext('2d'); bc.imageSmoothingEnabled=false;
-      (function loop(){ if(!document.getElementById('lcdBig'))return; try{bc.drawImage(src,0,0,960,540);}catch(e){} requestAnimationFrame(loop); })(); }
+      let lastSrc='';(function loop(){ if(!document.getElementById('lcdBig'))return; try{bc.drawImage(src,0,0,960,540);}catch(e){}
+        const ls=document.getElementById('lcdBigSrc');if(ls&&window.heroLcdSource){const t=window.heroLcdSource().label;if(t!==lastSrc){ls.textContent=t;lastSrc=t;}}
+        requestAnimationFrame(loop); })(); }
     [['lbA','hkA'],['lbB','hkB'],['lbC','hkC']].forEach(([a,b])=>{ const x=document.getElementById(a),y=document.getElementById(b); if(x&&y)x.onclick=()=>y.click(); });
   }
   window.enlargeLcd=enlargeLcd;

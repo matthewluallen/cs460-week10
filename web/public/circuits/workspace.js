@@ -21,7 +21,7 @@ const $=id=>document.getElementById(id),esc=SK.esc,txt=SK.txt;
 const VBW=1600;
 
 /* ================================================================= state */
-const ST={cur:'a',view:'bench',trace:true,sub:'wire',phoneSel:'orient',light:'room',ch1Set:false,active:false,
+const ST={lcdUrl:'',lcdAt:0,cur:'a',view:'bench',trace:true,sub:'wire',phoneSel:'orient',light:'room',ch1Set:false,active:false,
   sw:{},held:{},conn:'none',sock:null,
   field:{ok:null,di:null,relays:null,analog:null,analogNote:'',at:0,err:'',busy:false,next:0},
   io:{di:null,forced:null,cmd:null,act:null,at:0,last:0},
@@ -35,6 +35,22 @@ function connKind(){try{if(typeof wsSock!=='undefined'&&wsSock&&wsSock.readyStat
 const bits=(b,n)=>Array.from({length:n},(_,i)=>(b>>i)&1);
 function resetSwitches(c){ST.sw={};ST.held={};for(const p of c.parts)if(p.control)ST.sw[p.id]=!!p.rest;}
 resetSwitches(circuit());
+
+/* ================================================================= the controller's screen */
+/* The Logic view's panel canvas is the one source of the StampLC screen: on the twin it shows the REAL
+ * frame the firmware pushed to the ST7789 (GET /lcd); on a board or offline, a labelled mirror of the
+ * firmware's screens. The bench drawing shows a copy of it (refreshed in place, no re-render) and opens
+ * the same enlarge view; A/B/C on the drawing press the device's panel buttons. */
+const lcdSource=()=>{try{return window.heroLcdSource?window.heroLcdSource():{kind:'emulated',short:'—',label:'StampLC screen'};}catch(e){return{kind:'emulated',short:'—',label:'StampLC screen'};}};
+let lcdScratch=null;
+function refreshLcd(force){const src=document.getElementById('heroLcd');if(!src)return;const now=performance.now();if(!force&&now-ST.lcdAt<500)return;ST.lcdAt=now;
+  try{if(!lcdScratch){lcdScratch=document.createElement('canvas');lcdScratch.width=480;lcdScratch.height=270;}
+    const g=lcdScratch.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(src,0,0,480,270);ST.lcdUrl=lcdScratch.toDataURL('image/png');
+    document.querySelectorAll('#cwStage [data-lcd-mirror]').forEach(im=>im.setAttribute('href',ST.lcdUrl));}catch(e){}}
+function lcdOpen(){try{if(typeof window.enlargeLcd==='function')window.enlargeLcd();}catch(e){}}
+async function lcdKey(k){try{if(typeof window.heroPress!=='function')return;const ok=await window.heroPress(k);
+  if(ok===false){note('The controller did not take panel button '+k.toUpperCase()+' (the console is busy, or Monitor is read-only) — see the console line.');return;}
+  setTimeout(()=>refreshLcd(true),120);setTimeout(()=>refreshLcd(true),1400);}catch(e){}}
 
 /* ================================================================= view-model */
 function buildVm(c){const now=performance.now(),k=ST.conn;
@@ -113,7 +129,7 @@ function renderBench(c,v,T){
     if(P.kind==='wired')xray=SK.xrayPath(P.in-1,P.relay,{bypass:(v.live&&v.inSrc==='io'&&v.inForced[P.in-1])?[0,1]:null});
     else if(P.kind==='phone')xray=SK.xrayPath(0,P.relay,{network:1});
     else xray=SK.xrayPath(0,P.relay,{analog:1});}
-  s+=SK.stamplc({x:c.ctl.x,y:c.ctl.y,used,xray,wifi:!!c.phone,wifiLabel:c.phone?'Wi-Fi · MQTT client':''},v,T);
+  if(!ST.lcdUrl)refreshLcd(true);s+=SK.stamplc({x:c.ctl.x,y:c.ctl.y,used,xray,wifi:!!c.phone,wifiLabel:c.phone?'Wi-Fi · MQTT client':'',lcd:{href:ST.lcdUrl,label:lcdSource().short}},v,T);
   if(c.expansion)s+=SK.expansion(c.expansion,v,T);
   // trace glow under traced leads
   const pts={};for(const l of c.leads)pts[l.id]=SK.leadPoints(l,terms);
@@ -229,6 +245,7 @@ function lightCard(c,v,T){const x=1240,y=318,W=304,sel=lightSel(),a=ST.field.ana
 /* ---------------------------------------------------------------- live readout card */
 function readoutRows(c,v){const rows=[];const L=v.live;
   rows.push({l:'Field supply + / −',val:'4.45 V',tag:'NOMINAL'});
+  {const ls=lcdSource();rows.push({l:'StampLC screen',val:ls.kind==='real'?'real frame':ls.kind==='mirror'?'mirror':'—',tag:ls.kind==='real'?'OBSERVED':ls.kind==='mirror'?'MODELLED':null});}
   for(const p of c.parts.filter(p=>p.control)){const n=+p.in.slice(2),b=v.in[n-1],f=v.inForced[n-1];
     const name=(p.label&&p.label.t||p.id).replace(/\s+/g,' ');
     let val='—';if(L&&b!=null)val=String(b)+(f?' forced':'')+(p.type==='slide'&&c.id==='c'?(b?' healthy':' TRIP'):'');
@@ -449,10 +466,10 @@ function guideText(c,v){
   if(isAnalog(c))return['live','Twin live: the light buttons put the divider voltage on CH1 at the chip; the firmware reads it over I²C @0x20. Load light-alarm and RUN, then go from Room light to Covered and back through Hand hovering.'];
   return['live','Twin live: switches set the AW9523 input bit at the chip; the firmware reads it over I²C on its next scan.'];}
 function render(force){const c=circuit();ST.conn=connKind();const v=buildVm(c);const T=SK.THEMES[themeName()];
-  const key=JSON.stringify([ST.cur,ST.view,ST.trace,ST.sub,ST.phoneSel,T.name,v.live,v.conn,v.in,v.relay,v.inForced,v.cmd,v.act,v.mode,ST.sw,ST.held,v.mirror,v.regs&&[50,51,52].map(r=>v.regs[r]),v.monitorIW&&v.monitorIW.IW,v.busR,v.busW,v.fieldErr,ST.light,ST.field.analog&&[ST.field.analog.ch1_mv,ST.field.analog.ch1_source],ST.field.analogNote]);
+  const key=JSON.stringify([ST.cur,ST.view,ST.trace,ST.sub,ST.phoneSel,T.name,v.live,v.conn,v.in,v.relay,v.inForced,v.cmd,v.act,v.mode,ST.sw,ST.held,v.mirror,v.regs&&[50,51,52].map(r=>v.regs[r]),v.monitorIW&&v.monitorIW.IW,v.busR,v.busW,v.fieldErr,lcdSource().kind,ST.light,ST.field.analog&&[ST.field.analog.ch1_mv,ST.field.analog.ch1_source],ST.field.analogNote]);
   if(!force&&key===ST.renderKey)return;ST.renderKey=key;
   const stage=$('cwStage');if(!stage)return;
-  const focusId=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('[data-ctl],[data-phone],[data-light]');const fsel=focusId?(focusId.dataset.ctl?`[data-ctl="${focusId.dataset.ctl}"]`:focusId.dataset.light?`[data-light="${focusId.dataset.light}"]`:`[data-phone="${focusId.dataset.phone}"]`):null;
+  const focusId=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('[data-ctl],[data-phone],[data-light],[data-lcd-key],[data-lcd-open][tabindex="0"]');const fsel=focusId?(focusId.dataset.lcdKey?`[data-lcd-key="${focusId.dataset.lcdKey}"]`:focusId.dataset.lcdOpen?'[data-lcd-open][tabindex="0"]':focusId.dataset.ctl?`[data-ctl="${focusId.dataset.ctl}"]`:focusId.dataset.light?`[data-light="${focusId.dataset.light}"]`:`[data-phone="${focusId.dataset.phone}"]`):null;
   const gal=$('cwParts');
   if(ST.sub==='parts'){stage.innerHTML='';if(gal)gal.innerHTML=renderGallery(T);return;}
   if(gal&&gal.innerHTML)gal.innerHTML='';
@@ -516,7 +533,7 @@ function onIo(line){let m=/^DI\s*:\s*(.*)$/.exec(line);
   if(m){const tok=m[1].trim().split(/\s+/);if(tok.length>=8){ST.io.di=tok.slice(0,8).map(t=>t[0]==='1'?1:0);ST.io.forced=tok.slice(0,8).map(t=>/F/.test(t)?1:0);ST.io.at=performance.now();}return;}
   m=/^relay([0-3])\s+cmd=([01])\s+act=([01])/.exec(line);if(m){ST.io.cmd=ST.io.cmd||[0,0,0,0];ST.io.act=ST.io.act||[0,0,0,0];ST.io.cmd[+m[1]]=+m[2];ST.io.act[+m[1]]=+m[3];ST.io.at=performance.now();}}
 let ticker=null;
-function tick(){if(!ST.active||document.hidden)return;const prev=ST.conn;ST.conn=connKind();const now=performance.now();
+function tick(){if(!ST.active||document.hidden)return;if(ST.sub==='wire'&&ST.view==='bench')refreshLcd(false);const prev=ST.conn;ST.conn=connKind();const now=performance.now();
   if(ST.conn!==prev){ST.epoch++;ST.field={ok:null,di:null,relays:null,analog:null,analogNote:'',at:0,err:'',busy:false,next:0};ST.ch1Set=false;ST.io={di:null,forced:null,cmd:null,act:null,at:0,last:0};ST.ourForce={};ST.restKey='';ST.restP=null;if(!Object.values(ST.held).some(Boolean))resetSwitches(circuit());}
   if(ST.conn==='twin'){const c=circuit();if(ST.restKey!==ST.epoch+'|'+c.id&&ST.field.ok!==false)ensureRest(c);else if(now>=ST.field.next)pollField();if(now-ST.io.last>1000){ST.io.last=now;send('io');}pollModbus();}
   else if(ST.conn==='usb'){if(now-ST.io.last>500){ST.io.last=now;send('io');}}
@@ -538,7 +555,9 @@ function init(){const stage=$('cwStage');if(!stage)return;
   stage.addEventListener('pointerdown',e=>{const g=e.target.closest('[data-ctl]');if(!g)return;e.preventDefault();try{g.focus({preventScroll:true});}catch(_){}press(g.dataset.ctl);});
   window.addEventListener('pointerup',()=>{Object.keys(ST.held).forEach(id=>{if(ST.held[id])release(id);});});
   window.addEventListener('pointercancel',()=>{Object.keys(ST.held).forEach(id=>{if(ST.held[id])release(id);});});
-  stage.addEventListener('keydown',e=>{const g=e.target.closest('[data-ctl],[data-phone],[data-light]');if(!g)return;
+  stage.addEventListener('keydown',e=>{if(e.key===' '||e.key==='Enter'){const k=e.target.closest('[data-lcd-key]'),o=e.target.closest('[data-lcd-open]');
+      if(k){e.preventDefault();if(!e.repeat)lcdKey(k.dataset.lcdKey);return;}if(o){e.preventDefault();lcdOpen();return;}}
+    const g=e.target.closest('[data-ctl],[data-phone],[data-light]');if(!g)return;
     if(g.dataset.light){const ids=LIGHT.map(x=>x.id),i=ids.indexOf(ST.light);
       const go=id=>{ST.light=id;render(true);const n=stage.querySelector(`[data-light="${id}"]`);if(n)n.focus({preventScroll:true});setLight(id);};
       if(e.key===' '||e.key==='Enter'){e.preventDefault();go(g.dataset.light);}
@@ -549,7 +568,8 @@ function init(){const stage=$('cwStage');if(!stage)return;
     if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();press(g.dataset.ctl);}});
   stage.addEventListener('keyup',e=>{const g=e.target.closest('[data-ctl]');if(g&&(e.key===' '||e.key==='Enter'))release(g.dataset.ctl);});
   stage.addEventListener('focusout',e=>{const g=e.target.closest&&e.target.closest('[data-ctl]');if(g&&ST.held[g.dataset.ctl]&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest(`[data-ctl="${g.dataset.ctl}"]`)))setTimeout(()=>{const a=document.activeElement;if(!(a&&a.closest&&a.closest(`[data-ctl="${g.dataset.ctl}"]`)))release(g.dataset.ctl);},0);});
-  stage.addEventListener('click',e=>{const r=e.target.closest('[data-phone]');if(r){ST.phoneSel=r.dataset.phone;save();render(true);}
+  stage.addEventListener('click',e=>{const kk=e.target.closest('[data-lcd-key]');if(kk){lcdKey(kk.dataset.lcdKey);return;}if(e.target.closest('[data-lcd-open]')){lcdOpen();return;}
+    const r=e.target.closest('[data-phone]');if(r){ST.phoneSel=r.dataset.phone;save();render(true);}
     const l=e.target.closest('[data-light]');if(l)setLight(l.dataset.light);});
   $('cwPath').addEventListener('click',e=>{const b=e.target.closest('[data-target]');if(b)pulse(b.dataset.target);});
   try{if(typeof lineListeners!=='undefined'&&!lineListeners.includes(onIo))lineListeners.push(onIo);}catch(e){}

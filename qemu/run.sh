@@ -19,6 +19,9 @@
 #   SERIAL_SOCK / QMP_SOCK   unix socket paths (defaults /tmp/plc-serial, /tmp/plc-qmp)
 #   RESTART=1          stop an already-running twin on SERIAL_SOCK and boot fresh
 #                      (without it, a twin that is already running is reused, not rebooted)
+#   LCD_PPM=<path>|off where the twin writes its real screen (the 240x135 frame the firmware pushes to
+#                      the ST7789, about once a second; the Studio serves it as GET /lcd). Default:
+#                      beside the console socket (/tmp/plc-lcd.ppm). off = no screen dump.
 #   FIELD_ANALOG=1     the IO expansion's CH1/CH2 are YOURS: the twin's built-in process model
 #                      (tank level on CH1, pump current, skid temperature) is switched off, and the
 #                      Studio's Circuit tab / POST /field?ch1_mv= put a wired sensor's voltage on
@@ -144,8 +147,11 @@ fi
 # the twin exactly as on the board.
 IOEXP_ARGS=(-global tbd-ioexp.firmware-revision=1)
 PHYS_ENV=()
+LCD_PPM="${LCD_PPM:-${SERIAL_SOCK%-serial}-lcd.ppm}"
+[ "$LCD_PPM" = "$SERIAL_SOCK-lcd.ppm" ] && LCD_PPM="/tmp/plc-lcd.ppm"   # socket name without -serial
+[ "$LCD_PPM" != "off" ] && PHYS_ENV+=(TBD_LCD_PPM="$LCD_PPM")
 if [ "${FIELD_ANALOG:-0}" = "1" ]; then
-  PHYS_ENV=(TBD_NOPHYS=1)
+  PHYS_ENV+=(TBD_NOPHYS=1)
   echo "      FIELD_ANALOG=1: process model off — CH1/CH2 take the voltage your circuit puts on them"
 fi
 echo "twin: icount='${ICOUNT}'  reboot=$([ ${#REBOOT_ARGS[@]} -eq 0 ] && echo on || echo off)  W5500->$W5_BIND"

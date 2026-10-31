@@ -325,6 +325,14 @@ function stamplc(o,vm,T){const ox=o.x,oy=o.y,live=vm&&vm.live;
     if(net)s+=`<circle cx="${x+15}" cy="100" r="5.5" fill="#1b2130" stroke="${T.net}"/><path d="M${x+12},101 a4,4 0 0 1 6,0" fill="none" stroke="${T.net}" stroke-width="1.3"/>`;
   }
   // face: display, keys, ports, name
+  if(o.lcd){ // the controller's own screen (real twin frame, or a labelled mirror) — click/Enter to enlarge
+    s+=`<g class="sk-ctl sk-lcd" data-lcd-open="1" role="button" tabindex="0" aria-label="${esc('StampLC screen ('+(o.lcd.label||'')+'). Enlarge')}" style="cursor:zoom-in"><title>${esc((o.lcd.label||'StampLC screen')+' — click to enlarge')}</title>`+
+       `<rect x="18" y="120" width="172" height="90" rx="9" fill="#0b0e13" stroke="#59626e" stroke-width="2"/>`+
+       (o.lcd.href?`<image data-lcd-mirror="1" href="${o.lcd.href}" x="24" y="124" width="146" height="82" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated"/>`:'')+
+       `<path d="M174,198 v4 h4 M186,190 v-4 h-4 M174,202 l5,-5 M186,186 l-5,5" fill="none" stroke="#c9d3e0" stroke-width="1.7" stroke-linecap="round"/>`+
+       `<rect x="14" y="116" width="180" height="98" rx="11" class="sk-focus"/></g>`;
+    ['A','B','C'].forEach((k,i)=>s+=`<g class="sk-ctl" data-lcd-key="${k.toLowerCase()}" role="button" tabindex="0" aria-label="Panel button ${k}" style="cursor:pointer"><rect x="${18+i*50}" y="214" width="44" height="18" rx="6" fill="#2b3038"/><rect x="${16+i*50}" y="212" width="48" height="22" rx="7" class="sk-focus"/>`+txt(40+i*50,227,k,{anchor:'middle',size:12.5,weight:800,fill:'#e8edf5'})+`</g>`);
+  }else{
   s+=`<rect x="18" y="124" width="172" height="80" rx="9" fill="#0b0e13" stroke="#59626e" stroke-width="2"/>`;
   if(live){const md=vm.mode||'—',mc=md==='RUN'?'#5ff0b0':md==='REMOTE'?'#f3a53a':'#ff8a7a';
     s+=`<circle cx="33" cy="142" r="4.5" fill="${mc}"/>`+txt(43,147,md,{size:14,weight:900,fill:mc})+txt(182,147,vm.conn==='twin'?'twin':'board',{anchor:'end',size:12.5,fill:'#aab8cc',mono:1});
@@ -332,6 +340,7 @@ function stamplc(o,vm,T){const ox=o.x,oy=o.y,live=vm&&vm.live;
     s+=txt(28,192,'RLY '+(vm.relay||[]).map(b=>b==null?'·':b).join(' '),{size:12.5,fill:'#cfe0f5',mono:1});
   }else{s+=txt(104,160,'not connected',{anchor:'middle',size:13,weight:800,fill:'#7f8ca1'})+txt(104,182,'display idle',{anchor:'middle',size:12.5,fill:'#59626e',mono:1});}
   ['A','B','C'].forEach((k,i)=>s+=`<rect x="${18+i*50}" y="210" width="44" height="22" rx="6" fill="#2b3038"/>`+txt(40+i*50,226,k,{anchor:'middle',size:12.5,weight:800,fill:'#e8edf5'}));
+  }
   s+=`<rect x="290" y="124" width="72" height="26" rx="4" fill="#c4473e" stroke="#8a2c26"/><rect x="374" y="124" width="72" height="26" rx="4" fill="#3a78cf" stroke="#244f8c"/>`;
   for(let i=0;i<4;i++)s+=`<rect x="${300+i*13}" y="132" width="9" height="10" rx="1.5" fill="#3a1512"/><rect x="${384+i*13}" y="132" width="9" height="10" rx="1.5" fill="#10213c"/>`;
   s+=txt(326,167,'PORT.A',{anchor:'middle',size:12.5,weight:800,fill:'#262b33'})+txt(410,167,'PORT.C',{anchor:'middle',size:12.5,weight:800,fill:'#262b33'});
