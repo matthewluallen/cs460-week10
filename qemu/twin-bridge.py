@@ -39,9 +39,81 @@ Options (env or flags):
     --console-port 8081        raw TCP console port, localhost only (default 8081; 0 disables)
     --serial /tmp/plc-serial   twin console: a unix socket path, or host:port for TCP
     --dir <path>               static web root (default: ../web/public next to this script)
+    --bind 127.0.0.1           address the Studio port listens on (default 127.0.0.1; the Docker
+                               stations set BRIDGE_BIND=0.0.0.0 so the host port mapping reaches it)
+    --qmp /tmp/plc-qmp         the twin's QMP socket, used ONLY by the whitelisted /field endpoint
+
+Security model (this server can move a process, so it is locked to its own page):
+  * it listens on localhost unless told otherwise (Codespaces forwards localhost ports);
+  * a browser request that carries an Origin header must come from this server's own page
+    (Origin host == Host or X-Forwarded-Host, or listed in BRIDGE_ALLOWED_ORIGINS) — this covers
+    the console WebSocket and every state-changing request, so another web page the student has
+    open cannot drive the twin;
+  * Modbus WRITES (FC5/FC6) and /field writes need POST: a cross-site <img src> GET carries no
+    Origin, so GET can only ever read;
+  * no Access-Control-Allow-Origin: other sites cannot read process values through it either;
+  * /field exposes exactly two QMP properties of the twin's AW9523 expander (`di` read/write,
+    `relays` read) — never raw QMP, which could reset, pause or reconfigure the emulator.
+  Clients without an Origin header (curl, scripts, the console) are not browsers and are allowed.
 """
 import argparse, base64, hashlib, mimetypes, os, posixpath, socket, struct, sys, threading, time
 import urllib.parse
+import json as _json_mod
+
+ALLOWED_ORIGINS = {o.strip().rstrip("/").lower()
+                   for o in os.environ.get("BRIDGE_ALLOWED_ORIGINS", "").split(",") if o.strip()}
+
+def origin_ok(headers):
+    """Same-origin check for browser requests (see the security model in the module docstring)."""
+    o = headers.get("origin")
+    if not o:
+        return True                          # not a browser cross-site request (curl, scripts)
+    o = o.strip().rstrip("/").lower()
+    if o in ALLOWED_ORIGINS:
+        return True
+    try:
+        netloc = urllib.parse.urlparse(o).netloc
+    except ValueError:
+        return False
+    for h in (headers.get("host", ""), headers.get("x-forwarded-host", "")):
+        for part in h.split(","):
+            if part.strip().lower() == netloc:
+                return True
+    return False
+
+def _deny(conn, code, why):
+    body = _json_mod.dumps({"ok": False, "error": why}).encode()
+    conn.sendall(b"HTTP/1.1 %d %s\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n"
+                 b"Content-Length: %d\r\nConnection: close\r\n\r\n"
+                 % (code, b"Forbidden" if code == 403 else b"Method Not Allowed", len(body)) + body)
+
+QMP_SOCK = os.environ.get("QMP_SOCK", "/tmp/plc-qmp")
+_qmp_lock = threading.Lock()
+_FIELD_PATH = "/machine/soc/aw9523"
+
+def _qmp(cmds, timeout=3.0):
+    """Run a list of (execute, arguments) on the twin's QMP socket; return the list of returns."""
+    with _qmp_lock:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(timeout)
+        s.connect(QMP_SOCK)
+        f = s.makefile("rw")
+        try:
+            f.readline()                                           # greeting
+            out = []
+            for ex, args in [("qmp_capabilities", None)] + list(cmds):
+                m = {"execute": ex}
+                if args is not None: m["arguments"] = args
+                f.write(_json_mod.dumps(m) + "\n"); f.flush()
+                while True:
+                    r = _json_mod.loads(f.readline())
+                    if "return" in r or "error" in r:
+                        break
+                if "error" in r:
+                    raise RuntimeError(r["error"].get("desc", "qmp error"))
+                out.append(r["return"])
+            return out[1:]
+        finally:
+            s.close()
 
 WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 INDEX = "logic_studio.html"   # what "/" serves
@@ -391,7 +463,39 @@ def _serve_modbus(conn, path):
         result = {"ok": False, "error": str(e)}
     body = _json.dumps(result).encode()
     conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-                 b"Cache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\n"
+                 b"Cache-Control: no-store\r\n"
+                 b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body)
+
+
+def _serve_field(conn, method, path):
+    """Chip-level I/O for the circuit views: the twin's AW9523 `di` byte (the 8 opto inputs as the
+    expander sees them) and `relays` byte. GET reads both. POST ?bit=N&v=0|1 sets one input bit
+    (read-modify-write under a lock) or POST ?di=<0-255> sets the whole byte. The firmware then
+    reads the change over the emulated I2C bus on its next scan, exactly as if a wire had moved."""
+    qs = _up.parse_qs(_up.urlparse(path).query)
+    try:
+        if method == "POST":
+            if "di" in qs:
+                di = int(qs["di"][0]) & 0xFF
+            elif "bit" in qs:
+                bit = int(qs["bit"][0]); v = int(qs.get("v", ["1"])[0])
+                if not 0 <= bit <= 7:
+                    raise ValueError("bit must be 0-7")
+                cur = _qmp([("qom-get", {"path": _FIELD_PATH, "property": "di"})])[0]
+                di = (cur | (1 << bit)) if v else (cur & ~(1 << bit) & 0xFF)
+            else:
+                raise ValueError("POST /field needs ?bit=N&v=0|1 or ?di=<byte>")
+            _qmp([("qom-set", {"path": _FIELD_PATH, "property": "di", "value": di})])
+        di, relays = _qmp([("qom-get", {"path": _FIELD_PATH, "property": "di"}),
+                           ("qom-get", {"path": _FIELD_PATH, "property": "relays"})])
+        result = {"ok": True, "di": di, "relays": relays,
+                  "path": "QMP qom-get/qom-set %s (twin only; a physical board has no QMP)" % _FIELD_PATH}
+    except FileNotFoundError:
+        result = {"ok": False, "error": "no QMP socket at %s (is this a twin? a physical board has none)" % QMP_SOCK}
+    except Exception as e:
+        result = {"ok": False, "error": "%s: %s" % (type(e).__name__, e)}
+    body = _json.dumps(result).encode()
+    conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n"
                  b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body)
 
 
@@ -402,9 +506,32 @@ def handle(conn, hub, root):
             conn.close(); return
         method, path, headers = req
         if headers.get("upgrade", "").lower() == "websocket" and "sec-websocket-key" in headers:
+            if not origin_ok(headers):
+                print("[bridge] refused console WebSocket from origin %r" % headers.get("origin"), flush=True)
+                _deny(conn, 403, "cross-origin console connection refused"); conn.close(); return
             ws_relay(conn, headers, hub)
-        elif method in ("GET", "HEAD") and path.split("?", 1)[0] == "/modbus":
-            _serve_modbus(conn, path); conn.close()
+        elif path.split("?", 1)[0] == "/modbus":
+            fc = _up.parse_qs(_up.urlparse(path).query).get("fc", ["3"])[0]
+            write = fc in ("5", "6")
+            if method not in ("GET", "HEAD", "POST"):
+                _deny(conn, 405, "use GET to read or POST to write")
+            elif write and method != "POST":
+                _deny(conn, 405, "Modbus writes (fc=5/6) need POST")
+            elif method == "POST" and not origin_ok(headers):
+                print("[bridge] refused Modbus write from origin %r" % headers.get("origin"), flush=True)
+                _deny(conn, 403, "cross-origin write refused")
+            else:
+                _serve_modbus(conn, path)
+            conn.close()
+        elif path.split("?", 1)[0] == "/field":
+            if method == "POST" and not origin_ok(headers):
+                print("[bridge] refused /field write from origin %r" % headers.get("origin"), flush=True)
+                _deny(conn, 403, "cross-origin write refused")
+            elif method in ("GET", "HEAD", "POST"):
+                _serve_field(conn, method, path)
+            else:
+                _deny(conn, 405, "use GET to read or POST to write")
+            conn.close()
         elif method in ("GET", "HEAD"):
             serve_static(conn, path, root)
             conn.close()
@@ -446,10 +573,15 @@ def main(argv=None):
                     help="twin Modbus/TCP endpoint the /modbus proxy talks to (host:port)")
     ap.add_argument("--dir", default=os.environ.get("STUDIO_DIR", os.path.join(here, "..", "web", "public")),
                     help="static web root to serve (default ../web/public)")
+    ap.add_argument("--bind", default=os.environ.get("BRIDGE_BIND", "127.0.0.1"),
+                    help="address the Studio port listens on (default 127.0.0.1)")
+    ap.add_argument("--qmp", default=os.environ.get("QMP_SOCK", "/tmp/plc-qmp"),
+                    help="the twin's QMP socket, used only by the whitelisted /field endpoint")
     a = ap.parse_args(argv)
     root = os.path.realpath(a.dir)
-    global MODBUS_TARGET
+    global MODBUS_TARGET, QMP_SOCK
     MODBUS_TARGET = a.modbus
+    QMP_SOCK = a.qmp
 
     hub = TwinHub(a.serial)
 
@@ -458,8 +590,9 @@ def main(argv=None):
 
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    srv.bind(("0.0.0.0", a.port)); srv.listen(16)
-    print("twin-bridge: http://localhost:%d  (Studio)   ws:///ws  ->  %s" % (a.port, a.serial), flush=True)
+    srv.bind((a.bind, a.port)); srv.listen(16)
+    print("twin-bridge: http://localhost:%d  (Studio, listening on %s)   ws:///ws  ->  %s"
+          % (a.port, a.bind, a.serial), flush=True)
     print("Open that URL (in a Codespace, the forwarded port %d) and click 'Connect twin'." % a.port, flush=True)
     if not os.path.isfile(os.path.join(root, INDEX)):
         print("  WARNING: %s not found under %s — static serving will 404." % (INDEX, root), flush=True)
