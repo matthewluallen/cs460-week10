@@ -84,6 +84,16 @@ class Console:
             except ImportError:
                 sys.exit("SERIAL_PORT set but pyserial is missing — pip install pyserial")
             self._ser = serial.Serial(SERPORT, BAUD, timeout=0)
+            # Opening the USB port can reset an ESP32-S3 (seen on macOS). If it did, wait out the
+            # boot: a newline during the 5-second "Press ENTER" prompt opens the config menu
+            # instead of reaching plc>, and every check after it would read menu text.
+            first = self.drain(1.5)
+            if any(m in first for m in ("ESP-ROM", "Press ENTER", "[BOOT]", "StampLC OpenPLC")):
+                print("  (the board reset when the port opened — waiting for it to finish booting)")
+                t0 = time.time()
+                while "Startup complete" not in first and time.time() - t0 < 30:
+                    first += self.drain(0.5)
+                self.drain(1.5)
         elif bridge_holds_console():
             # ./qemu/studio.sh is running: its bridge owns the twin's ONE console connection,
             # so a second direct client would sit unanswered. Attach through the bridge instead.
