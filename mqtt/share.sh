@@ -20,16 +20,23 @@ if ! curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:${PORT}/whoami" 2>/dev
   done
 fi
 
-# 2. public URL + make it public (Codespaces)
+# The bridge mints a per-session key; the page and the WebSocket both require it, so the
+# link/QR below is what carries access. A bare guess of the public URL gets a "needs key"
+# notice, not the sharing UI or anyone's sensors.
+K="$(cat /tmp/bridge.key 2>/dev/null || true)"
+KQ=""; [ -n "$K" ] && KQ="?k=${K}"
+
+# 2. public URL + make it public (Codespaces). Exposure is opt-in: it happens HERE, when
+#    the student runs this command, not automatically on container start.
 if [ -n "${CODESPACE_NAME:-}" ]; then
-  URL="https://${CODESPACE_NAME}-${PORT}.app.github.dev/"
+  URL="https://${CODESPACE_NAME}-${PORT}.app.github.dev/${KQ}"
   if command -v gh >/dev/null 2>&1 && gh codespace ports visibility "${PORT}:public" -c "$CODESPACE_NAME" >/dev/null 2>&1; then
     PUB="public"
   else
     PUB="NOT-public"
   fi
 else
-  URL="http://localhost:${PORT}/"
+  URL="http://localhost:${PORT}/${KQ}"
   PUB="local"
 fi
 
@@ -39,6 +46,12 @@ node -e "require('./node_modules/qrcode').toString('${URL}',{type:'terminal',sma
 echo
 echo "  Scan the QR above with your phone, or open:"
 echo "    ${URL}"
+echo
+if [ "${PUB:-}" = "public" ]; then
+  echo "  HEADS UP: :${PORT} is now PUBLIC. Anyone with this link can open the page and see"
+  echo "  the sensors you choose to Share. It stays public until you stop the bridge or run"
+  echo "    gh codespace ports visibility ${PORT}:private -c \"\$CODESPACE_NAME\""
+fi
 if [ "${PUB:-}" = "NOT-public" ]; then
   echo
   echo "  NOTE: couldn't confirm :${PORT} is public. If the phone hits a GitHub login page,"

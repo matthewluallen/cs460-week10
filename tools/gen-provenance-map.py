@@ -132,13 +132,17 @@ def find_tool(name_glob, explicit):
         return explicit
     from shutil import which
     import glob
-    for cand in ("xtensa-esp32s3-elf-"+name_glob, "xtensa-esp-elf-"+name_glob,
-                 "xtensa-esp32s2-elf-"+name_glob):
+    # The StampLC is an ESP32-S3: only the S3 (or the unified esp-elf) toolchain is
+    # correct. Never fall back to esp32s2 tools — they resolve the same DWARF but mislabel
+    # the board/toolchain in the emitted map (board-specific lab => keep it S3-accurate).
+    for cand in ("xtensa-esp32s3-elf-"+name_glob, "xtensa-esp-elf-"+name_glob):
         p = which(cand)
         if p: return p
     home = os.path.expanduser("~/.platformio/packages")
-    hits = glob.glob(os.path.join(home, "**", "xtensa-esp*-"+name_glob), recursive=True)
-    return hits[0] if hits else None
+    for pat in ("xtensa-esp32s3-elf-"+name_glob, "xtensa-esp-elf-"+name_glob):
+        hits = glob.glob(os.path.join(home, "**", pat), recursive=True)
+        if hits: return hits[0]
+    return None
 
 def enrich_from_elf(rows, elf, objdump=None, addr2line=None):
     """Derive {func, addr} for each row's (file,line) from the ELF's DWARF.

@@ -2,7 +2,7 @@
 # verify-secure.sh — re-run the Part 6-8 attacks against a running SECURE twin and
 # show each one now fails (Part 9). Behavioral proof of the hardening, not a grep.
 #
-#   ./remediation/build.sh secure                       # build the hardened profile
+#   ./qemu/build-twin.sh secure                         # compile + package the hardened 8MB image
 #   ./qemu/run.sh secure                                # boot it in the twin, leave it running
 #   ./remediation/verify-secure.sh                      # <- then run this (another shell)
 set -euo pipefail

@@ -9,7 +9,6 @@
     "ghcr.io/devcontainers/features/sshd:1": {}
   },
   "postCreateCommand": "bash .devcontainer/postCreate.sh",
-  "postStartCommand": "bash .devcontainer/publish-phone-port.sh 8090",
   "forwardPorts": [8080, 8090, 8800],
   "portsAttributes": {
     "8080": { "label": "Logic Studio (drive the twin)", "onAutoForward": "notify" },

@@ -12,12 +12,20 @@ const net = require('net');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const ws = require('websocket-stream');
 const qrcode = require('qrcode');
 
 const TCP_PORT = parseInt(process.env.MQTT_TCP_PORT || '1883', 10);
 const HTTP_PORT = parseInt(process.env.HTTP_PORT || '8090', 10);
 const PAGE = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
+
+// Per-session access key. The page and the WebSocket are both gated on ?k=<KEY>, so a
+// bare guess of the public Codespace URL cannot load the sharing UI or subscribe to
+// phone/# — only someone who scanned THIS session's QR (which carries the key) can.
+// The twin on local TCP :1883 is not gated (it never leaves the container).
+const KEY = process.env.BRIDGE_KEY || crypto.randomBytes(4).toString('hex');
+try { fs.writeFileSync('/tmp/bridge.key', KEY); } catch (e) {}
 
 // ---- MQTT over TCP (the twin connects here) ----
 net.createServer(aedes.handle).listen(TCP_PORT, () =>
@@ -27,8 +35,14 @@ net.createServer(aedes.handle).listen(TCP_PORT, () =>
 function publicUrl(req) {
   const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${HTTP_PORT}`;
   const proto = req.headers['x-forwarded-proto'] || (host.includes('app.github.dev') ? 'https' : 'http');
-  return `${proto}://${host}/`;
+  return `${proto}://${host}/?k=${KEY}`;   // the key travels with the QR / link
 }
+function keyOf(req) { try { return new URL(req.url, 'http://x').searchParams.get('k'); } catch (e) { return null; } }
+const DENY = Buffer.from('<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">'
+  + '<body style="font:16px system-ui;max-width:34rem;margin:12vh auto;padding:0 1.2rem;background:#0b0e14;color:#e7eef6">'
+  + '<h2>This link needs its session key</h2><p>Open the phone page using the QR code or link printed by '
+  + '<code>bash mqtt/share.sh</code> in the Codespace. That link carries a one-time key for this session, so a '
+  + 'guessed URL can’t load the page or read anyone’s sensors.</p>');
 const httpServer = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
   if (url === '/qr.png') {
@@ -44,12 +58,18 @@ const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ url: publicUrl(req) }));
   }
+  if (keyOf(req) !== KEY) {          // bare/guessed URL: no sharing UI, no key leaked
+    res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(DENY);
+  }
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(PAGE);
 });
 
 // ---- MQTT over WebSocket on the SAME http server (phones publish here) ----
-ws.createServer({ server: httpServer }, aedes.handle);
+// Gate the WS handshake on the same key, so only a client that loaded the keyed page
+// can connect to publish OR subscribe (phone/#).
+ws.createServer({ server: httpServer, verifyClient: (info, cb) => cb(keyOf(info.req) === KEY) }, aedes.handle);
 httpServer.listen(HTTP_PORT, () =>
   console.log(`[bridge] HTTP + MQTT/WS :${HTTP_PORT}  (phone sensor page + QR)`));
 
@@ -68,3 +88,4 @@ aedes.on('publish', (pkt, c) => {
 });
 
 console.log('[bridge] CS460 phone-sensor MQTT bridge up.');
+console.log(`[bridge] session key: ${KEY}  (page + WS require ?k=${KEY}; 'bash mqtt/share.sh' prints the full link/QR)`);

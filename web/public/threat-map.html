@@ -211,10 +211,10 @@ const ATTACKS = [
     key:'overflow-force', name:'Buffer overflow → phantom relay force', phase:'Part 6/7 · exploit',
     intro:`An unauthenticated oversized write (e.g. <code>POST /api/tag</code>) overruns a 32-byte scratch buffer into the adjacent force-mask words, energizing a relay with <b>no audit entry</b> — the I/O image says "forced", the trail says nobody did it. A real memory-corruption actuation, deterministic in the twin (no ASLR).`,
     evidence:`$ xtensa-esp32s3-elf-nm -S firmware.elf | grep force\n3fca80c8 s_coil_force_val   <- overflow lands here (+32)\n3fca80d0 s_coil_force_en    <- (+40)\n# relay0 ON, audit log has NO FORCE record -> actuation without provenance`,
-    fix:`Secure build (ENABLE_CWE_DEMOS off): bounded copy; overflow fixed at compile time. CWE-121/787/306 closed.`,
+    fix:`Secure build (ENABLE_CWE_DEMOS off): bounded copy; overflow fixed at compile time. CWE-787/788/306 closed.`,
     fw:{
       emb3d:{id:'TID-327',title:'Out of Bounds Memory Access'},
-      cwe:[{id:'CWE-121',title:'Stack-based Buffer Overflow'},{id:'CWE-787',title:'Out-of-bounds Write'}],
+      cwe:[{id:'CWE-787',title:'Out-of-bounds Write'},{id:'CWE-788',title:'Access of Memory Location After End of Buffer'}],
       capec:{id:'CAPEC-100',title:'Overflow Buffers'},
       attack:{id:'T0866',title:'Exploitation of Remote Services'},
       caldera:null,

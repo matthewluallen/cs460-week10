@@ -5,8 +5,8 @@
   "elf": {
    "enriched": true,
    "elf": "/workspaces/cs460-week10/sbom/firmware/.pio/build/m5stamplc/firmware.elf",
-   "objdump": "/home/vscode/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s2-elf-objdump",
-   "addr2line": "/home/vscode/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s2-elf-addr2line",
+   "objdump": "/home/vscode/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump",
+   "addr2line": "/home/vscode/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-addr2line",
    "resolved_exact": 51,
    "resolved_nearest": 5,
    "unresolved": 0,

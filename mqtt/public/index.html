@@ -72,6 +72,9 @@
  .statechip.off{color:var(--danger);border-color:var(--danger-brd)}
  .lead{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:var(--dim)}
  .lead b{color:var(--fg)}
+ .consent{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:var(--dim);margin-bottom:11px}
+ .consent input{margin-top:2px;flex:none;width:17px;height:17px;accent-color:var(--accent)}
+ .consent b{color:var(--fg)}
  .swatch{height:42px;border-radius:10px;margin-top:12px;border:1px solid var(--brd);
          display:flex;align-items:center;justify-content:center;font:12px ui-monospace,monospace;color:var(--fg)}
 </style>
@@ -95,7 +98,10 @@
 </div>
 
 <div class="card">
-  <button id="go" class="bigbtn">Connect to broker</button>
+  <label class="consent"><input type="checkbox" id="consent">
+    <span>While this page is shared, <b>anyone with this link can open it and see the sensors you choose to Share</b>
+    (including coarse location if you share it). I'm using a device and account I'm OK with that on.</span></label>
+  <button id="go" class="bigbtn" disabled>Connect to broker</button>
   <div class="status"><span class="dot" id="bdot"></span><span id="bstat">broker: not connected</span> · <span id="cnt">0 msgs</span></div>
   <div class="note">Client id <code id="cid">—</code>. Each sensor is shared only after you grant its
   permission below. Topics: <code>phone/&lt;id&gt;/&lt;sensor&gt;</code>. A <span class="pill wired">used by logic</span>
@@ -138,6 +144,7 @@
 const cid = 'ph-' + Math.random().toString(36).slice(2, 7);
 document.getElementById('cid').textContent = cid;
 const base = 'phone/' + cid;
+const KEY = new URLSearchParams(location.search).get('k') || '';   // per-session access key (from the QR/link)
 let client = null, count = 0;
 const el = id => document.getElementById(id);
 
@@ -161,17 +168,38 @@ function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(x=>x+
 const SEM_DARK={'--code':'#ffd166','--accent':'#4d9fff','--ghost':'#22314a','--ghost-fg':'#cfe0f5','--on':'#1f6f4d','--on-fg':'#d6ffe9','--live':'#5ff0b0','--spoof':'#ffce7a','--spoof-bg':'#1c160a','--spoof-brd':'#6b5320','--off-text':'#8aa0ba','--off-bg':'#180f14','--off-brd':'#3a2330','--warn-bg':'#7a5312','--warn-fg':'#ffe3ad','--danger-bg':'#7a2130','--danger-fg':'#ffd0d6','--danger':'#ff9aa6','--danger-brd':'#5a2630','--wired':'#8fd0ff','--wired-brd':'#2b4d6b'};
 const SEM_LIGHT={'--code':'#9a5b00','--accent':'#1f6fe0','--ghost':'#dde7f2','--ghost-fg':'#1d2e44','--on':'#1f7a54','--on-fg':'#ffffff','--live':'#0a7d4f','--spoof':'#8a5a00','--spoof-bg':'#fff3dc','--spoof-brd':'#e3c488','--off-text':'#6a788a','--off-bg':'#f1e6e9','--off-brd':'#d7b8bf','--warn-bg':'#f0c24a','--warn-fg':'#4a3400','--danger-bg':'#c43246','--danger-fg':'#ffffff','--danger':'#b11a2b','--danger-brd':'#e3a4ac','--wired':'#135a8a','--wired-brd':'#9cc4e0'};
 function setTheme(bg,label){
-  const dark = cr(NEARW,bg) >= cr(NEARB,bg);          // near-white wins => dark background
+  // A narrow band of mid-tones (~#777) is un-AA-able: neither black nor white text
+  // reaches 4.5:1 on it. Only the custom picker can land there (the PLC's relay-driven
+  // colors are saturated corners). Nudge such a pick minimally toward black/white until
+  // a readable text color exists, so "readable on any background" holds honestly.
+  let dark = cr(NEARW,bg) >= cr(NEARB,bg);            // near-white wins => dark background
+  if(Math.max(cr(NEARW,bg),cr(NEARB,bg)) < 4.5){
+    const toward = dark ? NEARB : NEARW;              // deepen the gap from the text color
+    for(let t=0.03;t<=1.0001;t+=0.03){ const o=mix(bg,toward,t);
+      if(Math.max(cr(NEARW,o),cr(NEARB,o))>=4.5){ bg=o; dark=cr(NEARW,bg)>=cr(NEARB,bg); break; } }
+  }
   const fg = dark?NEARW:NEARB;
   const R=document.documentElement.style;
   R.setProperty('--bg',rgbs(bg));
   R.setProperty('--fg',rgbs(fg));
-  R.setProperty('--dim',rgbs(mix(fg,bg,0.30)));
+  // fit a text color to the background: blend it toward fg just until it clears a
+  // target WCAG ratio, so muted text and the semantic status colors stay readable on
+  // ANY background (incl. a mid-tone PLC-driven color), not only the primary --fg.
+  const fit = (c,min) => { const base=(typeof c==='string')?hexToRgb(c):c;
+    for(let t=0;t<1;t+=0.05){ const col=mix(base,fg,t); if(cr(col,bg)>=min) return rgbs(col); }
+    return rgbs(fg); };
+  R.setProperty('--dim', fit(mix(fg,bg,0.30), 4.5));   // was a flat mix; now AA-guaranteed
   R.setProperty('--card',rgbs(mix(bg,fg,dark?0.07:0.06)));
   R.setProperty('--field',rgbs(mix(bg,fg,dark?0.12:0.09)));
   R.setProperty('--brd',rgbs(mix(bg,fg,0.20)));
   const SEM = dark?SEM_DARK:SEM_LIGHT;
   for(const k in SEM) R.setProperty(k,SEM[k]);
+  // the semantic hues are used as TEXT (status chips on the pane, spoof/live readouts);
+  // recontrast the text ones against the real bg so a saturated pane can't bury them.
+  R.setProperty('--live',     fit(SEM['--live'],     4.5));
+  R.setProperty('--spoof',    fit(SEM['--spoof'],    4.5));
+  R.setProperty('--off-text', fit(SEM['--off-text'], 4.5));
+  R.setProperty('--danger',   fit(SEM['--danger'],   4.5));
   const acc=hexToRgb(SEM['--accent']);
   R.setProperty('--accent-fg', cr(NEARW,acc)>=cr(NEARB,acc)?rgbs(NEARW):rgbs(NEARB));
   document.documentElement.style.colorScheme = dark?'dark':'light';
@@ -225,7 +253,7 @@ const SENSORS = [
    wired:true, prim:'light', key:'lux', min:0, max:2000, step:1, unit:'lux', maps:'%IW (light level)' },
  { id:'sound',  name:'Microphone level', desc:'RMS loudness 0–100 (no audio is sent)', topics:'sound', start:startSound,
    wired:false, prim:'sound', key:'level', min:0, max:100, step:1, unit:'/100', maps:null },
- { id:'geo',    name:'Geolocation', desc:'latitude, longitude, accuracy, speed, heading', topics:'geo', start:startGeo,
+ { id:'geo',    name:'Geolocation', desc:'coarse latitude/longitude (~100 m), accuracy, speed, heading', topics:'geo', start:startGeo,
    wired:false, prim:null },
  { id:'battery',name:'Battery', desc:'charge level % and charging state', topics:'battery', start:startBattery,
    wired:false, prim:null },
@@ -327,8 +355,10 @@ function startGeo(){
     if(!navigator.geolocation) return res(false);
     navigator.geolocation.watchPosition(p=>{
       const c=p.coords;
-      if(tx.geo) setVal('geo', `lat ${c.latitude.toFixed(5)}  lon ${c.longitude.toFixed(5)}\nacc ${Math.round(c.accuracy)} m  spd ${c.speed==null?'—':c.speed.toFixed(1)} m/s  hdg ${c.heading==null?'—':Math.round(c.heading)+'°'}`);
-      throttled('geo',()=>gpub('geo','geo',{lat:+c.latitude.toFixed(6),lon:+c.longitude.toFixed(6),acc:+c.accuracy.toFixed(1),alt:c.altitude,spd:c.speed,hdg:c.heading}),2);
+      // Coarsened to 3 decimals (~110 m) on purpose: enough to show movement for the lab,
+      // not enough to pinpoint a student's home. This is the only value leaving the phone.
+      if(tx.geo) setVal('geo', `lat ${c.latitude.toFixed(3)}  lon ${c.longitude.toFixed(3)}  (coarse ~100 m)\nacc ${Math.round(c.accuracy)} m  spd ${c.speed==null?'—':c.speed.toFixed(1)} m/s  hdg ${c.heading==null?'—':Math.round(c.heading)+'°'}`);
+      throttled('geo',()=>gpub('geo','geo',{lat:+c.latitude.toFixed(3),lon:+c.longitude.toFixed(3),acc:+c.accuracy.toFixed(1),alt:c.altitude,spd:c.speed,hdg:c.heading}),2);
       res(true);
     }, err=>{ setVal('geo','permission denied / unavailable',false); res(false); }, {enableHighAccuracy:true, maximumAge:1000});
   });
@@ -389,9 +419,10 @@ function wirePhoneIO(){
   }
 }
 
+el('consent').onchange = e => { el('go').disabled = !e.target.checked; };   // gate Connect on explicit consent
 el('go').onclick = async () => {
   el('go').disabled = true; el('go').textContent = 'Connecting…';
-  const url=(location.protocol==='https:'?'wss://':'ws://')+location.host;
+  const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/?k='+encodeURIComponent(KEY);
   client = mqtt.connect(url, {clientId:cid, reconnectPeriod:2000, keepalive:30});
   client.on('connect', ()=>{ el('bdot').classList.add('on'); el('bstat').textContent='broker: connected ('+location.host+')';
     el('go').textContent='Connected — share sensors below'; el('go').className='bigbtn on';

@@ -7,9 +7,8 @@ This is the behavioral counterpart to grepping source: it does not read a banner
 or a CWE string, it drives the live console and HTTP services and checks the
 *effect*. Boot the secure image first:
 
-    ./remediation/build.sh secure
-    # merge/flash per ../docs/QEMU-Twin.md, then:
-    FLASH_IMG=<your-secure-8MB-image> ./qemu/run.sh      # leave it running
+    ./qemu/build-twin.sh secure      # compile + package the hardened 8MB image
+    ./qemu/run.sh secure             # boot it in the twin; leave it running
 
 Then, in another shell:   ./remediation/verify-secure.sh
 
