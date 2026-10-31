@@ -107,6 +107,17 @@ twin_detect() {
   return 1
 }
 
+# twin_wait_up SOCK SECONDS — after launching a boot: wait for the process to appear AND report
+# running (twin_detect alone returns at once when the process has not been exec'd yet)
+twin_wait_up() {
+  local sock="$1" n=$(( ${2:-30} * 5 ))
+  for _ in $(seq 1 "$n"); do
+    twin_detect "$sock" 0 && return 0
+    sleep 0.2
+  done
+  twin_detect "$sock" 0
+}
+
 # twin_stop SOCK [bridge] — stop the twin on SOCK; with "bridge", also stop the Studio server
 # attached to it. (A restart leaves the server up: it reconnects to the new twin by itself,
 # so an open Studio tab keeps working.)

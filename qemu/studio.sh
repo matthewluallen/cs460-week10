@@ -48,7 +48,7 @@ fi
 if ! twin_detect "$SERIAL_SOCK" 0; then
   echo "starting the twin ($PROFILE)…"
   SERIAL_SOCK="$SERIAL_SOCK" "$HERE/run.sh" "$PROFILE" >/tmp/twin.log 2>&1 &
-  twin_detect "$SERIAL_SOCK" 30 || { echo "twin did not come up — see /tmp/twin.log"; exit 1; }
+  twin_wait_up "$SERIAL_SOCK" 30 || { echo "twin did not come up — see /tmp/twin.log"; exit 1; }
   echo "twin up ($TWIN_WHICH, pid $TWIN_PID)."
 fi
 
