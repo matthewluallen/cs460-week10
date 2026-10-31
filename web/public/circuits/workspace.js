@@ -430,7 +430,7 @@ function hops(c,v){const P=c.path;if(!P)return[];const L=v.live,k=v.conn;const o
   }else{const twin=k==='twin';const iw=v.monitorIW&&Array.isArray(v.monitorIW.IW)?v.monitorIW.IW[0]:null;const a=ST.field.analog,sel=lightSel(),tw=twin&&v.fieldFresh&&a;
     H('light on RP1',twin?`${sel.name} · ≈${fmtR(sel.r)}`:'cover / uncover',twin?'MODELLED':'INFERRED','part-RP1',twin?'a chosen light level: the twin has no photoresistor':'the real photoresistor on your bench');
     H('divider → CH1','V = 4.45·RP1/(RP1+10k)'+(twin?' = '+lightMv(sel.r)+' mV':''),'MODELLED','part-R3','arithmetic, not a reading');
-    H('X1 ADC · I²C 0x20',tw?`CH1 = ${a.ch1_mv} mV`:'—',tw&&a.writable?'OBSERVED':(tw?'PENDING':'INFERRED'),'part-R3',tw&&a.writable?'QMP read of the expansion’s CH1 register; the firmware polls it @0x20':(tw?'the twin’s tank model owns CH1: RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh':'the firmware polls @0x20'));
+    H('X1 ADC · I²C 0x20',tw?`CH1 = ${a.ch1_mv} mV`:'—',tw&&a.writable?'OBSERVED':(tw?'PENDING':'INFERRED'),'x1',tw&&a.writable?'QMP read of the expansion’s CH1 register; the firmware polls it @0x20':(tw?'the twin’s tank model owns CH1: RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh':'the firmware polls @0x20'));
     H('%IW0 (mV)',iw!=null?String(iw):'—',iw!=null?'OBSERVED':'INFERRED','part-R3','Studio monitor (start Monitor in Logic)');
     H('rung',P.rung,'INFERRED',`relay${P.relay}`,'deadband + on-delay in your ladder');}
   H(`${qx} = ${cmd==null?'—':cmd}`,L?'io cmd':'—',cmd!=null?'OBSERVED':'INFERRED',`relay${P.relay}`,'the commanded output image');
