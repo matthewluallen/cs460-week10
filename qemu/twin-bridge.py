@@ -66,9 +66,12 @@ Security model (this server can move a process, so it is locked to its own page)
     (the twin's W5500, guest port 8080) — exactly those two paths, GET only, no query passthrough.
   * GET /twin/identity reads the running twin's flash image (partition table, otadata, app
     descriptor): profile, boot slot, ESP-IDF version, app ELF SHA-256. Read-only.
+  * GET /lcd returns the twin's real screen as a PNG: the 240x135 frame the firmware pushed to
+    the ST7789 panel, decoded by the emulator from the SPI traffic and dumped (TBD_LCD_PPM, about
+    once a second) to one fixed file. GET only, no parameters reach the filesystem.
   Clients without an Origin header (curl, scripts, the console) are not browsers and are allowed.
 """
-import argparse, base64, hashlib, mimetypes, os, posixpath, re, socket, struct, sys, threading, time
+import argparse, base64, hashlib, mimetypes, os, posixpath, re, socket, struct, sys, threading, time, zlib
 import urllib.parse
 import json as _json_mod
 
@@ -583,6 +586,55 @@ def _serve_field(conn, method, path):
     body = _json.dumps(result).encode()
     conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n"
                  b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body)
+
+
+# ───────────────────────── the twin's real screen (ST7789 framebuffer) ─────────────────────────
+LCD_PPM = os.environ.get("LCD_PPM", "")             # set in main() (default: beside the console socket)
+_lcd_cache = {"mtime": None, "png": None}
+
+
+def _ppm_to_png(data):
+    """P6 (binary RGB) -> PNG, standard library only. The emulator writes 'P6\n<w> <h>\n255\n'."""
+    parts = data.split(b"\n", 3)
+    if len(parts) < 4 or parts[0] != b"P6":
+        raise ValueError("not a P6 frame")
+    w, h = (int(x) for x in parts[1].split())
+    if not (0 < w <= 320 and 0 < h <= 320) or int(parts[2]) != 255 or len(parts[3]) < w * h * 3:
+        raise ValueError("incomplete frame")
+    px, row = parts[3], w * 3
+    raw = b"".join(b"\x00" + px[y * row:(y + 1) * row] for y in range(h))
+
+    def chunk(kind, body):
+        return (struct.pack(">I", len(body)) + kind + body +
+                struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) +
+            chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+
+
+def _serve_lcd(conn):
+    """The latest real frame as PNG; the previous good frame if the emulator is mid-write."""
+    try:
+        st = os.stat(LCD_PPM)
+    except OSError:
+        return _send_json(conn, {"ok": False, "error": "no screen frame at %s: this twin was started without "
+                                 "its screen dump; restart it: RESTART=1 ./qemu/studio.sh" % (LCD_PPM or "(unset)")}, 404)
+    if _lcd_cache["mtime"] != st.st_mtime or _lcd_cache["png"] is None:
+        for _ in range(3):
+            try:
+                with open(LCD_PPM, "rb") as f:
+                    data = f.read(400000)
+                _lcd_cache.update(mtime=st.st_mtime, png=_ppm_to_png(data))
+                break
+            except (OSError, ValueError):
+                time.sleep(0.03)                    # the emulator rewrites the file in place
+    png = _lcd_cache["png"]
+    if png is None:
+        return _send_json(conn, {"ok": False, "error": "screen frame not readable yet"}, 503)
+    age = max(0, int((time.time() - (_lcd_cache["mtime"] or 0)) * 1000))
+    conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nCache-Control: no-store\r\n"
+                 b"X-Frame-Age-Ms: %d\r\nX-Frame-Source: twin ST7789 framebuffer\r\n"
+                 b"Access-Control-Expose-Headers: X-Frame-Age-Ms\r\n"
+                 b"Content-Length: %d\r\nConnection: close\r\n\r\n" % (age, len(png)) + png)
 
 
 def _send_json(conn, result, code=200):
@@ -1103,6 +1155,12 @@ def handle(conn, hub, root):
         elif path.split("?", 1)[0] == "/twin/identity" and method in ("GET", "HEAD"):
             qs = _up.parse_qs(_up.urlparse(path).query)
             _send_json(conn, _twin_identity(with_hash=qs.get("hash", ["0"])[0] == "1")); conn.close()
+        elif path.split("?", 1)[0] == "/lcd":
+            if method in ("GET", "HEAD"):
+                _serve_lcd(conn)
+            else:
+                _deny(conn, 405, "read-only: GET only")
+            conn.close()
         elif path.split("?", 1)[0] in FW_PROXY_PATHS:
             if method not in ("GET", "HEAD"):
                 _deny(conn, 405, "read-only: GET only")
@@ -1168,9 +1226,14 @@ def main(argv=None):
     ap.add_argument("--fw-http", default=os.environ.get("FW_HTTP", ""),
                     help="firmware HTTP HMI host:port for the read-only /fw/api/* proxy "
                          "(default: the twin's W5500 bind address, port 8080)")
+    ap.add_argument("--lcd", default=os.environ.get("LCD_PPM", ""),
+                    help="the twin's screen dump (TBD_LCD_PPM), served read-only as GET /lcd "
+                         "(default: beside the console socket, e.g. /tmp/plc-lcd.ppm)")
     a = ap.parse_args(argv)
     root = os.path.realpath(a.dir)
-    global MODBUS_TARGET, QMP_SOCK, FW_HTTP
+    global MODBUS_TARGET, QMP_SOCK, FW_HTTP, LCD_PPM
+    LCD_PPM = a.lcd or (a.serial[:-len("-serial")] + "-lcd.ppm" if a.serial.endswith("-serial")
+                        else "/tmp/plc-lcd.ppm")
     MODBUS_TARGET = a.modbus
     QMP_SOCK = a.qmp
     FW_HTTP = a.fw_http

@@ -11,6 +11,14 @@
 // The fake bridge is a test double for these assertions only; nothing it returns is ever shown as live data.
 const {chromium}=require('playwright'),http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
 const ROOT=path.join(__dirname,'../web/public');
+const zlib=require('zlib');
+function pngOf(w,h,rgb){const crcT=new Uint32Array(256).map((_,n)=>{let c=n;for(let k=0;k<8;k++)c=c&1?0xedb88320^(c>>>1):c>>>1;return c>>>0;});
+  const crc=b=>{let c=0xffffffff;for(const x of b)c=crcT[(c^x)&255]^(c>>>8);return (c^0xffffffff)>>>0;};
+  const chunk=(t,d)=>{const len=Buffer.alloc(4);len.writeUInt32BE(d.length);const td=Buffer.concat([Buffer.from(t),d]);const c=Buffer.alloc(4);c.writeUInt32BE(crc(td));return Buffer.concat([len,td,c]);};
+  const ih=Buffer.alloc(13);ih.writeUInt32BE(w,0);ih.writeUInt32BE(h,4);ih[8]=8;ih[9]=2;
+  const raw=Buffer.alloc((w*3+1)*h);for(let y=0;y<h;y++){raw[y*(w*3+1)]=0;for(let x=0;x<w;x++)raw.set(rgb,y*(w*3+1)+1+x*3);}
+  return Buffer.concat([Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]),chunk('IHDR',ih),chunk('IDAT',zlib.deflateSync(raw)),chunk('IEND',Buffer.alloc(0))]);}
+const LCD_PNG=pngOf(240,135,[14,17,22]);
 const field={di:0,relays:0,ch1:0},log=[],forced={};let sockets=[];
 function firmware(){ // stand-in scan: relay1 follows input 1 (the pushbutton project); relay0 seals in on IN1
   const inp=i=>forced[i]!=null?forced[i]:(field.di>>i)&1;let r=field.relays;
@@ -23,6 +31,7 @@ const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x');
   if(u.pathname==='/field'){if(q.method==='POST'){log.push('POST '+u.search);if(u.searchParams.has('ch1_mv')){const m=u.searchParams.get('ch1_mv');field.ch1=m==='open'?0:+m;}
       else if(u.searchParams.has('di'))field.di=+u.searchParams.get('di')&255;else{const b=+u.searchParams.get('bit'),v=+u.searchParams.get('v');field.di=v?field.di|(1<<b):field.di&~(1<<b);}}
     firmware();r.writeHead(200,{'content-type':'application/json'});return r.end(JSON.stringify({ok:true,di:field.di,relays:field.relays,analog:{ch1_mv:field.ch1,ch2_mv:0,ch1_ua:0,ch2_ua:0,ch1_source:'field',ch2_source:'field',writable:true}}));}
+  if(u.pathname==='/lcd'){log.push('GET /lcd');r.writeHead(200,{'content-type':'image/png','x-frame-age-ms':'120'});return r.end(LCD_PNG);}
   if(u.pathname==='/modbus'){const fc=+u.searchParams.get('fc'),addr=+u.searchParams.get('addr'),n=+u.searchParams.get('count');let values=Array(n).fill(0);
     if(fc===1&&addr===100)values=values.map((_,i)=>(field.di>>i)&1);if(fc===3&&addr===50)values=[0,981,12];r.writeHead(200,{'content-type':'application/json'});return r.end(JSON.stringify({ok:true,values}));}
   let p=u.pathname==='/'?'/logic_studio.html':u.pathname;try{const b=fs.readFileSync(path.join(ROOT,p));r.writeHead(200,{'content-type':p.endsWith('.js')?'application/javascript':p.endsWith('.csco')||p.endsWith('.json')?'application/json':'text/html'});r.end(b);}catch(e){r.writeHead(404);r.end('nf');}});
@@ -31,7 +40,8 @@ srv.on('upgrade',(q,sock)=>{const k=q.headers['sec-websocket-key'];const acc=cry
   sock.on('data',d=>{rest=wsFrames(Buffer.concat([rest,d]),txt=>txt.split('\n').filter(Boolean).forEach(line=>{log.push('WS '+line);
     let m;if(line==='io')wsSend(sock,ioReply());else if(line==='status')wsSend(sock,'MODE=RUN  scan last=18000us min=1us max=1us  scans=1  hb=1\n');
     else if((m=/^force IX(\d) ([01])$/.exec(line))){forced[+m[1]]=+m[2];wsSend(sock,`forced %IX${m[1]} = ${m[2]}\n`);}
-    else if((m=/^unforce IX(\d)$/.exec(line))){delete forced[+m[1]];wsSend(sock,`unforced %IX${m[1]}\n`);}}));});sock.on('error',()=>{});});
+    else if((m=/^unforce IX(\d)$/.exec(line))){delete forced[+m[1]];wsSend(sock,`unforced %IX${m[1]}\n`);}
+    else if((m=/^btn ([abc])$/.exec(line)))wsSend(sock,`panel button ${m[1].toUpperCase()} injected\n`);}));});sock.on('error',()=>{});});
 let fails=0;const ok=(c,m)=>{console.log((c?'  ✓ ':'  ✗ ')+m);if(!c)fails++;};
 const until=async(fn,ms=6000)=>{const t=Date.now();while(Date.now()-t<ms){if(fn())return true;await new Promise(r=>setTimeout(r,50));}return fn();};
 const dom=(pg,fn,arg)=>pg.waitForFunction(fn,arg,{timeout:6000}).then(()=>true,()=>false);
@@ -68,6 +78,18 @@ const dom=(pg,fn,arg)=>pg.waitForFunction(fn,arg,{timeout:6000}).then(()=>true,(
   ok(await dom(pg,()=>/%IW2 = 981/.test(document.getElementById('cwStage').textContent)),'phone block: %IW2 read from Modbus reg 51');
   const ptags=await pg.evaluate(()=>[...document.querySelectorAll('#cwPath .cw-hop-tag')].map(e=>e.textContent));
   ok(ptags[3]==='BYPASSED','phone path: opto · 0x59 in · I²C read BYPASSED');
+  // the controller's screen: on the twin the drawing shows the real frame (GET /lcd), enlarges, and A/B/C press the panel
+  await pg.evaluate(()=>CircuitWorkspace.select('a'));
+  ok(await until(()=>log.includes('GET /lcd')),'twin: the screen is fetched from GET /lcd');
+  ok(await dom(pg,()=>/StampLC screen\s*real frame/.test(document.getElementById('cwStage').textContent)),'bench readout: StampLC screen = real frame (OBSERVED)');
+  ok(await pg.evaluate(()=>{const im=document.querySelector('#cwStage [data-lcd-mirror]');return !!(im&&/^data:image\/png/.test(im.getAttribute('href')));}),'bench StampLC shows the screen image');
+  await pg.waitForFunction(()=>typeof busBusy==='undefined'||!busBusy,null,{timeout:20000}).catch(()=>{});   // a pending readback owns the console
+  await pg.click('#cwStage [data-lcd-key="b"]');
+  if(!await until(()=>log.includes('WS btn b'),3000))console.log('    debug:',await pg.evaluate(()=>JSON.stringify({MODE,conn,busBusy,ws:!!wsSock,hp:typeof window.heroPress,log:[...document.querySelectorAll('#log div, .log div')].slice(-4).map(d=>d.textContent)})));
+  ok(log.includes('WS btn b'),'drawn key B → console btn b (the device’s panel button)');
+  await pg.click('#cwStage [data-lcd-open][tabindex="0"]');
+  ok(await dom(pg,()=>!!document.getElementById('lcdBig')&&/Real screen/.test((document.getElementById('lcdBigSrc')||{}).textContent||'')),'clicking the drawn screen opens the enlarged view, labelled as the real screen');
+  await pg.evaluate(()=>{try{closeModal();}catch(e){}});
   // analog circuit: the twin has no photoresistor; the light presets put the divider voltage on CH1 at the chip
   await pg.evaluate(()=>CircuitWorkspace.select('d'));
   ok(await until(()=>log.includes('POST ?ch1_mv=2225')),'light alarm: Room light (≈10 kΩ) → POST /field?ch1_mv=2225 at the chip');

@@ -114,6 +114,19 @@ def main():
     st, _, body = req("POST", "/field?di=0", origin=SELF)
     check(st == 200 and '"di": 0' in body, "/field restores the input byte", body[:60])
 
+    # the twin's real screen: read-only PNG of the frame the firmware pushed to the panel
+    st, hd, body = req("POST", "/lcd", origin=SELF)
+    check(st == 405, "/lcd is read-only (POST -> HTTP 405)", "HTTP %d" % st)
+    for _ in range(10):
+        conn = http.client.HTTPConnection("127.0.0.1", PORT, timeout=5)
+        conn.request("GET", "/lcd"); r = conn.getresponse(); png = r.read(); conn.close()
+        if r.status == 200: break
+        time.sleep(1)
+    ok = (r.status == 200 and r.getheader("Content-Type") == "image/png" and png[:8] == b"\x89PNG\r\n\x1a\n"
+          and png[16:24] == bytes.fromhex("000000f000000087"))
+    check(ok, "/lcd serves the twin's real 240x135 screen as PNG",
+          "HTTP %d %s %d bytes, frame age %s ms" % (r.status, r.getheader("Content-Type"), len(png), r.getheader("X-Frame-Age-Ms")))
+
     # IO-expansion CH1: a field voltage the firmware reads over I2C (the photoresistor circuit)
     st, _, body = req("POST", "/field?ch1_mv=4100", origin=EVIL)
     check(st == 403, "/field CH1 write from another site refused", "HTTP %d" % st)
