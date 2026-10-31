@@ -5,57 +5,75 @@
 <title>CS460 Phone Sensor Bridge</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>
- :root{color-scheme:dark}
+ /* All structural colors come from CSS variables so one call can re-theme the whole
+    pane. Defaults below are the dark theme; setTheme() in JS overwrites them (and the
+    text color is always the higher-contrast of near-white / near-black vs the bg, so
+    the type stays readable on ANY background the PLC or the user picks). */
+ :root{
+   color-scheme:dark;
+   --bg:#0b0e14; --fg:#e7eef6; --dim:#8aa0ba; --card:#121a28; --field:#0e1622; --brd:#1e2a38;
+   --code:#ffd166; --accent:#4d9fff; --accent-fg:#05121f;
+   --ghost:#22314a; --ghost-fg:#cfe0f5; --on:#1f6f4d; --on-fg:#d6ffe9;
+   --live:#5ff0b0; --spoof:#ffce7a; --spoof-bg:#1c160a; --spoof-brd:#6b5320;
+   --off-text:#8aa0ba; --off-bg:#180f14; --off-brd:#3a2330;
+   --warn-bg:#7a5312; --warn-fg:#ffe3ad; --danger-bg:#7a2130; --danger-fg:#ffd0d6; --danger:#ff9aa6; --danger-brd:#5a2630;
+   --wired:#8fd0ff; --wired-brd:#2b4d6b;
+ }
  *{box-sizing:border-box}
- body{margin:0;background:#0b0e14;color:#e7eef6;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-      padding:22px 16px calc(28px + env(safe-area-inset-bottom));max-width:680px;margin:0 auto}
+ body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      padding:22px 16px calc(28px + env(safe-area-inset-bottom));max-width:680px;margin:0 auto;
+      transition:background-color .28s ease,color .28s ease}
  h1{font-size:19px;margin:0 0 2px}
- .sub{color:#8aa0ba;font:12px ui-monospace,monospace;margin-bottom:16px;word-break:break-all}
- .card{background:#121a28;border:1px solid #1e2a38;border-radius:14px;padding:15px;margin-bottom:12px}
+ .sub{color:var(--dim);font:12px ui-monospace,monospace;margin-bottom:16px;word-break:break-all}
+ .card{background:var(--card);border:1px solid var(--brd);border-radius:14px;padding:15px;margin-bottom:12px;
+       transition:background-color .28s ease,border-color .28s ease}
  .qr{display:flex;gap:16px;align-items:center}
  .qr img{width:140px;height:140px;border-radius:10px;background:#fff;padding:6px;flex:none}
- .qr .t{font-size:13px;color:#9fb4cc}
+ .qr .t{font-size:13px;color:var(--dim)}
  button{appearance:none;border:0;border-radius:11px;padding:12px 16px;font-size:15px;font-weight:650;
-        background:#4d9fff;color:#05121f;cursor:pointer}
- button.ghost{background:#22314a;color:#cfe0f5}
- button.on{background:#1f6f4d;color:#d6ffe9}
+        background:var(--accent);color:var(--accent-fg);cursor:pointer}
+ button.ghost{background:var(--ghost);color:var(--ghost-fg)}
+ button.on{background:var(--on);color:var(--on-fg)}
  button:disabled{opacity:.45}
  .bigbtn{width:100%;font-size:16px;padding:14px}
  .status{display:flex;align-items:center;gap:9px;font:13px ui-monospace,monospace;margin:10px 0 0}
- .dot{width:11px;height:11px;border-radius:50%;background:#2a3650;flex:none}
+ .dot{width:11px;height:11px;border-radius:50%;background:var(--brd);flex:none}
  .dot.on{background:#5ff0b0;box-shadow:0 0 10px #5ff0b0}
- .note{color:#8aa0ba;font-size:12.5px;margin-top:8px}
- code{color:#ffd166;font-family:ui-monospace,monospace}
+ .note{color:var(--dim);font-size:12.5px;margin-top:8px}
+ code{color:var(--code);font-family:ui-monospace,monospace}
  .sensor{display:flex;flex-direction:column;gap:9px}
  .srow{display:flex;align-items:center;justify-content:space-between;gap:12px}
- .sname{font-weight:650}.sdesc{color:#8aa0ba;font:12px}
- .sval{font:13px/1.4 ui-monospace,monospace;color:#5ff0b0;background:#0e1622;border:1px solid #1e2a38;
-       border-radius:9px;padding:9px 11px;word-break:break-all;min-height:38px}
- .sval.na{color:#6b7f99}
- .sval.spoof{color:#ffce7a;border-color:#6b5320;background:#1c160a}
- .sval.off{color:#8aa0ba;border-color:#3a2330;background:#180f14}
- .tp{font:11px ui-monospace,monospace;color:#6b7f99}
- .pill{font:10px ui-monospace,monospace;color:#8aa0ba;border:1px solid #28364a;border-radius:999px;padding:2px 7px}
- .pill.wired{color:#8fd0ff;border-color:#2b4d6b}
+ .sname{font-weight:650}.sdesc{color:var(--dim);font:12px}
+ .sval{font:13px/1.4 ui-monospace,monospace;color:var(--live);background:var(--field);border:1px solid var(--brd);
+       border-radius:9px;padding:9px 11px;word-break:break-all;min-height:38px;white-space:pre-line}
+ .sval.na{color:var(--dim)}
+ .sval.spoof{color:var(--spoof);border-color:var(--spoof-brd);background:var(--spoof-bg)}
+ .sval.off{color:var(--off-text);border-color:var(--off-brd);background:var(--off-bg)}
+ .tp{font:11px ui-monospace,monospace;color:var(--dim)}
+ .pill{font:10px ui-monospace,monospace;color:var(--dim);border:1px solid var(--brd);border-radius:999px;padding:2px 7px}
+ .pill.wired{color:var(--wired);border-color:var(--wired-brd)}
  /* control bar: transmit on/off + override */
- .ctl{display:none;flex-direction:column;gap:10px;border-top:1px dashed #27384f;padding-top:11px;margin-top:2px}
+ .ctl{display:none;flex-direction:column;gap:10px;border-top:1px dashed var(--brd);padding-top:11px;margin-top:2px}
  .ctl.show{display:flex}
  .ctl .line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
- .lab{font:12px ui-monospace,monospace;color:#9fb4cc;min-width:74px}
- .seg{display:inline-flex;border:1px solid #2a3b57;border-radius:9px;overflow:hidden}
- .seg button{border-radius:0;padding:7px 13px;font-size:13px;font-weight:650;background:#15202f;color:#9fb4cc}
- .seg button.sel{background:#1f6f4d;color:#d6ffe9}
- .seg button.sel.warn{background:#7a5312;color:#ffe3ad}
- .seg button.sel.danger{background:#7a2130;color:#ffd0d6}
- input[type=range]{flex:1;min-width:120px;accent-color:#ffce7a}
- input[type=number]{width:92px;background:#0e1622;border:1px solid #2a3b57;color:#e7eef6;border-radius:8px;padding:7px 9px;font:13px ui-monospace,monospace}
- .ovhint{font:11px ui-monospace,monospace;color:#6b7f99}
- .statechip{font:10px/1 ui-monospace,monospace;padding:3px 8px;border-radius:999px;border:1px solid #28364a;color:#8aa0ba}
- .statechip.live{color:#5ff0b0;border-color:#1f6f4d}
- .statechip.spoof{color:#ffce7a;border-color:#6b5320}
- .statechip.off{color:#ff9aa6;border-color:#5a2630}
- .lead{background:#10233a;border:1px solid #244a6b;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#bcd4ee}
- .lead b{color:#fff}
+ .lab{font:12px ui-monospace,monospace;color:var(--dim);min-width:74px}
+ .seg{display:inline-flex;border:1px solid var(--brd);border-radius:9px;overflow:hidden}
+ .seg button{border-radius:0;padding:7px 13px;font-size:13px;font-weight:650;background:var(--field);color:var(--dim)}
+ .seg button.sel{background:var(--on);color:var(--on-fg)}
+ .seg button.sel.warn{background:var(--warn-bg);color:var(--warn-fg)}
+ .seg button.sel.danger{background:var(--danger-bg);color:var(--danger-fg)}
+ input[type=range]{flex:1;min-width:120px;accent-color:var(--spoof)}
+ input[type=number]{width:92px;background:var(--field);border:1px solid var(--brd);color:var(--fg);border-radius:8px;padding:7px 9px;font:13px ui-monospace,monospace}
+ input[type=color]{width:46px;height:34px;padding:2px;border:1px solid var(--brd);border-radius:8px;background:var(--field);cursor:pointer}
+ .ovhint{font:11px ui-monospace,monospace;color:var(--dim)}
+ .statechip{font:10px/1 ui-monospace,monospace;padding:3px 8px;border-radius:999px;border:1px solid var(--brd);color:var(--dim)}
+ .statechip.live{color:var(--live);border-color:var(--on)}
+ .statechip.spoof{color:var(--spoof);border-color:var(--spoof-brd)}
+ .statechip.off{color:var(--danger);border-color:var(--danger-brd)}
+ .lead{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:var(--dim)}
+ .lead b{color:var(--fg)}
+ .swatch{height:42px;border-radius:10px;margin-top:12px;border:1px solid var(--brd);
+         display:flex;align-items:center;justify-content:center;font:12px ui-monospace,monospace;color:var(--fg)}
 </style>
 </head>
 <body>
@@ -84,8 +102,23 @@
   tag marks the sensors this PLC maps into its input registers.</div>
 </div>
 
+<!-- display theme: the ladder-driven color (or a user choice) recolors the whole pane -->
+<div class="card" id="themecard">
+  <div class="srow"><div><div class="sname">Display theme</div>
+    <div class="sdesc">the ladder's color repaints the <b>whole pane</b> — background, cards and type.
+      Text auto-picks black or white so it stays readable on any color.</div></div>
+    <span class="pill" id="themepill">dark</span></div>
+  <div class="line" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px">
+    <span class="seg"><button id="th-dark" class="sel">Dark</button><button id="th-light">Light</button></span>
+    <span class="lab" style="min-width:0">Custom</span>
+    <input type="color" id="th-color" value="#2ea0ff">
+    <button id="th-apply" class="ghost" style="padding:7px 13px;font-size:13px">Apply color</button>
+    <span class="ovhint">the PLC's <code>stamplc/display/rgb</code> drives this the same way</span>
+  </div>
+</div>
+
 <!-- phone as PLC I/O: momentary buttons (phone -> %IX) + a PLC-logic-driven background -->
-<div class="card" id="iocard" style="border-color:#2a3b57">
+<div class="card" id="iocard">
   <div class="srow"><div><div class="sname">Phone as PLC I/O</div>
     <div class="sdesc">buttons drive the ladder's inputs; the ladder drives this color back</div></div>
     <span class="pill" id="rgbpill">display: —</span></div>
@@ -93,8 +126,7 @@
     <button id="btn1" class="ghost" style="flex:1;padding:22px" disabled>BTN 1<br><span class="sdesc">%IX6</span></button>
     <button id="btn2" class="ghost" style="flex:1;padding:22px" disabled>BTN 2<br><span class="sdesc">%IX7</span></button>
   </div>
-  <div id="rgbswatch" style="height:42px;border-radius:10px;margin-top:12px;border:1px solid #1e2a38;
-       background:#0e1622;display:flex;align-items:center;justify-content:center;font:12px ui-monospace,monospace;color:#8aa0ba">
+  <div id="rgbswatch" class="swatch" style="background:var(--field);color:var(--dim)">
     PLC display · relay0→R relay1→G relay2→B</div>
 </div>
 
@@ -110,6 +142,49 @@ let client = null, count = 0;
 const el = id => document.getElementById(id);
 
 fetch('/whoami').then(r=>r.json()).then(j=> el('where').textContent = 'server: ' + j.url).catch(()=>{});
+
+/* ---------- theme engine: one color re-themes the entire pane, text auto-contrasts ----------
+   setTheme(bg) derives every structural color from a single background:
+     - fg (the "contrast counterpart") = whichever of near-white / near-black has the
+       higher WCAG contrast ratio against bg, so the type is always legible;
+     - dim / card / field / border are bg mixed toward fg by fixed amounts;
+     - the semantic hues (live/spoof/danger…) switch between a dark-bg and light-bg set.
+   The PLC's stamplc/display/rgb message and the user's Dark/Light/Custom controls all
+   call the same function, so the behavior is identical however the color arrives. */
+const DARK={r:11,g:14,b:20}, LIGHT={r:238,g:243,b:248};
+const NEARW={r:245,g:249,b:254}, NEARB={r:10,g:14,b:20};
+function lum({r,g,b}){const f=c=>{c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);};return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b);}
+function cr(a,b){const x=lum(a),y=lum(b),hi=Math.max(x,y),lo=Math.min(x,y);return (hi+0.05)/(lo+0.05);}
+function mix(a,b,t){return {r:Math.round(a.r+(b.r-a.r)*t),g:Math.round(a.g+(b.g-a.g)*t),b:Math.round(a.b+(b.b-a.b)*t)};}
+function rgbs(c){return `rgb(${c.r},${c.g},${c.b})`;}
+function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)};}
+const SEM_DARK={'--code':'#ffd166','--accent':'#4d9fff','--ghost':'#22314a','--ghost-fg':'#cfe0f5','--on':'#1f6f4d','--on-fg':'#d6ffe9','--live':'#5ff0b0','--spoof':'#ffce7a','--spoof-bg':'#1c160a','--spoof-brd':'#6b5320','--off-text':'#8aa0ba','--off-bg':'#180f14','--off-brd':'#3a2330','--warn-bg':'#7a5312','--warn-fg':'#ffe3ad','--danger-bg':'#7a2130','--danger-fg':'#ffd0d6','--danger':'#ff9aa6','--danger-brd':'#5a2630','--wired':'#8fd0ff','--wired-brd':'#2b4d6b'};
+const SEM_LIGHT={'--code':'#9a5b00','--accent':'#1f6fe0','--ghost':'#dde7f2','--ghost-fg':'#1d2e44','--on':'#1f7a54','--on-fg':'#ffffff','--live':'#0a7d4f','--spoof':'#8a5a00','--spoof-bg':'#fff3dc','--spoof-brd':'#e3c488','--off-text':'#6a788a','--off-bg':'#f1e6e9','--off-brd':'#d7b8bf','--warn-bg':'#f0c24a','--warn-fg':'#4a3400','--danger-bg':'#c43246','--danger-fg':'#ffffff','--danger':'#b11a2b','--danger-brd':'#e3a4ac','--wired':'#135a8a','--wired-brd':'#9cc4e0'};
+function setTheme(bg,label){
+  const dark = cr(NEARW,bg) >= cr(NEARB,bg);          // near-white wins => dark background
+  const fg = dark?NEARW:NEARB;
+  const R=document.documentElement.style;
+  R.setProperty('--bg',rgbs(bg));
+  R.setProperty('--fg',rgbs(fg));
+  R.setProperty('--dim',rgbs(mix(fg,bg,0.30)));
+  R.setProperty('--card',rgbs(mix(bg,fg,dark?0.07:0.06)));
+  R.setProperty('--field',rgbs(mix(bg,fg,dark?0.12:0.09)));
+  R.setProperty('--brd',rgbs(mix(bg,fg,0.20)));
+  const SEM = dark?SEM_DARK:SEM_LIGHT;
+  for(const k in SEM) R.setProperty(k,SEM[k]);
+  const acc=hexToRgb(SEM['--accent']);
+  R.setProperty('--accent-fg', cr(NEARW,acc)>=cr(NEARB,acc)?rgbs(NEARW):rgbs(NEARB));
+  document.documentElement.style.colorScheme = dark?'dark':'light';
+}
+function seg2(which){ const d=el('th-dark'),l=el('th-light'); if(!d) return;
+  d.className = which==='dark'?'sel':''; l.className = which==='light'?'sel':''; }
+function initTheme(){
+  setTheme(DARK,'dark'); seg2('dark');
+  el('th-dark').onclick =()=>{ setTheme(DARK,'dark');   seg2('dark');  el('themepill').textContent='dark'; };
+  el('th-light').onclick=()=>{ setTheme(LIGHT,'light'); seg2('light'); el('themepill').textContent='light'; };
+  el('th-apply').onclick=()=>{ const c=hexToRgb(el('th-color').value); setTheme(c,'custom'); seg2(null); el('themepill').textContent='custom '+rgbs(c); };
+}
+initTheme();
 
 function pub(topic, obj){
   if(!client || !client.connected) return;
@@ -297,11 +372,12 @@ function wirePhoneIO(){
   client.subscribe('stamplc/display/rgb');            // the twin publishes the logic's color
   client.on('message', (t,p)=>{
     if(t!=='stamplc/display/rgb') return;
-    try{ const c=JSON.parse(p.toString()); const css=`rgb(${c.r|0},${c.g|0},${c.b|0})`;
-      el('rgbswatch').style.background=css; el('rgbswatch').style.color='#05121f';
-      el('rgbswatch').textContent=css+' · driven by ladder logic';
+    try{ const c=JSON.parse(p.toString()); const bg={r:c.r|0,g:c.g|0,b:c.b|0}; const css=rgbs(bg);
+      setTheme(bg,'plc');                         // repaint the ENTIRE pane; text auto-contrasts
+      seg2(null); el('themepill').textContent='PLC '+css;
+      const sw=el('rgbswatch'); sw.style.background=css; sw.style.color='var(--fg)';
+      sw.textContent=css+' · driven by ladder logic';
       el('rgbpill').textContent='display: '+css;
-      document.body.style.background=`linear-gradient(180deg, ${css}33, #0b0e14 240px)`;
     }catch(e){}
   });
   for(const [id,topic] of [['btn1','btn1'],['btn2','btn2']]){
