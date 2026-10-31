@@ -24,12 +24,12 @@ const THEMES={
     ink:'#eef2f8',sub:'#aab8cc',mut:'#8a97ab',card:'#0d121b',cardStroke:'#2a3650',cardInk:'#cfd8e6',cardRule:'#1e2a38',
     minusCasing:'#aeb8c5',minusStripCasing:'#b9c3cf',net:'#cc79a7',netInk:'#f0c7de',fence:'#e7b6d2',fenceFill:'#2a1f2a',fenceInk:'#f0c7de',fenceSub:'#d9aac4',
     accent:'#4dd8ff',accentInk:'#bff1ff',accentFill:'#0e2630',warnInk:'#ffd28a',okInk:'#5ff0b0',idle:'#8b96a8',schBg:'#0f141c',schGrid:'#18202b',schInk:'#dfe6f0',schWire:'#c3ccd8',
-    plcBody0:'#f1f3f6',plcBody1:'#d9dee4',plcStroke:'#a9b1bb',focus:'#4dd8ff'},
+    plcBody0:'#454c56',plcBody1:'#22272d',plcStroke:'#5a636e',focus:'#4dd8ff'},
   light:{name:'light',mat0:'#f6f8fc',mat1:'#e7edf5',board0:'#dfe5ee',board1:'#d3dae5',boardStroke:'#b8c2d0',hole:'#9aa5b5',holeRim:'#f4f7fb',
     ink:'#0d1726',sub:'#3c4a60',mut:'#55637a',card:'#ffffff',cardStroke:'#c3cfdf',cardInk:'#26324a',cardRule:'#e2e9f2',
     minusCasing:'#3a3f47',minusStripCasing:'#3a3f47',net:'#a2477c',netInk:'#7a2d5a',fence:'#a8507f',fenceFill:'#f6e7f0',fenceInk:'#7a2d5a',fenceSub:'#7d4566',
     accent:'#0a86ad',accentInk:'#05506a',accentFill:'#dff4fb',warnInk:'#8a5200',okInk:'#08795a',idle:'#6b778a',schBg:'#fbfcfe',schGrid:'#eef2f7',schInk:'#17202e',schWire:'#4a5568',
-    plcBody0:'#f7f8fa',plcBody1:'#e1e5ea',plcStroke:'#9aa3ad',focus:'#0a86ad'}
+    plcBody0:'#454c56',plcBody1:'#22272d',plcStroke:'#5a636e',focus:'#0a86ad'}
 };
 const TAGS={
   dark:{OBSERVED:['#0f2e26','#5ff0b0','#5ff0b0'],INFERRED:['#241433','#c98bf0','#d9b0f5'],MODELLED:['#332511','#f3a53a','#ffd28a'],
@@ -308,15 +308,16 @@ function stampTerms(o){const ox=o.x,oy=o.y,t={};
   t.wifi={x:ox+470,y:oy};return t;
 }
 function stamplc(o,vm,T){const ox=o.x,oy=o.y,live=vm&&vm.live;
-  const used=o.used||{};let s=`<g transform="translate(${ox},${oy})">`;
+  const used=o.used||{},ink='#eef2f8',sub='#aeb9c8';let s=`<g transform="translate(${ox},${oy})">`;   // charcoal housing, light ink
   s+=`<g filter="url(#skSh)"><rect x="0" y="0" width="470" height="372" rx="18" fill="url(#skPlc)" stroke="${T.plcStroke}" stroke-width="1.5"/></g>`;
+  s+=`<path d="M12,2.5 H458" stroke="#6a727d" stroke-opacity=".45" stroke-width="1.2"/>`;   // raised top-edge sheen
   // top strip
   s+=`<rect x="16" y="4" width="440" height="48" rx="8" fill="url(#skTstrip)" stroke="#b2bac4"/><line x1="141" y1="8" x2="141" y2="82" stroke="#8a939e" stroke-width="1.4"/>`;
   for(let k=0;k<11;k++)s+=`<rect x="${TOPX(k)-9}" y="-6" width="18" height="11" rx="2.5" fill="#22272e"/><use href="#skScrew" x="${TOPX(k)}" y="28"/>`;
-  const top=['+','−','C'];top.forEach((t,k)=>s+=txt(TOPX(k),77,t,{anchor:'middle',size:k===2?18:20,weight:800,fill:'#262b33'}));
+  const top=['+','−','C'];top.forEach((t,k)=>s+=txt(TOPX(k),77,t,{anchor:'middle',size:k===2?18:20,weight:800,fill:ink}));
   for(let i=0;i<8;i++){const x=TOPX(i+3);
-    s+=`<text x="${x}" y="77" text-anchor="middle" font-weight="800" fill="#262b33"><tspan font-size="12.5" font-weight="700">IN</tspan><tspan font-size="18">${i+1}</tspan></text>`;
-    s+=txt(x,93,'di'+i,{anchor:'middle',size:12.5,weight:700,fill:'#4f5865',mono:1});
+    s+=`<text x="${x}" y="77" text-anchor="middle" font-weight="800" fill="${ink}"><tspan font-size="12.5" font-weight="700">IN</tspan><tspan font-size="18">${i+1}</tspan></text>`;
+    s+=txt(x,93,'di'+i,{anchor:'middle',size:12.5,weight:700,fill:sub,mono:1});
     // live input chip (overlay: never mistaken for hardware)
     const b=vm&&vm.in?vm.in[i]:null,show=live&&b!=null;
     const f=vm&&vm.inForced&&vm.inForced[i],net=vm&&vm.inNet&&vm.inNet[i];
@@ -343,8 +344,8 @@ function stamplc(o,vm,T){const ox=o.x,oy=o.y,live=vm&&vm.live;
   }
   s+=`<rect x="290" y="124" width="72" height="26" rx="4" fill="#c4473e" stroke="#8a2c26"/><rect x="374" y="124" width="72" height="26" rx="4" fill="#3a78cf" stroke="#244f8c"/>`;
   for(let i=0;i<4;i++)s+=`<rect x="${300+i*13}" y="132" width="9" height="10" rx="1.5" fill="#3a1512"/><rect x="${384+i*13}" y="132" width="9" height="10" rx="1.5" fill="#10213c"/>`;
-  s+=txt(326,167,'PORT.A',{anchor:'middle',size:12.5,weight:800,fill:'#262b33'})+txt(410,167,'PORT.C',{anchor:'middle',size:12.5,weight:800,fill:'#262b33'});
-  s+=txt(290,198,'StampLC',{size:21,weight:900,fill:'#262b33'})+txt(290,217,'controller · 8 IN · 4 RELAY',{size:12.5,weight:600,fill:'#4f5865'});
+  s+=txt(326,167,'PORT.A',{anchor:'middle',size:12.5,weight:800,fill:ink})+txt(410,167,'PORT.C',{anchor:'middle',size:12.5,weight:800,fill:ink});
+  s+=txt(290,198,'StampLC',{size:21,weight:900,fill:ink})+txt(290,217,'controller · 8 IN · 4 RELAY',{size:12.5,weight:600,fill:sub});
   // relay contact windows (overlay): N.O–COM–N.C order like the screws beneath; blade at N.O when energised
   for(let n=1;n<=4;n++){const bx=11+118*(n-1),u=used['RELAY'+n],b=vm&&vm.relay?vm.relay[n-1]:null,show=live&&b!=null;const on=show&&b===1;
     const op=u?(show?.92:.6):.4;
@@ -357,8 +358,8 @@ function stamplc(o,vm,T){const ox=o.x,oy=o.y,live=vm&&vm.live;
   }
   // bottom labels + screws
   for(let n=1;n<=4;n++){const cx=59+118*(n-1);
-    s+=`<text x="${cx-50}" y="299" font-weight="800" fill="#262b33"><tspan font-size="12.5" font-weight="700">RELAY </tspan><tspan font-size="17">${n}</tspan><tspan dx="6" font-size="12.5" font-weight="700" fill="#4f5865" font-family="${MONO}">relay${n-1}</tspan></text>`;
-    s+=txt(cx-32,317,'N.O',{anchor:'middle',size:12.5,weight:800,fill:'#262b33'})+`<rect x="${cx-17}" y="305" width="34" height="16" rx="2" fill="#262b33"/>`+txt(cx,318,'COM',{anchor:'middle',size:12.5,weight:800,fill:'#f1f4f8'})+txt(cx+32,317,'N.C',{anchor:'middle',size:12.5,weight:800,fill:'#262b33'});
+    s+=`<text x="${cx-50}" y="299" font-weight="800" fill="${ink}"><tspan font-size="12.5" font-weight="700">RELAY </tspan><tspan font-size="17">${n}</tspan><tspan dx="6" font-size="12.5" font-weight="700" fill="${sub}" font-family="${MONO}">relay${n-1}</tspan></text>`;
+    s+=txt(cx-32,317,'N.O',{anchor:'middle',size:12.5,weight:800,fill:ink})+`<rect x="${cx-17}" y="305" width="34" height="16" rx="2" fill="#11151b" stroke="#6a727d" stroke-opacity=".5"/>`+txt(cx,318,'COM',{anchor:'middle',size:12.5,weight:800,fill:'#f1f4f8'})+txt(cx+32,317,'N.C',{anchor:'middle',size:12.5,weight:800,fill:ink});
   }
   s+=`<rect x="6" y="326" width="460" height="42" rx="8" fill="url(#skTstrip)" stroke="#b2bac4"/>`;
   [118,236,354].forEach(x=>s+=`<line x1="${x}" y1="288" x2="${x}" y2="364" stroke="#8a939e" stroke-width="1.4"/>`);
@@ -402,62 +403,63 @@ function xrayPath(inIdx,relayN,opts){opts=opts||{};const lane=206,rx=59+118*(rel
  * leads name them, tools/circuit-catalog-check.js reads them through expTerms(). */
 const EXP_W=224,EXP_H=372,EXP_BUS=[96,184];  // body size; bus header span (local y) — level with the controller's x-ray entry at y 121
 const EXP_PINS=[['CH1.ISO','ISO GND',1],['CH1.IN-','IN−',1],['CH1.IN+','IN+',1],['CH2.ISO','ISO GND',2],['CH2.IN-','IN−',2],['CH2.IN+','IN+',2]]; // left → right, top end
-const EXP_OUT=[['RELAY.NO','N.O','#8f4325',20],['RELAY.COM','COM','#262b33',52],['RELAY.NC','N.C','#c8233f',84],
-               ['MOS2','MOS2','#16884c',140],['MOS1','MOS1','#23786a',172],['MOS.COM','COM','#262b33',204]];  // left → right, bottom end
+const EXP_OUT=[['RELAY.NO','N.O','#8f4325',20],['RELAY.COM','COM','#11151b',52],['RELAY.NC','N.C','#c8233f',84],
+               ['MOS2','MOS2','#16884c',140],['MOS1','MOS1','#23786a',172],['MOS.COM','COM','#11151b',204]];  // left → right, bottom end
 const EXP_INX=k=>32+32*k, EXP_INY=48, EXP_OUTY=322;
 function expTerms(o){const t={};
   EXP_PINS.forEach(([id],k)=>{const x=o.x+EXP_INX(k);t[id]={x,y:o.y+EXP_INY,wire:[x,o.y-20],side:'top'};});
   EXP_OUT.forEach(([id,,,x])=>{t[id]={x:o.x+x,y:o.y+EXP_OUTY,wire:[o.x+x,o.y+EXP_H+22],side:'bottom'};});
   return t;}
-function expansion(o,vm,T){const W=EXP_W,H=EXP_H,used=o.used||{},ink='#262b33',sub='#4f5865',dim=.42;
-  const well=(x,y,u)=>`<g opacity="${u?1:dim}"><circle cx="${x}" cy="${y}" r="13.6" fill="#b7bfc8" stroke="#9aa3ad"/><use href="#skScrewS" x="${x}" y="${y}"/></g>`;
+function expansion(o,vm,T){const W=EXP_W,H=EXP_H,used=o.used||{},ink='#eef2f8',sub='#aeb9c8',dink='#1c2430',dsub='#4a5565',dim=.5;
+  const well=(x,y,u)=>`<g opacity="${u?1:dim}"><circle cx="${x}" cy="${y}" r="13.6" fill="#c2c9d1" stroke="#8a929c"/><use href="#skScrewS" x="${x}" y="${y}"/></g>`;
   const anyUsed=ids=>ids.some(id=>used[id]);
   let s=`<g transform="translate(${o.x},${o.y})" data-hop-target="x1"><title>X1 · IO expansion — I²C 0x20 (address switch on the back, 1–4 OFF)</title>`;
   // bus header, mated: its shell shows in the seam between controller and module
-  s+=`<rect x="-9" y="${EXP_BUS[0]}" width="14" height="${EXP_BUS[1]-EXP_BUS[0]}" rx="2" fill="#22272e"/>`;
+  s+=`<rect x="-9" y="${EXP_BUS[0]}" width="14" height="${EXP_BUS[1]-EXP_BUS[0]}" rx="2" fill="#15181d"/>`;
   for(let i=0;i<8;i++)s+=`<rect x="-8" y="${EXP_BUS[0]+6+i*10.5}" width="6" height="2.4" fill="#c9a227"/>`;
-  // housing
+  // housing (charcoal, light ink)
   s+=`<g filter="url(#skSh)"><rect x="0" y="0" width="${W}" height="${H}" rx="16" fill="url(#skPlc)" stroke="${T.plcStroke}" stroke-width="1.5"/></g>`;
-  s+=`<rect x="${W-3}" y="${EXP_BUS[0]+6}" width="5" height="${EXP_BUS[1]-EXP_BUS[0]-12}" rx="1.5" fill="#22272e" opacity=".85"/>`;  // pass-through socket (right side)
+  s+=`<path d="M12,2.5 H${W-12}" stroke="#6a727d" stroke-opacity=".45" stroke-width="1.2"/>`;   // raised top-edge sheen
+  s+=`<rect x="${W-3}" y="${EXP_BUS[0]+6}" width="5" height="${EXP_BUS[1]-EXP_BUS[0]-12}" rx="1.5" fill="#15181d" opacity=".85"/>`;  // pass-through socket (right side)
   // terminal blocks seen at both ends (green), wire entries over each screw
   s+=`<rect x="12" y="-5" width="${W-24}" height="10" rx="2" fill="#36a46b" stroke="#1f6b45"/>`;
   s+=`<rect x="4" y="${H-5}" width="96" height="10" rx="2" fill="#36a46b" stroke="#1f6b45"/><rect x="124" y="${H-5}" width="96" height="10" rx="2" fill="#36a46b" stroke="#1f6b45"/>`;
-  EXP_PINS.forEach((_,k)=>s+=`<rect x="${EXP_INX(k)-6}" y="-3.5" width="12" height="7" rx="1.5" fill="#123826"/>`);
-  EXP_OUT.forEach(([, , ,x])=>s+=`<rect x="${x-6}" y="${H-3.5}" width="12" height="7" rx="1.5" fill="#123826"/>`);
-  // top end: printed input labels on a grey line, screws below
-  s+=`<rect x="10" y="12" width="${W-20}" height="12" rx="2" fill="#e1e5ea"/>`;
+  EXP_PINS.forEach((_,k)=>s+=`<rect x="${EXP_INX(k)-6}" y="-3.5" width="12" height="7" rx="1.5" fill="#0c2619"/>`);
+  EXP_OUT.forEach(([, , ,x])=>s+=`<rect x="${x-6}" y="${H-3.5}" width="12" height="7" rx="1.5" fill="#0c2619"/>`);
+  // top end: printed input labels on a light strip, screws below
+  s+=`<rect x="10" y="10" width="${W-20}" height="15" rx="2.5" fill="#e4e8ec"/>`;
   EXP_PINS.forEach(([id,lbl],k)=>{const x=EXP_INX(k);
     if(lbl==='ISO GND')s+=`<rect x="${x-15}" y="4" width="30" height="14" rx="1.5" fill="#7a2596"/><rect x="${x-15}" y="18" width="30" height="14" rx="1.5" fill="#1d2127"/>`+
       txt(x,15.2,'ISO',{anchor:'middle',size:12.5,weight:800,fill:'#ffffff',mono:1})+txt(x,29.2,'GND',{anchor:'middle',size:12.5,weight:800,fill:'#ffffff',mono:1});
-    else s+=txt(x,23,lbl,{anchor:'middle',size:12.5,weight:800,fill:ink,mono:1});
+    else s+=txt(x,22.5,lbl,{anchor:'middle',size:12.5,weight:800,fill:dink,mono:1});
     s+=well(x,EXP_INY,used[id]);});
   // channel brackets (course annotation, like di0 under IN1 on the controller)
   [1,2].forEach(ch=>{const x0=EXP_INX(3*(ch-1))-14,x1=EXP_INX(3*(ch-1)+2)+14,u=anyUsed(['IN+','IN-','ISO'].map(p=>`CH${ch}.${p}`));
-    s+=`<path d="M${x0},66 v5 H${x1} v-5" fill="none" stroke="${u?sub:'#9aa3ad'}" stroke-width="1.4"/>`+txt((x0+x1)/2,86,`CH${ch}`,{anchor:'middle',size:12.5,weight:800,fill:u?ink:sub,mono:1});});
+    s+=`<path d="M${x0},66 v5 H${x1} v-5" fill="none" stroke="${u?sub:'#7d8792'}" stroke-width="1.4"/>`+txt((x0+x1)/2,86,`CH${ch}`,{anchor:'middle',size:12.5,weight:800,fill:u?ink:sub,mono:1});});
   // raised centre panel: name, address-switch inset (rear), status-LED windows
-  s+=`<rect x="5" y="94" width="${W-10}" height="112" rx="9" fill="#ffffff" fill-opacity=".5" stroke="#c3cad3"/><line x1="10" y1="205.5" x2="${W-10}" y2="205.5" stroke="#aab2bc" stroke-width="1.2"/>`;
+  s+=`<rect x="5" y="94" width="${W-10}" height="112" rx="9" fill="#ffffff" fill-opacity=".055" stroke="#5a636e"/><line x1="10" y1="205.5" x2="${W-10}" y2="205.5" stroke="#5a636e" stroke-width="1.1"/>`;
   s+=txt(16,121,'X1',{size:22,weight:900,fill:ink})+txt(48,121,'IO expansion',{size:13.5,weight:800,fill:ink})+txt(16,140,'2 analog in · 2 SSR · 1 relay',{size:12.5,weight:600,fill:sub});
-  s+=`<text x="17" y="190" font-size="34" letter-spacing="1" fill="#e7ebef" stroke="#c2c9d1" stroke-width=".9">I/O</text>`;   // moulded mark (plain text, low contrast)
+  s+=`<text x="17" y="190" font-size="34" letter-spacing="1" fill="#3f4650" stroke="#565e69" stroke-opacity=".6" stroke-width=".9">I/O</text>`;   // moulded mark (embossed charcoal)
   { const ix=96,iy=150;   // the address switch is on the back of the module: dashed = not visible from the front
-    s+=`<rect x="${ix}" y="${iy}" width="${W-ix-12}" height="50" rx="6" fill="#ffffff" fill-opacity=".85" stroke="#56708a" stroke-width="1.3" stroke-dasharray="4 3"/>`;
-    s+=txt(ix+7,iy+16,'ADDR SW',{size:12.5,weight:800,fill:ink})+txt(W-18,iy+16,'back',{anchor:'end',size:12.5,fill:sub});
+    s+=`<rect x="${ix}" y="${iy}" width="${W-ix-12}" height="50" rx="6" fill="#f4f6f8" fill-opacity=".95" stroke="#8a97ab" stroke-width="1.3" stroke-dasharray="4 3"/>`;
+    s+=txt(ix+7,iy+16,'ADDR SW',{size:12.5,weight:800,fill:dink})+txt(W-18,iy+16,'back',{anchor:'end',size:12.5,fill:dsub});
     s+=`<rect x="${ix+7}" y="${iy+23}" width="58" height="22" rx="2" fill="#1d2127"/>`;
     for(let i=0;i<4;i++)s+=`<rect x="${ix+12+i*13}" y="${iy+25.5}" width="9" height="17" rx="1" fill="#454c57"/><rect x="${ix+12+i*13}" y="${iy+34.5}" width="9" height="8" rx="1" fill="#f1f4f8"/>`;  // knobs down = OFF
-    s+=txt(W-18,iy+41,'0x20',{anchor:'end',size:14,weight:800,fill:ink,mono:1}); }
+    s+=txt(W-18,iy+41,'0x20',{anchor:'end',size:14,weight:800,fill:dink,mono:1}); }
   // status-LED windows: relay (over its COM), SSR 2 and SSR 1 (over MOS2, MOS1); unlit: the drawing never claims an output state
   const relayUsed=anyUsed(['RELAY.NO','RELAY.COM','RELAY.NC']),ssrUsed=anyUsed(['MOS1','MOS2','MOS.COM']);
-  [[52,relayUsed],[140,ssrUsed],[172,ssrUsed]].forEach(([x,u])=>s+=`<g opacity="${u?1:.6}"><circle cx="${x}" cy="214" r="4.6" fill="#2b3038" stroke="#8d96a1"/><circle cx="${x-1.4}" cy="212.6" r="1.3" fill="#ffffff" opacity=".5"/></g>`);
+  [[52,relayUsed],[140,ssrUsed],[172,ssrUsed]].forEach(([x,u])=>s+=`<g opacity="${u?1:.6}"><circle cx="${x}" cy="214" r="4.6" fill="#11151b" stroke="#8d96a1"/><circle cx="${x-1.4}" cy="212.6" r="1.3" fill="#ffffff" opacity=".5"/></g>`);
   // printed relay panel (changeover contact, shown de-energised: COM–N.C closed)
-  s+=`<rect x="6" y="224" width="94" height="80" rx="6" fill="#f2dde6"/>`+txt(12,240,'RELAY',{size:12.5,weight:800,fill:ink})+txt(12,256,'5 A · 250 V~',{size:12.5,fill:sub});
-  s+=`<g opacity="${relayUsed?1:.55}" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M20,290 V270 H28 M84,290 V266 H74 M52,290 V280 L78,266"/>`+
+  s+=`<rect x="6" y="224" width="94" height="80" rx="6" fill="#f2dde6"/>`+txt(12,240,'RELAY',{size:12.5,weight:800,fill:dink})+txt(12,256,'5 A · 250 V~',{size:12.5,fill:dsub});
+  s+=`<g opacity="${relayUsed?1:.55}" stroke="${dink}" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M20,290 V270 H28 M84,290 V266 H74 M52,290 V280 L78,266"/>`+
      [20,52,84].map(x=>`<circle cx="${x}" cy="294" r="3.2" fill="#ffffff"/>`).join('')+`</g>`;
   // printed SSR panel (two MOSFET switches, common COM; DC only)
-  s+=`<rect x="124" y="224" width="${W-130}" height="80" rx="6" fill="#f6eecb"/>`+txt(130,240,'SSR · DC only',{size:12.5,weight:800,fill:ink})+txt(130,256,'60 V · 2.5 A',{size:12.5,fill:sub});
-  s+=`<g opacity="${ssrUsed?1:.55}" stroke="${ink}" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M204,290 V266 H140 M140,266 V270 M172,266 V270 M140,290 V284 L132,272 M172,290 V284 L164,272"/>`+
+  s+=`<rect x="124" y="224" width="${W-130}" height="80" rx="6" fill="#f6eecb"/>`+txt(130,240,'SSR · DC only',{size:12.5,weight:800,fill:dink})+txt(130,256,'60 V · 2.5 A',{size:12.5,fill:dsub});
+  s+=`<g opacity="${ssrUsed?1:.55}" stroke="${dink}" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M204,290 V266 H140 M140,266 V270 M172,266 V270 M140,290 V284 L132,272 M172,290 V284 L164,272"/>`+
      [140,172,204].map(x=>`<circle cx="${x}" cy="294" r="3.2" fill="#ffffff"/>`).join('')+`</g>`;
   // bottom end: screws, then the printed colour badges (always legible: they are print, not state)
   EXP_OUT.forEach(([id,lbl,col,x])=>{s+=well(x,EXP_OUTY,used[id]);
-    s+=`<rect x="${x-15.5}" y="339" width="31" height="16" rx="2" fill="${col}"/>`+txt(x,351.4,lbl,{anchor:'middle',size:12.5,weight:800,fill:'#ffffff',mono:1,ls:lbl.length>3?'-.5':null});});
+    s+=`<rect x="${x-15.5}" y="339" width="31" height="16" rx="2" fill="${col}" stroke="#aeb9c8" stroke-opacity=".35"/>`+txt(x,351.4,lbl,{anchor:'middle',size:12.5,weight:800,fill:'#ffffff',mono:1,ls:lbl.length>3?'-.5':null});});
   s+=`</g>`;return s;
 }
 
