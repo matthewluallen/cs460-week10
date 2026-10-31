@@ -46,12 +46,22 @@ def jreq(method, path, origin=None, timeout=60):
     try: return st, json.loads(b)
     except ValueError: return st, {"raw": b[:200].decode("latin1")}
 def console(cmd, wait=3.0, until=None):
+    # The console port is one shared stream: first drain whatever an earlier client left in
+    # flight, then read until OUR command's echo is followed by the next prompt (a reply can
+    # arrive in several chunks, so stopping at the first marker would cut it short).
     s = socket.create_connection(("127.0.0.1", CON), timeout=3); s.settimeout(0.3)
+    drain_end = time.time() + 0.6
+    while time.time() < drain_end:
+        try:
+            if not s.recv(65536): break
+        except socket.timeout: break
     s.sendall((cmd + "\n").encode()); out = b""; end = time.time() + wait
+    echo = cmd.encode()
     while time.time() < end:
         try: out += s.recv(65536)
         except socket.timeout: pass
-        if until and until in out: break
+        i = out.find(echo)
+        if i >= 0 and b"plc> " in out[i + len(echo):]: break
     s.close(); return out.decode("utf-8", "replace")
 def qmp(cmds):
     s = socket.socket(socket.AF_UNIX); s.settimeout(3); s.connect(QMP); f = s.makefile("rw"); f.readline(); out = []
@@ -141,7 +151,7 @@ elif lg.get("shadowed"):
 else:
     print("FAIL /fw/api/log: %s" % lg.get("error"))
 out = console("log", 3.0)
-rows = [l for l in out.splitlines() if re.match(r"^\s{2}\d+ [a-z0-9]+(/\S*)? .+", l)]
+rows = [l for l in out.splitlines() if re.match(r"^\s{2}\d+ [A-Za-z0-9]+(/\S*)? .+", l)]   # e.g. "  11859 MODBUS/tcp/127.0.0.1:59724 WRITE coil 8"
 print(("PASS" if rows else "FAIL") + " console fallback: plc> log returns audit rows (%d, last: %s)" % (len(rows), rows[-1].strip() if rows else "-"))
 print(("PASS" if any("coil 8" in r for r in rows) or (isinstance(lg, list) and any("coil 8" in r for r in lg)) else "FAIL")
       + " the coil-8 write left an audit row")
