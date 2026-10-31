@@ -12,7 +12,19 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 mkdir -p out
-BIN="firmware/prebuilt/stamplc-factory-8MB.bin"
+# Default: the app your RUNNING twin booted (its boot slot, carved from the twin's flash image);
+# else the committed prebuilt. Or pass any app/flash image path.
+BIN="${1:-}"
+if [ -z "$BIN" ]; then
+  # shellcheck source=../qemu/twin-status.sh
+  . ../qemu/twin-status.sh
+  if twin_detect "${SERIAL_SOCK:-/tmp/plc-serial}" 0 && [ -n "${TWIN_IMG:-}" ]; then
+    python3 ../qemu/fw_identity.py --extract-app out/running-app.bin "$TWIN_IMG"
+    BIN="out/running-app.bin"; echo "(scanning the app your running twin booted, from $TWIN_IMG)"
+  else
+    BIN="firmware/prebuilt/stamplc-factory-8MB.bin"; echo "(no twin running - scanning the committed prebuilt)"
+  fi
+fi
 [ -f "$BIN" ] || { echo "firmware binary not found: $BIN  (build it — see firmware/BUILD.md)"; exit 1; }
 
 echo "============================================================"
