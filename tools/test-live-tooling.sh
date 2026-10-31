@@ -205,7 +205,8 @@ if command -v tshark >/dev/null 2>&1; then
   if sudo -n true 2>/dev/null; then
     sudo -n timeout 6 tshark -i lo -f "tcp port 502" -a duration:4 -w /tmp/ltt-502.pcap >/dev/null 2>&1 &
     sleep 1.5; for _ in 1 2 3; do curl -s -o /dev/null "$BASE/modbus?fc=3&addr=25&count=1"; sleep 0.5; done; wait
-    N="$(tshark -r /tmp/ltt-502.pcap -Y modbus 2>/dev/null | wc -l)"
+    # the capture ran as root, so its pcap is root-owned (0600): read it back with sudo too
+    N="$(sudo -n tshark -r /tmp/ltt-502.pcap -Y modbus 2>/dev/null | wc -l)"
     [ "${N:-0}" -ge 2 ] && pass "sudo tshark captured live Modbus on lo:502 ($N frames)" || fail "tshark saw $N Modbus frames on lo:502"
   else skip "no passwordless sudo for a live tshark capture"; fi
 else fail "tshark not installed (re-run .devcontainer/postCreate.sh)"; fi
