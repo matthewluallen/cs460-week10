@@ -76,11 +76,13 @@ twin_detect() {
   return 1
 }
 
-# twin_stop SOCK — stop the twin on SOCK and any Studio bridge attached to it
+# twin_stop SOCK [bridge] — stop the twin on SOCK; with "bridge", also stop the Studio server
+# attached to it. (A restart leaves the server up: it reconnects to the new twin by itself,
+# so an open Studio tab keeps working.)
 twin_stop() {
   local sock="$1" pids
   pids="$(_twin_pids "$sock")"
-  pkill -f "twin-bridge.py.*--serial $sock" 2>/dev/null || true
+  [ "${2:-}" = "bridge" ] && { pkill -f "twin-bridge.py.*--serial $sock" 2>/dev/null || true; }
   if [ -n "$pids" ]; then
     # shellcheck disable=SC2086
     kill $pids 2>/dev/null || true
@@ -110,8 +112,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       esac ;;
     stop)
       twin_detect "$SOCK" 0 >/dev/null 2>&1 || true
-      twin_stop "$SOCK"
-      echo "twin on $SOCK stopped${TWIN_WHICH:+ ($TWIN_WHICH)}." ;;
+      twin_stop "$SOCK" bridge
+      echo "twin on $SOCK stopped${TWIN_WHICH:+ ($TWIN_WHICH)}, and its Studio server if one was running." ;;
     *) echo "usage: ./qemu/twin-status.sh [status|stop]"; exit 2 ;;
   esac
 fi

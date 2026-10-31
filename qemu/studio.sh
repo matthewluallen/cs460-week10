@@ -30,7 +30,7 @@ WANT_IMG="$(twin_image_for "$PROFILE" "$HERE")"
 # ── 1. the twin: reuse if running, otherwise boot ────────────────────────────
 if twin_detect "$SERIAL_SOCK" 15; then
   if [ "${RESTART:-0}" = "1" ]; then
-    echo "RESTART=1: stopping the running twin (pid $TWIN_PID, $TWIN_WHICH) and its Studio server…"
+    echo "RESTART=1: stopping the running twin (pid $TWIN_PID, $TWIN_WHICH); the Studio server reconnects…"
     twin_stop "$SERIAL_SOCK"
   elif [ "$EXPLICIT" = "1" ] && [ "$TWIN_IMG" != "$WANT_IMG" ]; then
     echo "A different build is already running: $TWIN_WHICH (pid $TWIN_PID)."
