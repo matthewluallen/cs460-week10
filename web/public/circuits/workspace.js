@@ -222,7 +222,7 @@ function lightCard(c,v,T){const x=1240,y=318,W=304,sel=lightSel(),a=ST.field.ana
   else if(v.conn==='usb'&&iw!=null){big=`%IW0 = ${iw} mV`;sub2='Studio monitor (the real CH1)';tag='OBSERVED';}
   else if(v.conn==='usb'){sub2='start Monitor in Logic to read %IW0';}
   s+=txt(16,py+52,big,{size:26,weight:800,fill:tag==='OBSERVED'?T.ink:T.mut,mono:1})+txt(16,py+72,sub2,{size:12.5,fill:T.sub});
-  if(tag)s+=SK.tag(tag,W-16-SK.tagWidth(tag),py+34,T);
+  if(tag)s+=SK.tag(tag,W-16-SK.tagWidth(tag),py+7,T);
   s+=txt(16,py+94,(tw&&iw!=null?`%IW0 = ${iw} mV · `:'')+'alarm sets > 3000 · clears < 2400 mV',{size:12.5,fill:T.cardInk});
   return s+`</g>`;}
 
@@ -238,8 +238,8 @@ function readoutRows(c,v){const rows=[];const L=v.live;
       val=cm!=null?`cmd ${cm}·act ${ac}`:(chip!=null?'chip '+chip:'—');}   // cmd/act from io; else the 0x59 output register
     rows.push({l:`RELAY ${n} (relay${n-1})`,val,tag:L&&val!=='—'?'OBSERVED':null});}
   if(isAnalog(c)){let val='—',tag=null;const a=ST.field.analog;
-    if(v.conn==='twin'&&v.fieldFresh&&a&&a.writable){val=a.ch1_mv+' mV · light';tag='OBSERVED';}
-    else if(v.conn==='twin'&&v.fieldFresh&&a){val=a.ch1_mv+' mV · tank model';tag='PENDING';}
+    if(v.conn==='twin'&&v.fieldFresh&&a&&a.writable){val=a.ch1_mv+' mV';tag='OBSERVED';}
+    else if(v.conn==='twin'&&v.fieldFresh&&a){val=a.ch1_mv+' mV';tag='PENDING';}
     else if(L&&v.monitorIW&&Array.isArray(v.monitorIW.IW)){val=v.monitorIW.IW[0]+' mV';tag='OBSERVED';}
     rows.push({l:'CH1 → %IW0 (divider)',val,tag});}
   if(c.phone){const sel=CC.PHONE_MAP.find(x=>x.id===ST.phoneSel)||CC.PHONE_MAP[1];const pv=phoneValue(sel,v);rows.push({l:`phone · ${sel.name}`,val:pv.text.replace(/^.* = /,''),tag:pv.tag});}
