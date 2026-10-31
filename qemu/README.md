@@ -12,7 +12,7 @@ vulnerable Modbus / HMI / OTA services you'd meet on the bench — entirely in s
 
 ```bash
 ./qemu/fetch-qemu.sh        # one-time: downloads the prebuilt twin for your platform
-./qemu/studio.sh            # boots the twin, serves the Studio on :8080, muxes the console
+./qemu/studio.sh            # boots the twin, serves the Studio on :8088, muxes the console
 # in another shell (optional — only if you want the text console too):
 ./qemu/console.sh           # the plc> console   (quit: Ctrl-C)
 ```
@@ -29,9 +29,9 @@ twin, so it can move the (emulated) process. It listens on localhost (Codespaces
 browser request must come from the Studio's own page (checked by Origin on the console WebSocket and
 on every write), Modbus writes need POST (so a link or image on another site can't flip a coil), and
 other sites can't read values through it. Circuit views set the twin's inputs **at the chip** through
-`/field` — exactly two expander properties, never raw QMP. `python3 qemu/test-bridge-security.py`
+`/field` — a fixed list of chip properties (the input and relay bytes, the IO-expansion CH1/CH2 frame), never raw QMP. `python3 qemu/test-bridge-security.py`
 checks all of this (CI runs it). A real attacker on the *plant network* is a different story — the
-twin's own Modbus port is unauthenticated on the vulnerable build on purpose (Parts 1 and 6).
+twin's own Modbus port is unauthenticated on the vulnerable build on purpose (Parts 3 and 6).
 
 **Already running? Nothing is booted twice.** `studio.sh`, `run.sh` and
 `assessment/verify-lab.py --boot-twin` all check first. A twin counts as running when its
@@ -46,6 +46,13 @@ RESTART=1 ./qemu/run.sh secure   # replace the running twin (an open Studio tab 
 ./qemu/twin-status.sh stop       # stop the twin and its Studio server
 ./qemu/test-twin-status.sh       # regression test for all of the above (also runs in CI)
 ```
+
+**Wiring your own analog sensor (the photoresistor circuit).** By default the twin's built-in process
+model owns the IO expansion's CH1/CH2 (a tank level on CH1, a 4–20 mA flow loop on CH2). To wire your
+own sensor instead, restart with `RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh`: the process model is
+switched off and the Circuit tab's *Light on RP1* buttons (or `POST /field?ch1_mv=<mV>`) put the
+divider voltage on CH1, which the firmware reads over I²C @0x20 exactly as on the board. The twin's
+IO expansion reports module revision 1, the same as the bench StampLC's pack.
 
 > **On an Apple-Silicon Mac?** There's no native-macOS twin — the patched QEMU is built
 > for Linux only (the release ships `qemu-twin-linux-x86_64` and `-linux-arm64`; stock
@@ -72,6 +79,20 @@ part annotated, and when you run it, it prints the exact command before executin
 | `./supply-chain/diff-images.sh` | `ls -l` the two images + compute the byte delta | 7 |
 | `./supply-chain/run-malicious.sh` | `RESTART=1 ICOUNT=off FLASH_IMG=…MALICIOUS.bin ./qemu/run.sh` | 7 |
 | `./supply-chain/arm.sh` / `benign.sh` | `echo ARM > /tmp/c2_state` / `rm -f /tmp/c2_state` | 7 |
+| `./bus-analysis/tap.sh [secs]` | `curl -X POST localhost:8088/bus/capture?seconds=6` — records YOUR running twin's I²C bus (→ `.sr`/`.pvs`/`.vcd` in `bus-analysis/out/`, sigrok decode of 0x59) | bus |
+| `./sbom/scan-running.sh` | fingerprint the image the twin booted → SPDX + CycloneDX → grype → RISK | SBOM |
+| `python3 qemu/fw_identity.py <image>` | read partition table, boot slot, ESP-IDF version and app ELF SHA-256 from a flash image | SBOM |
+
+### Studio server endpoints (all same-origin; writes need POST)
+
+| Endpoint | What it does |
+|---|---|
+| `GET /field`, `POST /field?bit=N&v=0\|1` | the AW9523 expander's `di`/`relays` bytes through QMP (chip level) |
+| `POST /field?ch1_mv=<0-12000>\|open` (also `ch2_mv`) | a field voltage on the IO expansion's CH1/CH2 (the photoresistor circuit's divider), read by the firmware over I²C @0x20. Only on a twin started with `FIELD_ANALOG=1` (its built-in tank/pump model is then off and CH1/CH2 are yours); otherwise the write is refused with that instruction. `GET /field` reports the `analog` frame and its owner |
+| `POST /bus/capture?seconds=N` (alias `POST /bustap?secs=N`), N ≤ 10 | live I²C capture of the running twin: QMP `logfile` + `trace-event-set-state esp32_i2c_observe` on, N s, off; converted to `.vcd`/`.sr`/`.pvs`/`.json` + sigrok decode. The trace event is never left on (also switched off at server start). |
+| `GET /bus/captures`, `GET /bus/files/<name>` | list / download captures (strict file-name pattern) |
+| `GET /twin/identity[?hash=1]` | the running twin's image: profile, boot slot, ESP-IDF, app ELF SHA-256 (from the flash image, not the firmware) |
+| `GET /fw/api/log`, `GET /fw/api/points` | read-only proxy to the firmware's HTTP HMI. If this server is started on the firmware's own port (`BRIDGE_PORT=8080`; the default is 8088), it answers 503 `shadowed` and Provenance Studio reads `plc> log` over the console instead; `BRIDGE_PORT=8088 ./qemu/studio.sh` frees 8080 for the firmware. |
 
 ## Why the twin needs one capability (and not root)
 

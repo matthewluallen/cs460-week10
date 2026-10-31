@@ -6,7 +6,7 @@
    Output syntax: this sample writes the output as COIL[n] — the Modbus
    coil image. "relay0" is the physical thing COIL[0] drives; they are not two
    different commands. (The write to that coil is unauthenticated — see
-   latch_with_estop.st and Part 5.)
+   latch_with_estop.st and Part 1.)
 
    This is the "prebuilt block." You change ONE rung — see ladder/README.md. *)
 

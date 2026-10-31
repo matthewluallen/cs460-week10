@@ -16,10 +16,10 @@ check() { if eval "$1"; then ok "$2"; else bad "$2"; fi; }
 show() { sed 's/^/        | /' <<<"$1"; }
 twins()   { pgrep -f "[q]emu-system-xtensa.*unix:$SOCK,server" | wc -l | tr -d ' '; }
 twinpid() { pgrep -f "[q]emu-system-xtensa.*unix:$SOCK,server" | head -n1; }
-bridges() { pgrep -f "[t]win-bridge.py --port 8080 --serial $SOCK" | wc -l | tr -d ' '; }
+bridges() { pgrep -f "[t]win-bridge.py --port 8088 --serial $SOCK" | wc -l | tr -d ' '; }
 wait_running() { for _ in $(seq 1 200); do ./qemu/twin-status.sh >/dev/null 2>&1 && return 0; sleep 0.2; done; return 1; }
 wait_http()    { for _ in $(seq 1 100); do
-                   [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080/logic_studio.html")" = 200 ] && return 0
+                   [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8088/logic_studio.html")" = 200 ] && return 0
                    sleep 0.2; done; return 1; }
 console_says() {  # send one command through the Studio bridge's console port, print the reply
   python3 - "$1" <<'PY'
@@ -61,7 +61,7 @@ check '[ "$(twinpid)" = "$PID1" ]' "running twin untouched"
 
 echo "5. studio.sh with the twin already running"
 setsid nohup ./qemu/studio.sh >/tmp/tts-studio1.log 2>&1 < /dev/null &
-check 'wait_http' "Studio served on :8080"
+check 'wait_http' "Studio served on :8088"
 show "$(head -4 /tmp/tts-studio1.log)"
 check 'grep -q "reusing it" /tmp/tts-studio1.log' "studio.sh reused the twin"
 check '[ "$(twins)" = 1 ] && [ "$(twinpid)" = "$PID1" ]' "no second twin booted"
@@ -69,7 +69,7 @@ check '[ "$(bridges)" = 1 ]' "one Studio server"
 
 echo "6. studio.sh again"
 out=$(timeout 40 ./qemu/studio.sh 2>&1); rc=$?; show "$out"
-check '[ $rc -eq 0 ] && grep -q "already running on :8080" <<<"$out"' "second studio.sh starts nothing (exit 0)"
+check '[ $rc -eq 0 ] && grep -q "already running on :8088" <<<"$out"' "second studio.sh starts nothing (exit 0)"
 check '[ "$(bridges)" = 1 ] && [ "$(twins)" = 1 ]' "still one server, one twin"
 
 echo "7. studio.sh asking for a different build"
@@ -81,17 +81,17 @@ out=$(console_says "status"); show "$(head -6 <<<"$out")"
 check 'grep -qi "mode" <<<"$out"' "console via the bridge answers 'status'"
 
 echo "9. verify-lab --boot-twin with the twin and Studio already running"
-# (P5 is left out here: the student twin image ships without the Part 4/5 motor program until the
-#  student loads it from the Studio — step 9b checks that P5 says so; step 13 runs P5 on the factory image.)
-out=$(timeout 400 python3 assessment/verify-lab.py --boot-twin P1 P3 P6 P8 2>&1); rc=$?; show "$out"
+# (P1 is left out here: the student twin image ships without the Part 1/2 motor program until the
+#  student loads it from the Studio — step 9b checks that P1 says so; step 13 runs P1 on the factory image.)
+out=$(timeout 400 python3 assessment/verify-lab.py --boot-twin P3 P4 P6 P8 2>&1); rc=$?; show "$out"
 check 'grep -q "reusing it" <<<"$out"' "verifier reused the running twin"
 check 'grep -q "via the Studio bridge" <<<"$out"' "verifier attached through the bridge (not a dead second socket client)"
 check '[ $rc -eq 0 ]' "verifier exit 0 (no FAIL)"
 check '[ "$(twinpid)" = "$PID1" ]' "verifier left the student's twin running"
 
-echo "9b. P5 on a twin without the motor program explains what to do"
-out=$(timeout 120 python3 assessment/verify-lab.py P5 2>&1); show "$out"
-check 'grep -q "Logic Studio" <<<"$out" || grep -q "PASS\] P5" <<<"$out"' "P5 passes, or names the missing program and the fix"
+echo "9b. P1 on a twin without the motor program explains what to do"
+out=$(timeout 120 python3 assessment/verify-lab.py P1 2>&1); show "$out"
+check 'grep -q "Logic Studio" <<<"$out" || grep -q "PASS\] P1" <<<"$out"' "P1 passes, or names the missing program and the fix"
 
 echo "10. RESTART=1 reboots; the open Studio server reconnects"
 setsid nohup env RESTART=1 ./qemu/run.sh >/tmp/tts-run2.log 2>&1 < /dev/null &
@@ -124,7 +124,7 @@ out=$(./qemu/twin-status.sh stop 2>&1); show "$out"
 check '[ "$(twins)" = 0 ] && [ "$(bridges)" = 0 ] && [ ! -e "$SOCK" ]' "twin, Studio server and socket all gone"
 
 echo "13. CI path: verify-lab --boot-twin with nothing running boots its own and tears it down"
-out=$(timeout 400 python3 assessment/verify-lab.py --boot-twin P1 P5 2>&1); rc=$?; show "$out"
+out=$(timeout 400 python3 assessment/verify-lab.py --boot-twin P3 P1 2>&1); rc=$?; show "$out"
 check '[ $rc -eq 0 ] && ! grep -q "reusing it" <<<"$out"' "booted its own twin, exit 0"
 sleep 1
 check '[ "$(twins)" = 0 ]' "and tore it down"

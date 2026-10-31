@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Part 2 helper — generate two SBOM formats and scan for CVEs. Narrates each step.
+# Worked contrast on a SAMPLE manifest (sbom/vuln-sample/), not the device. The lab's SBOM step is
+# ./sbom/scan-running.sh (the firmware image your twin is running + the HMI container).
+# Generates two SBOM formats and scans for CVEs. Narrates each step.
 # Run from anywhere:  bash sbom/run_sbom.sh
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"            # sbom/
@@ -40,7 +42,7 @@ grype_progress() {            # usage: grype_progress <outfile> <show:yes|no> <g
   return "$rc"
 }
 
-step "SBOM of the sample component ( sbom/vuln-sample/ )"
+step "SBOM of a SAMPLE manifest ( sbom/vuln-sample/ ) — a worked contrast, not your device (that is ./sbom/scan-running.sh)"
 say "An SBOM lists what is inside the software. We generate it two ways, then scan it for known CVEs."
 predict "Before scanning, write down which of the top CVEs you expect to be FIRMWARE-RESIDENT (run on the chip) vs BUILD-HOST/TOOLCHAIN-ONLY (present in this tree but never shipped). This scope call is the graded insight."
 

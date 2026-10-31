@@ -22,7 +22,7 @@
 // ACTIVE INJECTION (teaching demo, OFF by default): when explicitly armed ('inject on',
 // CONTROL mode), the 'force <addr> <reg> <val>' command drives the tap pins for ONE I2C
 // write — e.g. forcing a relay ON by writing the AW9523 (0x59) output latch. This is a
-// live demonstration of ATT&CK ICS T0855 (Unauthorized Command Message) / T0831
+// live demonstration of ATT&CK ICS T1692.001 (Unauthorized Message: Command Message; formerly T0855) / T0831
 // (Manipulation of Control) for the CS460 lab; run it against the QEMU twin or an
 // isolated bench, not a live process. Each arm fires once, then auto-disarms.
 //
@@ -82,7 +82,7 @@ struct Txn {
   uint8_t  data[16];
   uint8_t  n;         // data byte count (capped at 16)
   bool     overflow;  // >16 data bytes seen
-  bool     injected;  // this frame was INJECTED by the analyzer (active T0855 demo)
+  bool     injected;  // this frame was INJECTED by the analyzer (active T1692.001 demo)
 };
 static const int TXN_MAX = 64;
 static Txn      g_txn[TXN_MAX];
@@ -265,7 +265,7 @@ static void draw() {
   if (g_inject_armed) {
     g_cv.setTextColor(TFT_RED, TFT_BLACK);
     g_cv.setCursor(2, H - 9);
-    g_cv.printf("** INJECT ARMED (T0855) **  USB:clear  drop:%lu", (unsigned long)g_drops);
+    g_cv.printf("** INJECT ARMED (T1692.001) **  USB:clear  drop:%lu", (unsigned long)g_drops);
   } else {
     g_cv.setTextColor(TFT_DARKGREY, TFT_BLACK);
     g_cv.setCursor(2, H - 9);
@@ -346,7 +346,7 @@ static void do_download() {   // reboot into ROM download mode so esptool can re
   esp_restart();
 }
 
-// ---- ACTIVE INJECTION (T0855 demo) — drives the tap to write ONE I2C frame ----
+// ---- ACTIVE INJECTION (T1692.001 demo) — drives the tap to write ONE I2C frame ----
 // The opposite of the passive tap. Gated: CONTROL mode + explicitly armed; one shot.
 // Records the forced write into the txn buffer (red '!' on the LCD, "inj":true in JSON)
 // so the analyzer shows its own attack the same way it shows legitimate traffic.
@@ -363,7 +363,7 @@ static void record_injected(uint8_t addr, uint8_t reg, uint8_t val) {
 static void force_write(uint8_t addr, uint8_t reg, uint8_t val) {
   if (g_mode != MODE_CONTROL) { Serial.println("[ERR] force: CONTROL mode only (send 'mode control')"); return; }
   if (!g_inject_armed)        { Serial.println("[ERR] force: not armed (send 'inject on' first)"); return; }
-  Serial.printf("[FORCE] *** ACTIVE INJECTION (T0855) *** writing 0x%02X -> reg 0x%02X @0x%02X\n",
+  Serial.printf("[FORCE] *** ACTIVE INJECTION (T1692.001) *** writing 0x%02X -> reg 0x%02X @0x%02X\n",
                 (unsigned)val, (unsigned)reg, (unsigned)addr);
   // stop passively sniffing while we drive the two lines ourselves
   detachInterrupt(digitalPinToInterrupt((int)PIN_SCL));
@@ -417,7 +417,7 @@ static void print_id() {
 static void bv_help() {
   Serial.println("[HELP] help | id | ver | stats | export | cap | {arm json} | mode sensor|control | pause | resume | clear | stream on|off | bye | reboot | download");
   Serial.println("[HELP] CONFIG (USB, persisted in NVS): rate <hz> | samples <n> | settings   (reboot/download/force need a 'confirm' line)");
-  Serial.println("[HELP] INJECT (T0855 demo, CONTROL+armed): inject on|off | force <addr> <reg> <val> | {\"cmd\":\"force\",\"addr\":89,\"reg\":2,\"val\":1}");
+  Serial.println("[HELP] INJECT (T1692.001 demo, CONTROL+armed): inject on|off | force <addr> <reg> <val> | {\"cmd\":\"force\",\"addr\":89,\"reg\":2,\"val\":1}");
 }
 static void bv_stats() {
   Serial.printf("[STATS] mode=%s total=%lu drops=%lu paused=%d stream=%d\n",
@@ -474,7 +474,7 @@ static void bv_exec(const char* ln) {
   }
   if      (!strcmp(ln, "help") || !strcmp(ln, "?"))   bv_help();
   else if (!strcmp(ln, "id") || !strcmp(ln, "whoami")) print_id();
-  else if (!strcmp(ln, "ver"))                        Serial.println("[VER] StamPLC Bus Viewer v3 (sniff + #CAP waveform + guarded T0855 inject)");
+  else if (!strcmp(ln, "ver"))                        Serial.println("[VER] StamPLC Bus Viewer v3 (sniff + #CAP waveform + guarded T1692.001 inject)");
   else if (!strcmp(ln, "stats") || !strcmp(ln, "s"))  bv_stats();
   else if (!strcmp(ln, "export") || !strcmp(ln, "e")) export_json();
   else if (!strcmp(ln, "pause"))                      { g_paused = true;  Serial.println("[OK] paused"); }
@@ -492,7 +492,7 @@ static void bv_exec(const char* ln) {
     Serial.println("[OK] bye - stream off; safe to close the port (capture keeps running)");
     Serial.flush();
   }
-  else if (!strcmp(ln, "inject on") || !strcmp(ln, "arm"))    { g_inject_armed = true;  Serial.println("[WARN] INJECTION ARMED - next 'force' DRIVES the bus (ATT&CK ICS T0855). CONTROL mode, one shot."); }
+  else if (!strcmp(ln, "inject on") || !strcmp(ln, "arm"))    { g_inject_armed = true;  Serial.println("[WARN] INJECTION ARMED - next 'force' DRIVES the bus (ATT&CK ICS T1692.001). CONTROL mode, one shot."); }
   else if (!strcmp(ln, "inject off") || !strcmp(ln, "disarm")){ g_inject_armed = false; Serial.println("[OK] injection disarmed"); }
   else if (!strncmp(ln, "force ", 6)) {               // text form: force <addr> <reg> <val> (hex 0x.. or dec) — confirm-gated
     char* end; unsigned long a = strtoul(ln + 6, &end, 0);
@@ -502,7 +502,7 @@ static void bv_exec(const char* ln) {
     else if (!g_inject_armed)    Serial.println("[ERR] force: not armed (send 'inject on' first)");
     else {
       g_pf_addr = (uint8_t)a; g_pf_reg = (uint8_t)r; g_pf_val = (uint8_t)v; g_pending = PEND_FORCE;
-      Serial.printf("[CONFIRM] force 0x%02X -> reg 0x%02X @0x%02X will DRIVE the bus (ATT&CK ICS T0855). Type 'confirm' to proceed, anything else cancels.\n",
+      Serial.printf("[CONFIRM] force 0x%02X -> reg 0x%02X @0x%02X will DRIVE the bus (ATT&CK ICS T1692.001). Type 'confirm' to proceed, anything else cancels.\n",
                     (unsigned)v, (unsigned)r, (unsigned)a);
     }
   }

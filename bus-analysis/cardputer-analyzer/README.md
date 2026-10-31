@@ -46,7 +46,7 @@ for the list. The commands:
 | `settings` | show the current mode / rate / samples |
 | `id` / `ver` / `stats` | identity handshake / version / per-address counts |
 | `reboot` / `download` | restart / enter ROM download mode — **each asks for `confirm` first** |
-| `inject on` + `force <addr> <reg> <val>` | guarded T0855 active-injection demo (CONTROL only); the typed `force` also asks for `confirm` |
+| `inject on` + `force <addr> <reg> <val>` | guarded T1692.001 (Unauthorized Message: Command Message, formerly T0855) active-injection demo (CONTROL only); the typed `force` also asks for `confirm` |
 
 Risky commands (`force`, `reboot`, `download`) only **arm** when typed — the next line must be
 `confirm` (or `y`) or they cancel. (The web analyzer's JSON `{"cmd":"force"}` path stays

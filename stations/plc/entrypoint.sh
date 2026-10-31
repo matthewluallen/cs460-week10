@@ -9,9 +9,10 @@ if ! ls qemu/twin/qemu-twin-linux-*/qemu-system-xtensa >/dev/null 2>&1; then
   ./qemu/fetch-qemu.sh || { echo "[plc] fetch-qemu failed; run it once in the repo before 'docker compose up'"; exit 1; }
 fi
 export W5_BIND=0.0.0.0          # expose Modbus :502 + HTTP :80 on the plant network
-export BRIDGE_BIND=0.0.0.0      # the Studio server must accept the host's port mapping (8080:8080)
+export BRIDGE_BIND=0.0.0.0      # the Studio server must accept the host's port mapping (8088:8088)
+export BRIDGE_PORT=8088         # Studio port; the firmware's own web HMI keeps :8080 on the plant network
 export SERIAL_SOCK=/tmp/plc-serial
-echo "[plc] booting the twin (${PROFILE:-vuln}) + bridge; Modbus :502, HTTP :80, Studio :8080 on $(hostname -i)"
+echo "[plc] booting the twin (${PROFILE:-vuln}) + bridge; Modbus :502, HTTP :80, web HMI :8080, Studio :8088 on $(hostname -i)"
 # Once the console answers, point the controller at the phone broker (mqtt station) so phone
 # sensors arrive as NETWORK points. Firmware without the `mqtt` command just prints "? type 'help'".
 MQTT_BROKER="${MQTT_BROKER:-10.20.30.40}"

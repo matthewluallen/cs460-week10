@@ -3,7 +3,7 @@
 //   g++ -std=c++17 -Isrc -I.pio/libdeps/m5stamplc/ArduinoJson/src test/default_project_test.cpp src/plc_engine.cpp -o /tmp/dpt
 //   /tmp/dpt
 // It decodes factory/default-project.json with the firmware's own decoder, then runs
-// the firmware's own VM scan-by-scan through the Part 5 sequence, and checks the phone
+// the firmware's own VM scan-by-scan through the Part 1 sequence, and checks the phone
 // ingest, freshness, pinning and word-source binding.
 #include "project_json.h"
 #include "mqtt_sensors_core.h"

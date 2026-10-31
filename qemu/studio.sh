@@ -6,21 +6,21 @@
 # Checks first, boots only if needed:
 #   • a twin already running on the console socket → reused, NOT rebooted
 #     (a leftover socket file from a crashed twin does not count — that boots fresh);
-#   • the Studio server already running on :8080   → reused, nothing restarted.
+#   • the Studio server already running on :8088   → reused, nothing restarted.
 # If you name a profile and a DIFFERENT build is running, it tells you how to switch
 # (RESTART=1 ./qemu/studio.sh <profile>) instead of silently driving the wrong firmware.
 #
 # The server both serves the Studio page AND bridges it to the twin, so the browser's
 # "Connect twin" is same-origin — no URL to figure out.
-#   • GitHub Codespaces : open the auto-forwarded port 8080 (popup, or the Ports tab).
-#   • Local VS Code     : open http://localhost:8080
+#   • GitHub Codespaces : open the auto-forwarded port 8088 (popup, or the Ports tab).
+#   • Local VS Code     : open http://localhost:8088
 #
 # Then click "Connect twin" in the Studio. Ctrl-C stops the server; the twin keeps
 # running (check it: ./qemu/twin-status.sh   stop it: ./qemu/twin-status.sh stop).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SERIAL_SOCK="${SERIAL_SOCK:-/tmp/plc-serial}"
-PORT="${BRIDGE_PORT:-8080}"
+PORT="${BRIDGE_PORT:-8088}"
 EXPLICIT=0; [ $# -ge 1 ] && EXPLICIT=1
 PROFILE="${1:-vuln}"
 # shellcheck source=twin-status.sh
@@ -38,6 +38,10 @@ if twin_detect "$SERIAL_SOCK" 15; then
     exit 3
   else
     echo "twin already running — reusing it, not booting ($TWIN_WHICH, pid $TWIN_PID)."
+    if [ "${FIELD_ANALOG:-0}" = "1" ] && ! tr '\0' '\n' < "/proc/$TWIN_PID/environ" 2>/dev/null | grep -q '^TBD_NOPHYS=1$'; then
+      echo "NOTE: FIELD_ANALOG=1 applies when the twin boots; the running one keeps its process model."
+      echo "      Replace it:   RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh"
+    fi
   fi
 elif [ "$TWIN_STATE" = "starting" ] || [ "$TWIN_STATE" = "orphaned" ]; then
   if [ "${RESTART:-0}" = "1" ]; then

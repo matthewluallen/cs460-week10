@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Part 2, Exercise 3 — scan the COMPILED firmware binary for embedded components + CVEs.
+# Part 5, Exercise 3 — scan the COMPILED firmware binary for embedded components + CVEs.
 #
 # Exercise 2 read build *manifests* (a source SBOM). This reads the shipped artifact
 # itself: cve-bin-tool fingerprints well-known components inside the .bin and maps them to
@@ -12,7 +12,19 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 mkdir -p out
-BIN="firmware/prebuilt/stamplc-factory-8MB.bin"
+# Default: the app your RUNNING twin booted (its boot slot, carved from the twin's flash image);
+# else the committed prebuilt. Or pass any app/flash image path.
+BIN="${1:-}"
+if [ -z "$BIN" ]; then
+  # shellcheck source=../qemu/twin-status.sh
+  . ../qemu/twin-status.sh
+  if twin_detect "${SERIAL_SOCK:-/tmp/plc-serial}" 0 && [ -n "${TWIN_IMG:-}" ]; then
+    python3 ../qemu/fw_identity.py --extract-app out/running-app.bin "$TWIN_IMG"
+    BIN="out/running-app.bin"; echo "(scanning the app your running twin booted, from $TWIN_IMG)"
+  else
+    BIN="firmware/prebuilt/stamplc-factory-8MB.bin"; echo "(no twin running - scanning the committed prebuilt)"
+  fi
+fi
 [ -f "$BIN" ] || { echo "firmware binary not found: $BIN  (build it — see firmware/BUILD.md)"; exit 1; }
 
 echo "============================================================"
@@ -22,7 +34,7 @@ echo "============================================================"
 echo
 echo "== Offline proof the components are really in the image (no network needed) =="
 strings "$BIN" | grep -iE 'mbedtls|lwip|wpa_supplicant|esp-idf|esp-tls' | sort -u | head -20 || true
-echo "   ^ these are the crypto + TCP/IP stacks the Part-2 note said 'most embedded CVEs live in'."
+echo "   ^ these are the crypto + TCP/IP stacks the Part-5 note said 'most embedded CVEs live in'."
 
 echo
 if ! command -v cve-bin-tool >/dev/null 2>&1; then

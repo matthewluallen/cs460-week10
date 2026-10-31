@@ -1,5 +1,7 @@
 # lab outputs
 sbom/out/
+bus-analysis/out/
+web/public/provenance-maps/
 **/node_modules/
 .netlify/
 web/.netlify/

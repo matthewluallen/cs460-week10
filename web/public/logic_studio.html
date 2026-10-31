@@ -266,7 +266,7 @@ textarea#stl{flex:1;border:0;resize:none;padding:12px 14px 40px;font-family:var(
 .app.circuit-active #viewCircuit{display:flex}
 .circ-body{flex:1;min-height:0;display:grid;grid-template-columns:1.25fr .9fr .9fr;gap:0;overflow:auto}
 .circ-body[hidden],.cw-wire[hidden],.cw-parts[hidden]{display:none!important}
-/* ----- Part 5 wire & run: predesigned snap-kit circuits (circuits/workspace.js) ----- */
+/* ----- Part 1 wire & run: predesigned snap-kit circuits (circuits/workspace.js) ----- */
 .cw-wire{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
 #cwSub button,#cwView button{white-space:nowrap}
 .cw-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel2)}
@@ -651,7 +651,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
           <button class="btn" id="bReadStatus" disabled>Read controller status</button>
           <button class="btn" id="bReadProject" disabled>Read installed application</button>
           <button class="btn" id="bExportProjectReadback" disabled>Export readback evidence</button>
-          <button class="btn" id="bBench" title="Open the predesigned Part 5 circuits (Circuit tab · Wire &amp; run) and drive them on the twin or a board">⚡ Test bench</button>
+          <button class="btn" id="bBench" title="Open the predesigned Part 1 circuits (Circuit tab · Wire &amp; run) and drive them on the twin or a board">⚡ Test bench</button>
           <button class="btn" id="bNetCfg" title="Configure the device network (WiFi STA/setup-AP, and W5500 Ethernet if fitted), static or DHCP">⚙ Network</button>
           <button class="btn" id="bSensors">Grove devices</button>
           <div class="menu-sep"></div>
@@ -865,7 +865,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
 
   <section id="viewCircuit" aria-label="Circuit Studio — wire and run predesigned circuits">
     <div class="proto-head">
-      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">Part 5 · wire &amp; run · snap-kit parts on the StampLC</span></div>
+      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">Part 1 · wire &amp; run · snap-kit parts on the StampLC</span></div>
       <span class="seg" id="cwSub" role="tablist" aria-label="Circuit Studio views"><button type="button" role="tab" data-sub="wire" class="on">Wire &amp; run</button><button type="button" role="tab" data-sub="paths">Input paths</button><button type="button" role="tab" data-sub="parts">Parts</button></span>
       <span class="spacer" style="flex:1"></span>
       <span class="flow-hint" id="circuitHint"></span>
@@ -923,7 +923,8 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
       <button id="bConsoleToggle" title="Collapse or expand the console to give the ladder more room">▾</button></div>
     <div id="log"></div>
     <div id="busView">
-      <div class="bus-tools"><span id="busState" role="status">Trace state unknown</span><button class="btn" id="bBusRead">Read retained</button><button class="btn" id="bBusOff">Request trace OFF</button><button class="btn" id="bBusFile">Open capture</button><button class="btn" id="bBusExport">Export capture</button></div>
+      <div class="bus-tools"><span id="busState" role="status">Trace state unknown</span><button class="btn" id="bBusRead">Read retained</button><button class="btn" id="bBusOff">Request trace OFF</button><button class="btn" id="bBusTwinTap" title="Record YOUR running twin's I²C bus for 6 s through the Studio server (QEMU's own I²C controller trace, outside the firmware). Press an input while it records. Saves .sr for PulseView + .vcd in bus-analysis/out/.">● Record twin bus (6 s)</button><button class="btn" id="bBusFile">Open capture</button><button class="btn" id="bBusExport">Export capture</button></div>
+      <p class="bus-note" id="busTapNote" hidden></p>
       <p class="bus-note" id="busEvidenceNote">Software annotations show selected firmware calls, not electrical transactions. <b>Capture 1 s</b> changes diagnostic tracing in Author; <b>Read retained</b> is read-only. Only the latest 16 diagnostic records survive. USB loss can leave tracing enabled; reconnect and request OFF.</p>
       <p class="bus-note" id="busSummary" role="status">No capture loaded. Select a record to see its meaning and limitations beside the original evidence.</p>
       <div id="qemuBusTools" class="bus-tools" hidden><label id="qemuWindowLabel" hidden>Test interval <select id="qemuWindow"></select></label><label>Controller <select id="qemuController"></select></label><label>Event <select id="qemuEvent"></select></label><button class="btn" id="qemuPrev">Previous</button><span id="qemuPage" role="status"></span><button class="btn" id="qemuNext">Next</button></div>
@@ -3399,10 +3400,11 @@ function openProject(){
 }
 function openExampleProjects(){
   showModal(`<h3>Example project files</h3><div class="body"><p>Each file supplies its own logic, names and I/O mappings. All use the same generic runtime and can be loaded into either firmware profile. Choose an example explicitly; opening one never installs it. The factory and twin images ship with only Motor start/stop + E-stop installed.</p>
-    <p><b>Part 5 factory default:</b> <button class="btn" data-example="motor-start-stop-estop">Open Motor start/stop + E-stop</button> <a href="projects/motor-start-stop-estop.csco" download>.csco</a> — the program the factory and twin images ship installed (PROGRAM mode). Start seals the motor in; Stop drops it; the N.C. E-stop (estop_ok, 1 = healthy) latches the fault lamp; restoring the E-stop never restarts the motor; Reset clears the fault; Start must be pressed again. On the twin every input reads 0 at boot, so the E-stop reads tripped until you drive estop_ok to 1.</p>
-    <p><b>Part 5 Test-bench pair:</b> <button class="btn" data-example="pushbutton">Open Pushbutton → green LED</button> <a href="projects/pushbutton.csco" download>.csco</a> · <button class="btn" data-example="two-led-nonc">Open Two LEDs — NO / NC</button> <a href="projects/two-led-nonc.csco" download>.csco</a></p>
+    <p><b>Part 1 factory default:</b> <button class="btn" data-example="motor-start-stop-estop">Open Motor start/stop + E-stop</button> <a href="projects/motor-start-stop-estop.csco" download>.csco</a> — the program the factory and twin images ship installed (PROGRAM mode). Start seals the motor in; Stop drops it; the N.C. E-stop (estop_ok, 1 = healthy) latches the fault lamp; restoring the E-stop never restarts the motor; Reset clears the fault; Start must be pressed again. On the twin every input reads 0 at boot, so the E-stop reads tripped until you drive estop_ok to 1.</p>
+    <p><b>Part 1 Test-bench pair:</b> <button class="btn" data-example="pushbutton">Open Pushbutton → green LED</button> <a href="projects/pushbutton.csco" download>.csco</a> · <button class="btn" data-example="two-led-nonc">Open Two LEDs — NO / NC</button> <a href="projects/two-led-nonc.csco" download>.csco</a></p>
     <p><button class="btn" data-example="indicator">Open Input indicator</button> <a href="projects/indicator.csco" download>Download indicator.csco</a></p>
     <p><button class="btn" data-example="interlocked-pair">Open Ventilation interlock</button> <a href="projects/interlocked-pair.csco" download>Download interlocked-pair.csco</a></p>
+    <p><b>Part 1 light alarm:</b> <button class="btn" data-example="light-alarm">Open Light sensor → alarm</button> <a href="projects/light-alarm.csco" download>.csco</a> — photoresistor on IO expansion CH1 → RELAY 3, with a 3000 / 2400 mV deadband.</p>
     <p><button class="btn" data-example="io-expansion">Open IO expansion level alarm</button> <a href="projects/io-expansion.csco" download>Download io-expansion.csco</a></p>
     <p><button class="btn" data-example="reservoir-pid">Open Reservoir level PID</button> <a href="projects/reservoir-pid.csco" download>Download reservoir-pid.csco</a> — a closed-loop analog example: PID holds tank level at setpoint (CV → pump) with high/low level alarms.</p>
     <p><button class="btn" data-example="reboot-run-indicator">Open Reboot RUN indicator</button> <a href="projects/reboot-run-indicator.csco" download>Complete project</a> · <a href="projects/reboot-run-indicator.st" download>Matching Studio ST</a></p><p>The first three examples retain default PROGRAM on reboot. Reboot RUN indicator explicitly adds the separate startup rung and equivalent ST declaration; its host policy is disabled. The .st file contains logic and the startup declaration only; use .csco to retain symbols, settings and host rules.</p><p id="projectImportError" role="alert"></p><p>When using a standalone file page, download an example and choose Open .csco.</p>
@@ -4246,6 +4248,43 @@ function renderBusControls(){
   document.getElementById('bBusOff').disabled=busBusy||!conn||MODE!=='edit';
   document.getElementById('bBusFile').disabled=busBusy;
   document.getElementById('bBusExport').disabled=busBusy||!busCapture;
+  const tap=document.getElementById('bBusTwinTap');if(tap)tap.disabled=busBusy||!/^https?:$/.test(location.protocol);
+}
+/* ===== live I2C tap of the student's OWN running twin (Studio server POST /bus/capture) =====
+   The server switches QEMU's I2C controller trace on for N s over QMP, then off, and converts it
+   (bus-analysis/tools/trace_to_sigrok.py): .vcd/.sr for PulseView, a sigrok-cli decode, and a
+   Studio bundle that loads here through the same importer as "Open capture". */
+async function recordTwinBus(secs=6){
+  if(busBusy)return;
+  const btn=document.getElementById('bBusTwinTap'),note=document.getElementById('busTapNote'),label=btn.textContent;
+  busBusy=true;renderBusControls();showConTab('bus');
+  note.hidden=false;note.textContent=`Recording your twin's I²C bus for ${secs} s — press an input now (Circuit tab, or POST /field). Nothing is replayed: these are the bytes your twin's emulated I²C controller moves right now.`;
+  let left=secs;btn.textContent=`● recording… ${left} s`;
+  const tick=setInterval(()=>{left--;btn.textContent=left>0?`● recording… ${left} s`:'● converting…';},1000);
+  let j=null;
+  try{
+    const r=await fetch(`/bus/capture?seconds=${secs}`,{method:'POST',cache:'no-store'});
+    j=await r.json();
+    if(!j.ok)throw new Error(j.error||('HTTP '+r.status));
+  }catch(e){
+    clearInterval(tick);btn.textContent=label;busBusy=false;renderBusControls();
+    note.textContent='Bus capture failed: '+e.message+' — run the twin with ./qemu/studio.sh and open the Studio from it (or use ./bus-analysis/tap.sh).';
+    log('Bus capture failed: '+e.message,'er');return;
+  }
+  clearInterval(tick);btn.textContent=label;busBusy=false;renderBusControls();
+  const ch=(j.summary.relay_write_changes||[]).map(c=>`${c.value} @${c.t_ms} ms`).join(' → ')||'none';
+  const sg=j.sigrok&&j.sigrok.ok?`sigrok-cli decoded ${Object.entries(j.sigrok.addresses).map(([k,v])=>k+'×'+v).join(', ')}`:`sigrok: ${(j.sigrok&&j.sigrok.error)||'not run'}`;
+  note.replaceChildren();
+  const add=(t)=>note.append(document.createTextNode(t));
+  add(`LIVE TAP of your twin · ${j.captured.start_local} · ${j.seconds} s · ${j.summary.frames} transactions on ${j.bus}. RELAY byte (0x59 reg 0x02) changes: ${ch}. ${sg}. Files in ${j.repo_path}/: `);
+  for(const [k,u] of Object.entries(j.download)){if(k==='trace')continue;const a=document.createElement('a');a.href=u;a.textContent=u.split('/').pop();a.download='';a.style.marginRight='8px';note.append(a);}
+  add(' — open the .sr in PulseView (add the I²C decoder: SCL, SDA). '+j.summary.fidelity);
+  log(`bus tap: ${j.summary.frames} transactions, relay writes ${ch}`,'ok');
+  if(j.download.studio){
+    try{const text=await (await fetch(j.download.studio,{cache:'no-store'})).text();
+        await importBusFile({size:new TextEncoder().encode(text).length,text:async()=>text});}
+    catch(e){log('Studio view of the capture failed: '+e.message,'er');}
+  }else if(j.studio_bundle_note){log('Capture saved; Studio view skipped: '+j.studio_bundle_note,'er');}
 }
 /* ===== embedded lane timeline (week-10 inspector view) — renders the SAME records the
    table does, by address lane, R(read)/W(write) colored; click proxies to the record detail ===== */
@@ -4588,7 +4627,7 @@ async function disconnect(){
 function twinDefaultUrl(){
   if(location.protocol==='http:'||location.protocol==='https:')
     return (location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
-  return 'ws://localhost:8080/ws';
+  return 'ws://localhost:8088/ws';
 }
 function connectTwin(url){
   if(connecting||port||wsSock)return;
@@ -4920,6 +4959,7 @@ document.getElementById('bBusRead').onclick=()=>collectBus('retained');
 document.getElementById('bBusOff').onclick=()=>collectBus('trace-off');
 document.getElementById('bBusExport').onclick=()=>{if(busCapture&&!busBusy)downloadText('studio-bus-capture.json',JSON.stringify(busCapture,null,2),'application/json');};
 document.getElementById('bBusFile').onclick=openBusCapture;
+document.getElementById('bBusTwinTap').onclick=()=>recordTwinBus(6);
 document.querySelectorAll('.contabs button').forEach(b=>b.onclick=()=>showConTab(b.dataset.tab));
 document.getElementById('bTheme').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');setTheme(c==='dark'?'light':'dark');};
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
@@ -5086,7 +5126,7 @@ initTheme();modeChips();setMode('edit');rebuildFromModel();openProject();
 log('Open a project, validate its settings, then load and read back the application. RUN is a separate controller command.','ok');
 if(inFrame)log('Embedded preview: authoring works here. For USB access, open student/logic_studio.html standalone in Chrome/Edge.','rx');
 </script>
-<!-- Part 5 "Wire & run": snap-kit circuit views (Circuit tab). Loaded after the main script so the
+<!-- Part 1 "Wire & run": snap-kit circuit views (Circuit tab). Loaded after the main script so the
      console transport (rawSend, lineListeners, wsSock/port) and AppView already exist. -->
 <script src="circuits/snapkit.js"></script>
 <script src="circuits/catalog.js"></script>

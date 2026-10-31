@@ -61,7 +61,7 @@ forwards it automatically — open the **Ports** tab and click the globe on port
 
 **Do:** from the HMI and the `cwe`/`proto` output, list the services that answer **by
 default** and the port each uses. Note which of them require any authentication to issue
-a command. (You met one of these as an *unauthenticated Modbus write* in Part 1 — find it
+a command. (You met one of these as an *unauthenticated Modbus write* in Part 3 — find it
 again here, now with the whole device around it.)
 
 ---
@@ -165,7 +165,7 @@ assignment:
 - **Signed OTA** — the update server's images are signed; the device checks the signature
   before flashing.
 - **Signed SBOM attestation** (SLSA / in-toto) — so the running image can be tied back to
-  the exact source and dependency set you vetted in Part 2.
+  the exact source and dependency set you vetted in Part 5.
 
 Part 7 shows what an attacker does with this primitive when it's left open.
 
@@ -182,6 +182,6 @@ explanation.** Concretely:
 3. The quoted verification code (Exercise 3) and your static-vs-dynamic argument.
 4. One sentence: which single control from "the lesson" you would add first, and why.
 
-> Remember the habit from Part 1: separate **what you observed** from **what you inferred**.
+> Remember the habit from Part 3: separate **what you observed** from **what you inferred**.
 > "The endpoint returned `verified=NO`" is an observation; "the device would boot a
 > malicious image" is an inference — a correct one, but say which is which.

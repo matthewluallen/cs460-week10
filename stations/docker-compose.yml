@@ -4,19 +4,20 @@
 # capture with Wireshark — the multi-station model from the wind-turbine lab, applied to
 # the StampLC. No wind farm here; this stack stands alone.
 #
-#   plc       10.20.30.10   the controller — the QEMU twin + bridge (Modbus :502, HTTP :80, Studio :8080)
+#   plc       10.20.30.10   the controller — the QEMU twin + bridge (Modbus :502, HTTP :80, web HMI :8080, Studio :8088)
 #   hmi       10.20.30.20   a SCADA HMI that polls the controller over Modbus (dashboard :8800)
 #   engineer  10.20.30.30   an engineering/attacker workstation — a Modbus master
 #   mqtt      10.20.30.40   the phone broker + sensor page (MQTT :1883, phone page / MQTT-over-WS :8090)
 #   capture                 a passive sniffer (Wireshark/tshark) watching the plant network
-#                           (Modbus :502, DNP3 :20000, MQTT :1883, phone MQTT-over-WS :8090)
+#                           (Modbus :502, DNP3 :20000, MQTT :1883, phone MQTT-over-WS :8090,
+#                           firmware update HTTP :80, web HMI :8080)
 #
 # First (once, in the repo root, so the twin is present for the mounted plc station):
 #   ./qemu/fetch-qemu.sh
 # Then:
 #   docker compose -f stations/docker-compose.yml up --build
 #
-# In a Codespace, forward ports 8800 (HMI) and 8080 (Studio) from the Ports tab.
+# In a Codespace, forward ports 8800 (HMI) and 8088 (Studio) from the Ports tab.
 
 name: cs460-stations
 
@@ -41,7 +42,7 @@ services:
       plant:
         ipv4_address: 10.20.30.10
     ports:
-      - "8080:8080"              # Logic Studio + /modbus proxy + console (same-origin)
+      - "8088:8088"              # Logic Studio + /modbus proxy + console (same-origin)
     # binds the controller's own Modbus :502 and HTTP :80 on the plant network (W5_BIND=0.0.0.0)
 
   hmi:

@@ -1,4 +1,4 @@
-<h2 style="color:#13325b;">Part 5.5 &middot; You are the sensor &mdash; and the attacker (phone-sensor lab)</h2>
+<h2 style="color:#13325b;">Part 8 &middot; You are the sensor &mdash; and the attacker (phone-sensor lab)</h2>
 <p><em>Runs on the MQTT phone-sensor bridge (the QR page). No extra hardware &mdash; your own phone is the sensor and the attack tool. Pairs with the <strong>Signal Journey</strong> view in the Logic Studio toolbar.</em></p>
 
 <div style="border-left:5px solid #e64100;background:#fff5f0;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;">
@@ -21,7 +21,7 @@
 <li><strong>SAY</strong> &mdash; which lenses in the Signal Journey still catch this and which do not. (The byte <em>is</em> on the wire, <em>is</em> in the <code>SRC_WEB</code>/MQTT log, <em>is</em> attributable to your phone &mdash; and is still false.)</li>
 <li><strong>WHY</strong> &mdash; why &ldquo;it&rsquo;s logged and attributable&rdquo; does not mean &ldquo;it&rsquo;s true,&rdquo; and what independent check would have caught it: a second sensor, a physical limit (float switch / hard stop), a rate-of-change / plausibility gate.</li>
 </ul>
-<p style="font-size:14px;"><strong>Maps to:</strong> CWE-20 (improper input validation), <strong>CWE-345</strong> (insufficient verification of data authenticity), CWE-1254 (no plausibility check); ATT&amp;CK for ICS <strong>T0856 Spoof Reporting Message</strong>, <strong>T0855 Unauthorized Command Message</strong> (the button path); CAPEC-148 (content spoofing).</p>
+<p style="font-size:14px;"><strong>Maps to:</strong> CWE-20 (improper input validation), <strong>CWE-345</strong> (insufficient verification of data authenticity), CWE-1254 (no plausibility check); ATT&amp;CK for ICS <strong>T1692.002 Unauthorized Message: Reporting Message</strong> (formerly T0856), <strong>T1692.001 Unauthorized Message: Command Message</strong> (formerly T0855) (the button path); CAPEC-148 (content spoofing).</p>
 
 <h3 style="color:#13325b;">Then defend it</h3>
 <p>Add a <strong>plausibility gate</strong> to your logic (range + rate-of-change limit, or a cross-check against a second input) so a spoofed value is rejected or flagged instead of acted on &mdash; and prove the <em>legitimate</em> reading still works afterward. This is the same move as the Modbus REMOTE-mode gate (CWE-306) one layer up: don&rsquo;t trust an input just because it arrived.</p>

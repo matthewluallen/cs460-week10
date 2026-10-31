@@ -22,7 +22,7 @@ curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/ins
        && sudo tar -xzf /tmp/trivy.tgz -C "$BIN" trivy 2>/dev/null && echo "   trivy installed (tarball fallback)"; } \
   || echo "   (trivy optional — skipped; syft+grype cover Exercise 2)"
 
-echo "==> Installing cve-bin-tool (binary CVE scanner — Part 2 Exercise 3) + gsutil (for the CVE mirror)…"
+echo "==> Installing cve-bin-tool (binary CVE scanner — Part 5 Exercise 3) + gsutil (for the CVE mirror)…"
 # cve-bin-tool fingerprints a compiled .bin for component versions. pipx keeps it isolated; fall
 # back to pip. gsutil lets it pull CVE data from the json-mirror (a public GCS bucket) instead of
 # the NVD API — so Exercise 3 needs NO NVD key and works even when nvd.nist.gov is down. Non-fatal.
@@ -33,7 +33,7 @@ pipx install cve-bin-tool >/dev/null 2>&1 \
 pip3 install --quiet gsutil 2>/dev/null || pip3 install --quiet --break-system-packages gsutil 2>/dev/null \
   || echo "   (gsutil install skipped — Exercise 3 notes the fallback)"
 
-echo "==> Installing SAST tools for Part 2 Exercise 4 (flawfinder; cppcheck came via apt above)…"
+echo "==> Installing SAST tools for Part 5 Exercise 4 (flawfinder; cppcheck came via apt above)…"
 # flawfinder = CWE-tagged risky-C/C++ pattern scanner. cppcheck (apt, above) = bug/style SAST.
 # Exercise 4 runs both to show SAST finds code-pattern weaknesses but MISSES the firmware's
 # architectural CWEs (no-auth / cleartext / unsigned-OTA / default creds). Non-fatal.
@@ -53,10 +53,17 @@ if command -v cve-bin-tool >/dev/null 2>&1; then
     || echo "   (CVE mirror pre-cache skipped — run 'bash sbom/run_cve_bin_tool.sh' later)"
 fi
 
-echo "==> Installing bus & firmware tooling (sigrok decoder, pymodbus, nc)…"
+echo "==> Installing bus & network tooling (sigrok-cli, tshark, nc, cppcheck)…"
 sudo apt-get update -qq || true
-sudo apt-get install -y -qq sigrok-cli xz-utils netcat-openbsd cppcheck >/dev/null 2>&1 \
-  || echo "   (some apt packages skipped — Parts 1/6 note fallbacks)"
+# tshark's package asks "Should non-superusers be able to capture packets?" (wireshark-common/
+# install-setuid). Answer it BEFORE installing so the Codespace build never stops at a dialog.
+# false = capturing stays root-only: students run  sudo tshark -i lo -f "tcp port 502"  (reading a
+# saved .pcap needs no sudo). sigrok-cli decodes the live I2C tap (./bus-analysis/tap.sh).
+echo "wireshark-common wireshark-common/install-setuid boolean false" | sudo debconf-set-selections
+sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
+    sigrok-cli tshark xz-utils netcat-openbsd cppcheck >/dev/null 2>&1 \
+  || sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sigrok-cli tshark xz-utils netcat-openbsd cppcheck >/dev/null 2>&1 \
+  || echo "   (some apt packages skipped — run: sudo apt-get install -y sigrok-cli tshark)"
 pip3 install --quiet --break-system-packages pymodbus 2>/dev/null \
   || pip3 install --quiet pymodbus 2>/dev/null \
   || echo "   (pip pymodbus skipped — Part 6 notes the HMI fallback)"
@@ -106,12 +113,31 @@ TWIN="not fetched (optional; Parts 1–5 need no device)"
 PIOST="not installed"
 [ -x "$HOME/.platformio/penv/bin/pio" ] && PIOST="installed + toolchain cached"
 
+ver() {   # first line of "<tool> <args>" or "not installed" (no pipes: safe under pipefail)
+  command -v "$1" >/dev/null 2>&1 || { echo "not installed"; return 0; }
+  local out; out="$("$@" 2>/dev/null || true)"
+  out="${out#"${out%%[![:space:]]*}"}"
+  out="${out%%$'\n'*}"
+  echo "${out:-installed (version unknown)}"
+}
+echo
+echo "==> Tool versions"
+printf '   %-13s %s\n' "tshark:"       "$(ver tshark --version)"
+printf '   %-13s %s\n' "sigrok-cli:"   "$(ver sigrok-cli --version)"
+printf '   %-13s %s\n' "syft:"         "$(ver syft --version)"
+printf '   %-13s %s\n' "grype:"        "$(ver grype --version)"
+printf '   %-13s %s\n' "trivy:"        "$(ver trivy --version)"
+printf '   %-13s %s\n' "cve-bin-tool:" "$(PATH="$HOME/.local/bin:$PATH" ver cve-bin-tool --version)"
+printf '   %-13s %s\n' "pio:"          "$(ver pio --version)"
+printf '   %-13s %s\n' "python3:"      "$(ver python3 --version)"
+printf '   %-13s %s\n' "node:"         "$(ver node --version)"
+
 echo
 echo "============================================================"
 echo " CS460 Weeks 10–12 lab ready."
 echo "   syft:  $(command -v syft  >/dev/null && echo installed || echo 'not installed')    grype: $(command -v grype >/dev/null && echo installed || echo 'not installed')"
 echo "   z3:    $(python3 -c 'import z3' 2>/dev/null && echo 'installed (Week 12 formal verification)' || echo 'not installed — pip install z3-solver')"
-echo "   sigrok:$(command -v sigrok-cli >/dev/null && echo ' installed' || echo ' not installed')  node: $(node --version)   python: $(python3 --version)"
+echo "   sigrok:$(command -v sigrok-cli >/dev/null && echo ' installed' || echo ' not installed')  tshark:$(command -v tshark >/dev/null && echo ' installed (capture: sudo tshark)' || echo ' not installed')  node: $(node --version)   python: $(python3 --version)"
 echo "   cve-bin-tool:$(command -v cve-bin-tool >/dev/null && echo ' installed' || echo ' not installed')  flawfinder:$(command -v flawfinder >/dev/null && echo ' installed' || echo ' not installed')  cppcheck:$(command -v cppcheck >/dev/null && echo ' installed' || echo ' not installed')  trivy:$(command -v trivy >/dev/null && echo ' installed' || echo ' optional/absent')"
 echo "   pio:   $PIOST"
 echo "   twin:  $TWIN"

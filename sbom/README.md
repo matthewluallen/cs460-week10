@@ -1,4 +1,4 @@
-# Part 2 — Software Bill of Materials (SBOM)
+# Part 5 — Software Bill of Materials (SBOM)
 
 An **SBOM** lists what's *inside the software*: the libraries, packages and versions
 a build pulls in. Security teams use it to answer "do we ship anything with a known
@@ -37,25 +37,37 @@ if so — whether a fix would be a firmware patch or a library bump. Note your u
 
 ---
 
-## Exercise 2 — generate, compare, scan
+## Exercise 2 — SBOM of the firmware your twin is running
 
-Run the helper — it generates the same component set as **SPDX** and as
-**CycloneDX**, scans the SBOM with grype, and (step 4) runs the CWE bridge:
+With your twin running (`./qemu/studio.sh`), first note its fingerprint at the console:
+`plc> diag json` → `elf_sha256`. Then:
 
 ```bash
-bash sbom/run_sbom.sh   # SPDX + CycloneDX via syft, grype scan, CWE bridge -> sbom/out/
+./sbom/scan-running.sh      # fingerprint -> build match -> SPDX + CycloneDX -> grype -> RISK table
 ```
+
+It reads the boot slot of the flash image your twin booted (and asks the console for
+`diag json` to compare), checks which build in this checkout has that fingerprint, and writes
+an SBOM in **both** formats with every component labelled **DECLARED** (from
+`firmware/platformio.ini`) or **FOUND** (from the image itself: the ESP-IDF version in the app
+descriptor, strings that prove mbedTLS / lwIP / FreeRTOS are linked in). If the plant is up it
+also SBOMs the operator screen's container (`cs460/hmi-nodered`). grype scans both and the
+**RISK** column ranks the findings (EPSS forecast + CISA KEV + severity).
+
+Outputs in `sbom/out/`: `firmware.spdx.json`, `firmware.cdx.json`, `hmi.spdx.json`,
+`hmi.cdx.json`, `grype-firmware.txt/.json`, `grype-hmi.txt/.json`, `risk.txt`,
+`running-identity.json`, `app.bin` (the boot slot), `cwe-bridge.txt`.
 
 In your notebook, record:
 
-1. **SPDX vs CycloneDX** — one concrete difference you see (a field name, how components
-   are identified, the component count). They describe the same thing in different schemas.
-2. **Top 5 CVEs** from the grype table (CVE, severity, component, version) for the report.
-3. Pick **one** CVE, find it in the NVD, and summarize its cause in a sentence.
+1. **The fingerprint** — does `diag json` agree with the image's boot slot? Which build matched?
+2. **SPDX vs CycloneDX** — one concrete difference (field names, how a component is
+   identified, how the build-only platform is marked).
+3. **One finding with its RISK** and its scope: firmware on the chip, or the HMI container.
+4. **What the firmware scan could not see** — the FOUND components with no version.
 
-The script writes `out/sbom.spdx.json`, `out/sbom.cdx.json`, `out/grype.txt`,
-`out/grype.json` and `out/cwe-bridge.txt` — read those rather than re-typing the
-raw `syft`/`grype` commands.
+*Worked contrast (optional, not your device):* `bash sbom/run_sbom.sh` runs the same tools on a
+small sample manifest in `sbom/vuln-sample/`.
 
 ### Active learning
 - **Predict** — before scanning, look at the component list from Exercise 1 and
@@ -63,7 +75,7 @@ raw `syft`/`grype` commands.
   **firmware-resident** (code that actually runs on the microcontroller) vs
   **build-host / toolchain-only** (present in the scanned tree but never shipped
   to the chip). This "scope" call is the graded insight.
-- **Run** — `bash sbom/run_sbom.sh`
+- **Run** — `./sbom/scan-running.sh`
 - **Reconcile** — compare your prediction against the grype table. Being listed
   establishes only that a *component version* carries a known CVE; it does **not**
   establish that the weak code path runs on the device or is reachable. Mark each
@@ -86,12 +98,13 @@ You'll get **almost nothing** — a `platformio.ini` of C/C++ library pins is no
 package ecosystem the scanner catalogs, and there's no compiled tree here. That's the
 real-world catch:
 
-- **Build-host / toolchain SBOM** (what Exercise 2 scans) finds plenty and is where
-  supply-chain attacks like *XZ* and *SolarWinds* live — but those components don't all
-  run on the microcontroller.
+- **Container / build-host SBOM** (the HMI container in Exercise 2, or the optional sample)
+  finds plenty and is where supply-chain attacks like the *XZ* backdoor and *SUNBURST* live —
+  but those components don't run on the microcontroller.
 - **Firmware-resident SBOM** (mbedTLS, lwIP inside ESP-IDF) is what actually ships on
-  the chip, and you usually get it by mapping the **framework version → the libraries it
-  bundles → the NVD**, not from a one-shot scan.
+  the chip. `scan-running.sh` finds them in the image but with **no version**, so you get
+  versions by mapping the **framework version → the libraries it bundles → the NVD**, not
+  from a one-shot scan.
 
 Say clearly in your finding **which scope** your SBOM covered, and what it therefore
 could not have caught.
@@ -103,10 +116,8 @@ A scanner finding is a *library* fact: "this component has CVE‑X." Whether it 
 weak path, and can you **see the result**. The **CWE** is what joins the scanner's CVE
 to the firmware's code and to the analyzer's evidence.
 
-`cwe_bridge.py` makes that join from the real scan. `run_sbom.sh` (Exercise 2,
-step 4) already produced `out/grype.json` and wrote the bridge output to
-`out/cwe-bridge.txt` — read that, or re-run `bash sbom/run_sbom.sh` to regenerate
-it. It splits the scanner's CWE classes into two groups:
+`cwe_bridge.py` makes that join from the real scan. `scan-running.sh` (Exercise 2)
+already ran it on its grype output and wrote `out/cwe-bridge.txt`. It splits the scanner's CWE classes into two groups:
 
 - **Observable in the twin** — the SBOM found the weakness class in a library *and*
   the firmware has code that reaches it, so the analyzer can show the outcome. From

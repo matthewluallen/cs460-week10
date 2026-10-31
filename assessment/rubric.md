@@ -18,7 +18,7 @@ target a student used does not change their score.
 | Mechanics — the observable occurred | **40%** | `verify-lab.py <part>` (PASS/FAIL/SKIP) |
 | Reasoning — the finding | **60%** | instructor, against the finding standard below |
 
-A `SKIP` (tool or target not available, e.g. Part 7 without the malicious image, or Part 2
+A `SKIP` (tool or target not available, e.g. Part 7 without the malicious image, or Part 5
 without syft/grype) is **not** a penalty: mechanics credit transfers to the reasoning share
 for that part, and the student documents what they would run to close it.
 
@@ -37,17 +37,17 @@ Reasoning % = (sum / 12) × 60.
 
 ## Per-part criteria
 
-| Part | Mechanics (40%) — verifier anchor | Reasoning (60%) — the finding must argue… |
-|---|---|---|
-| **1 Bus analysis** | `P1`: sample decodes to FC3 / register 25 | that a successful read establishes a value was *reported*, not that it is *trustworthy* or *current* |
-| **2 SBOM** | `P2`: SPDX + CycloneDX both generate and differ | one chosen CVE's **reachability** — library-present vs. called-in-code — using the CWE bridge |
-| **3 HBOM** | `P3`: six internal I²C devices + 0x77 on the target | each live address reconciled to an HBOM line, and what a *missing* or *extra* address would imply |
-| **4 Ladder** | `P4`: edited/example project compiles to IR, pairing holds | the predicted I/O behavior of the change, and the CWE-306 point the rung embodies |
-| **5 Wire & run** | `P5`: `start_pb`→relay0&1 + seal-in; `estop_ok`=0 drops motor, latches relay3; no restart on restore; reset clears, motor stays off | why the output (not the input or the HMI) is ground truth, and what the interlock protects against |
-| **6 Unsigned OTA** | `P6`: OTA endpoint accepts an unsigned image | the exact integrity control that is missing (signature verification) and where a signer would sit |
-| **7 Supply-chain** | `P7` *(twin)*: armed image changes the relay | why a binary diff **cannot** isolate the payload, and what attestation (reproducible build / SLSA / in-toto) would |
-| **8 NTP / Y2038** | `P8`: benign sync clean; armed sync wraps to ~1902 | that unauthenticated time is attacker input, and why the **monotonic** audit clock is the right fix |
-| **9 Remediation** | `P9`: on the **secure** build, OTA→401, no wrap, overflow blocked | each attack mapped to the control that now stops it, **plus the residual limits** (e.g. HMAC key is a repo constant) |
+| Section | Part | Mechanics (40%) — verifier anchor | Reasoning (60%) — the finding must argue… |
+|---|---|---|---|
+| A · Build | **1 Wire & run** | `P1`: `start_pb`→relay0&1 + seal-in; `estop_ok`=0 drops motor, latches relay3; no restart on restore; reset clears, motor stays off | why the output (not the input or the HMI) is ground truth, and what the interlock protects against |
+| A · Build | **2 Ladder** | `P2`: edited/example project compiles to IR, pairing holds | the predicted I/O behavior of the change, and the CWE-306 point the rung embodies |
+| B · Analyze | **3 Bus analysis** | `P3`: sample decodes to FC3 / register 25 | that a successful read establishes a value was *reported*, not that it is *trustworthy* or *current* |
+| B · Analyze | **4 HBOM** | `P4`: six internal I²C devices + 0x77 on the target | each live address reconciled to an HBOM line, and what a *missing* or *extra* address would imply |
+| B · Analyze | **5 SBOM** | `P5`: SPDX + CycloneDX both generate and differ | one chosen CVE's **reachability** — library-present vs. called-in-code — using the CWE bridge |
+| C · Break | **6 Unsigned OTA** | `P6`: OTA endpoint accepts an unsigned image | the exact integrity control that is missing (signature verification) and where a signer would sit |
+| C · Break | **7 Supply-chain** | `P7` *(twin)*: armed image changes the relay | why a binary diff **cannot** isolate the payload, and what attestation (reproducible build / SLSA / in-toto) would |
+| C · Break | **8 NTP / Y2038** | `P8`: benign sync clean; armed sync wraps to ~1902 | that unauthenticated time is attacker input, and why the **monotonic** audit clock is the right fix |
+| D · Secure | **9 Remediation** | `P9`: on the **secure** build, OTA→401, no wrap, overflow blocked | each attack mapped to the control that now stops it, **plus the residual limits** (e.g. HMAC key is a repo constant) |
 
 ## Extensions
 
@@ -71,7 +71,7 @@ is the CIE habit the two-target environment exists to teach: knowing the scope o
 # Twin (default): boot it, then verify in another shell
 ./qemu/run.sh                     # or ./qemu/run.sh secure   (for Part 9)
 python assessment/verify-lab.py              # all applicable parts
-python assessment/verify-lab.py P5           # one part
+python assessment/verify-lab.py P1           # one part
 
 # Physical StampLC over USB
 SERIAL_PORT=/dev/ttyACM0 OTA_HOST=<plc-ip>:80 HMI_HOST=<plc-ip>:8080 \

@@ -1,4 +1,4 @@
-# Part 6.5 — Firmware reverse-engineering (static analysis)
+# Part 5 (the firmware image) — Firmware reverse-engineering (static analysis)
 
 Read-only static analysis of the prebuilt teaching image
 `sbom/firmware/prebuilt/firmware.bin`. Nothing here flashes or runs the device —
@@ -33,5 +33,5 @@ bash firmware-re/analyze.sh
 ## MITRE
 Baked-in creds/keys → **CWE-798 / CWE-321**; recovering them from a shipped image maps
 to ATT&CK for ICS **T0877 (I/O Image)** / the firmware-analysis tradecraft behind
-**T0857 (System Firmware)**. The fix is Secure Boot + encrypted flash + per-device keys —
+**T1693.001 (Modify Firmware: System Firmware; formerly T0857)**. The fix is Secure Boot + encrypted flash + per-device keys —
 not "change the password," because the password is in the binary.

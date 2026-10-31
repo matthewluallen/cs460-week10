@@ -149,7 +149,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         echo "twin: RUNNING  pid $TWIN_PID  $TWIN_WHICH  ($TWIN_IMG)"
         echo "      emulator reports running; console socket $SOCK — nothing to boot."
         if pgrep -f "twin-bridge.py.*--serial $SOCK" >/dev/null 2>&1; then
-          echo "      Studio server is up (http://localhost:${BRIDGE_PORT:-8080}); text console: ./qemu/console.sh"
+          echo "      Studio server is up (http://localhost:${BRIDGE_PORT:-8088}); text console: ./qemu/console.sh"
         else
           echo "      no Studio server yet — ./qemu/studio.sh adds it without rebooting the twin"
         fi

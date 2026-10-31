@@ -80,7 +80,7 @@ xz -9 -k stamplc-flash-8MB.bin       # -> stamplc-flash-8MB.bin.xz (what qemu/fe
 
 Host checks that need no twin: `python3 scripts/generate_point_map.py --check`, the unit test
 in [`test/default_project_test.cpp`](test/default_project_test.cpp) (decodes the factory payload
-with the firmware's own decoder and runs the firmware's VM through the Part 5 sequence; build
+with the firmware's own decoder and runs the firmware's VM through the Part 1 sequence; build
 line at the top of the file), and `node tools/studio-regression.js`.
 
 ## Existing prebuilt images

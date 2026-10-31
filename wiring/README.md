@@ -1,6 +1,6 @@
-# Part 5 — Wire & run: one input → your logic → one output
+# Part 1 — Wire & run: one input → your logic → one output
 
-Your ladder logic (Part 4) drives one input → one output. **The canonical path is your own
+Your ladder logic (Part 2) drives one input → one output. **The canonical path is your own
 twin**: boot it, drive the input, and read the output back — no bench, no team code, the same
 `plc>` console and `io` readback you'd get over USB on real hardware. An instructor-run
 **Team Console** (a shared classroom bench) is an optional alternative, documented further down.
@@ -89,7 +89,7 @@ plc> unforce estop_ok      # never leave a safety input forced; on the twin IN3 
 `relay0 cmd/act 1/1` is your evidence — the logic **commanded** the coil on (`cmd=1`) and the
 device reports it **actually** on (`act=1`). Prefer that readback over "the light looks on." You
 can also drive it visually in **Logic Studio** (`./qemu/studio.sh`). The machine-checkable anchor
-is `python assessment/verify-lab.py P5`, which runs exactly this sequence (seal-in, stop, trip,
+is `python assessment/verify-lab.py P1`, which runs exactly this sequence (seal-in, stop, trip,
 no restart, reset, start again) and asserts the relays — the **same check passes on a physical
 StampLC**.
 
@@ -103,7 +103,7 @@ StampLC**.
 start released (IN1, IN2, IN4 = 0). If RUN began while IN3 still read 0, the fault lamp is lit:
 press Reset once.
 
-**Your own Part-4 program replaces it.** Loading a project writes it into your twin's flash, so it
+**Your own Part-2 program replaces it.** Loading a project writes it into your twin's flash, so it
 survives a reboot of that image. To get the factory program back, open *Example projects → Motor
 start/stop + E-stop* in the Logic Studio and Load it (or re-fetch the twin image).
 
@@ -122,7 +122,7 @@ own twin.
    YOU (remote)                          LAB BENCH (your team's StampLC)
    ┌───────────┐   team code    ┌──────────┐      ┌────────────────────────────────┐
    │  Front end │ ────────────▶ │  Gateway  │ ──▶  │  force IX0 ──▶ ladder logic     │  input
-   │ (Netlify) │                │ (Funnel)  │      │   (Part 4)        │             │
+   │ (Netlify) │                │ (Funnel)  │      │   (Part 2)        │             │
    │  • trigger │ ◀──────────── │           │ ◀──  │                   ▼             │
    │  • apply   │   readback     └──────────┘      │              relay0 ──▶ LED     │  output
    │  • output? │                                  └────────────────────────────────┘
@@ -150,17 +150,17 @@ own twin.
 [^atom]: **Not the same Atom you meet elsewhere.** The dropped idea was an AtomS3 wired to
     *inject the DI 0 input* for this part. It is **not** the Atom **sensor spoofer**
     (`bus-analysis/sensor-spoofer`, an AtomS3 Lite that impersonates an I²C sensor) you use in
-    Part 1. That spoofer sits **out‑of‑band** on the sensor bus and is a separate exercise;
-    here in Part 5 there is no Atom at all — the input is `force`d in software.
+    Part 3. That spoofer sits **out‑of‑band** on the sensor bus and is a separate exercise;
+    here in Part 1 there is no Atom at all — the input is `force`d in software.
 
 > **Relay names.** The board prints **RELAY 1–4**; the firmware calls them **relay0–relay3**.
 > Names like `motor` or `run_light` are *labels a PLC program gives a relay* (the factory program
-> uses those) — they aren't the relay's name. Part 4 drives **relay0** (RELAY 1).
+> uses those) — they aren't the relay's name. Part 2 drives **relay0** (RELAY 1).
 
 ### Run it
 
 1. Open the front end, enter your **team code**.
-2. **Apply** your program from Part 4.
+2. **Apply** your program from Part 2.
 3. **Trigger** the input (the button sends `force IX0`; in person, flip the switch) and watch
    **output** flip.
 4. **Read the output back over Modbus.** Don't rely on "the light looks on." In the Team
@@ -182,7 +182,7 @@ own twin.
    also shows `mode`, `scan`, and `forces`. Note: the **mock** console returns a fixed snapshot
    tagged `(MOCK)` and does **not** reflect your `force` — the live `cmd/act` above is the real
    device, reached once `DEVICE_ENDPOINTS` is wired.)
-5. Try your Part‑4 change (invert, or the AND gate) and confirm the readback changed to match.
+5. Try your Part‑2 change (invert, or the AND gate) and confirm the readback changed to match.
 
 ### Active learning
 
@@ -199,7 +199,7 @@ own twin.
 - **Pair check.** Tell a partner which line of `io` is your evidence and what `cmd` vs `act`
   each mean.
 
-<!-- SHOT: part 5 — Team Console after Trigger: Output·Relay 0 lit and the `io` readback showing RELAY cmd/act 1/1 -->
+<!-- SHOT: part 1 — Team Console after Trigger: Output·Relay 0 lit and the `io` readback showing RELAY cmd/act 1/1 -->
 
 > **Serving the console locally.** In class you get a hosted URL + team code. If you want to
 > run the front end yourself (dev/offline, mock mode), serve the browser tools with

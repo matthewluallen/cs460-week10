@@ -1,5 +1,5 @@
 // Circuit catalog check — no browser, no twin.   node tools/circuit-catalog-check.js
-// For every predesigned Part 5 circuit (web/public/circuits/catalog.js) it rebuilds the connectivity
+// For every predesigned Part 1 circuit (web/public/circuits/catalog.js) it rebuilds the connectivity
 // from the BENCH DRAWING (part studs, conductor strips, flying leads, controller/module terminals) and
 // fails if that differs from the circuit's declared netlist (which the schematic view is drawn from).
 // It also enforces the wiring rules of the visual spec:

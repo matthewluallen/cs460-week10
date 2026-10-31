@@ -24,7 +24,7 @@ By the end of Week 12 a student will be able to:
 
 | # | SWBAT (measurable) | Observable / anchor | Mapping |
 |---|---|---|---|
-| 1 | **Run** the verifier on the vulnerable build and **interpret** each counterexample as the exploit input it is | every control VIOLATED; student explains one counterexample (date/length/mode) | CWE per control · ATT&CK T0835/T0855/T0830 · CIE: an unproven control is no control |
+| 1 | **Run** the verifier on the vulnerable build and **interpret** each counterexample as the exploit input it is | every control VIOLATED; student explains one counterexample (date/length/mode) | CWE per control · ATT&CK T0835/T1692.001 (formerly T0855)/T0830 · CIE: an unproven control is no control |
 | 2 | **Explain** why the secure build proves five controls but leaves `attestation` violated | `secure` matrix; student states integrity ≠ origin | CWE-494 · ATT&CK T0862 · CIE: trust needs provenance |
 | 3 | **Show** that the verified (Level 3) build proves all six, and **state** what the provenance requirement adds | `verified` all PROVEN | SLSA/in-toto · ATT&CK M0947 · CIE |
 | 4 | **Analyze** one model against its firmware source and **identify** a model↔implementation fidelity gap | named divergence between `verify_controls.py` and `sbom/firmware/src/` | CIE: a proof is only as strong as its model |

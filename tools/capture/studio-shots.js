@@ -1,10 +1,10 @@
-// One command, one consistent screenshot set from the unified Studio (:8080) against the
+// One command, one consistent screenshot set from the unified Studio (:8088) against the
 // live twin. Run inside the Codespace:   node tools/capture/studio-shots.js
 // Captures: bus analyzer, ladder (live), circuit designer (live), protocol studio.
 const PW='/workspaces/cs460-week10/.capture/node_modules/playwright';
 const {chromium}=require(PW);
 const OUT='/workspaces/cs460-week10/docs/img/';
-const BASE='http://localhost:8080';
+const BASE='http://localhost:8088';
 
 async function shot(ctx, name, fn){
   const p=await ctx.newPage();

@@ -2,14 +2,18 @@
 cat <<'EOF'
 CS460 Week 10 — StampLC: SBOM/HBOM + Bus & Firmware Analysis
 
-  Part 1  bus-analysis/   decode a real Modbus RTU exchange              (no device)
-  Part 2  sbom/           bash sbom/run_sbom.sh                          (no device)
-  Part 3  hbom/           complete hbom/stamplc-hbom.csv                 (no device)
-  Part 4  ladder/         change one rung in ladder/passthrough.st       (no device)
-  Part 5  wiring/         drive YOUR twin from the Logic Studio  ./qemu/studio.sh (twin)
+  A · Build
+  Part 1  wiring/         drive YOUR twin from the Logic Studio  ./qemu/studio.sh (twin)
+  Part 2  ladder/         change one rung in ladder/passthrough.st       (no device)
+  B · Analyze
+  Part 3  bus-analysis/   decode a real Modbus RTU exchange              (no device)
+  Part 4  hbom/           complete hbom/stamplc-hbom.csv                 (no device)
+  Part 5  sbom/           bash sbom/run_sbom.sh                          (no device)
+  C · Break
   Part 6  firmware-ota/   boot the twin; find the unsigned-OTA bug       (twin)
   Part 7  supply-chain/   detonate a dormant OTA kill switch             (twin)
   Part 8  ntp-aitm/       spoof network time; wrap the clock to 1902     (twin)
+  D · Secure
   Part 9  remediation/    flip the secure build; watch the attacks fail  (twin)
 
 Helper scripts (Parts 6-9): short to type, annotated inside, and they print the

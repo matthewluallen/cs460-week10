@@ -1,11 +1,11 @@
 # Remote StampLC console (Netlify)
 
-> **Optional path.** The canonical Part 5 path is each student driving **their own twin**
+> **Optional path.** The canonical Part 1 path is each student driving **their own twin**
 > (`./qemu/run.sh` + the `plc>` console or Logic Studio — see [`wiring/`](../wiring/) and the
 > main [README](../README.md)). This team-gated remote console is an **optional** shared-bench
-> alternative for in-class use; it is not required to complete Part 5.
+> alternative for in-class use; it is not required to complete Part 1.
 
-A tiny team-gated front end for Part 5. Students enter a team code, apply a program,
+A tiny team-gated front end for Part 1. Students enter a team code, apply a program,
 toggle the input, and watch the output. The browser never touches a device directly —
 it calls a Netlify Function that checks the code and (when configured) forwards to that
 team's StampLC through the gateway.
@@ -66,7 +66,7 @@ Use `netlify dev` only when you need the **Function** — team-code gating and t
 Protocol Studio, Operator panel, Team Console) as static pages, you don't need Netlify:
 
 ```bash
-./tools/serve-web.sh   # serves web/public on :8000 (same tool Parts 1/4/5 use)
+./tools/serve-web.sh   # serves web/public on :8000 (same tool Parts 1/2/3 use)
 ```
 
 Served statically the Team Console page loads, but its `apply`/`trigger`/`status` calls hit

@@ -1,4 +1,4 @@
-/* SnapKit — original snap-together-block style SVG parts for the Part 5 "Wire & run" circuit views.
+/* SnapKit — original snap-together-block style SVG parts for the Part 1 "Wire & run" circuit views.
  *
  * ORIGINAL ARTWORK. A generic snap-block *style* (modules on a 40-unit base grid, snap studs, printed
  * IEC-style symbols). No product's branding, logos, part numbering, artwork or trade dress is copied.

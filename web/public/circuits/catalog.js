@@ -1,4 +1,4 @@
-/* CircuitCatalog — the Part 5 "Wire & run" predesigned circuits as DATA.
+/* CircuitCatalog — the Part 1 "Wire & run" predesigned circuits as DATA.
  *
  * Each circuit lists its parts (snap-kit modules placed on the 40-unit base grid), conductor strips,
  * flying leads (with hand-routed waypoints that follow the routing rules: perpendicular exits, nested-L
@@ -73,7 +73,7 @@ const CIRCUITS=[
     run:'Hold S1. Watch the path strip, then the console (io). Repeat with a forced input on a USB board and compare the hop tags.',
     reconcile:'Compare the read → write gap with the scan time. With force, which hops turned BYPASSED, and where did the force act?',
     mustNot:['that the button is electrically connected to the LED','that act = 1 proves the contact closed (it is the expander pin readback)','that a forced input exercised the input wiring'],
-    consequence:'2015 Ukraine distribution grid: breakers opened by commands sent through the operators’ own software. The controller obeys whatever reaches its command path (T0855, T0835).'}
+    consequence:'2015 Ukraine distribution grid: breakers opened by commands sent through the operators’ own software. The controller obeys whatever reaches its command path (T1692.001, T0835).'}
 },
 /* ------------------------------------------------------------------ b */
 {id:'b',key:'no-vs-nc',name:'NO vs NC · two LEDs',
@@ -118,7 +118,7 @@ const CIRCUITS=[
 /* ------------------------------------------------------------------ c */
 {id:'c',key:'motor-estop',name:'Motor start/stop + E-stop',
   title:'Motor start / stop + fail-safe E-stop',subtitle:'START IN1 · STOP IN2 · E-STOP IN3 (NC, ON = healthy) · RESET IN4 → RELAY 1 motor on its own 3 V pack',
-  project:{file:null,name:'your Part 5 motor latch',reads:['%IX0 START','%IX1 STOP','%IX2 E-STOP (1 = healthy)','%IX3 RESET'],writes:['%QX0 motor (RELAY 1)','%QX1 run light (RELAY 2)','%QX3 fault lamp (RELAY 4)'],
+  project:{file:null,name:'your Part 1 motor latch',reads:['%IX0 START','%IX1 STOP','%IX2 E-STOP (1 = healthy)','%IX3 RESET'],writes:['%QX0 motor (RELAY 1)','%QX1 run light (RELAY 2)','%QX3 fault lamp (RELAY 4)'],
     note:'Build it in Logic: seal-in on %QX0, permissives %IX1 and %IX2, a latched fault (%MX) on %IX2 = 0, reset on %IX3. ladder/latch_with_estop.st still trips on %IX2 = 1 (energise-to-trip); the fail-safe version trips on 0.'},
   ctl:CTL,used:{IN1:1,IN2:1,IN3:1,IN4:1,RELAY1:1,RELAY2:1,RELAY4:1},
   restDi:0x04,
@@ -178,10 +178,9 @@ const CIRCUITS=[
 /* ------------------------------------------------------------------ d */
 {id:'d',key:'light-alarm',name:'Light sensor → alarm',
   title:'Light sensor → alarm (analog CH1)',subtitle:'photoresistor divider → IO expansion CH1 → %IW0 (mV) → compare rung → RELAY 3 (relay2) → buzzer + LED',
-  project:{file:'io-expansion',name:'IO expansion level alarm',reads:['%IW0 = CH1 mV (process binding)'],writes:['%QX0 → set its output binding to Base relay 2 (RELAY 3)'],
-    note:'The example binds CH1 → %IW0 and compares > 1000 mV; its %QX0 drives the expansion relay. For this bench, point %QX0 at Base relay 2 (RELAY 3) in Project settings, and add a deadband (set > 3000 mV, clear < 2400 mV).'},
+  project:{file:'light-alarm',name:'Light sensor → alarm',reads:['%IW0 light_mv = CH1 mV (process binding)'],writes:['%QX2 light_alarm → RELAY 3 (relay2)'],
+    note:'Ready to load: CH1 → %IW0; the alarm sets above 3000 mV and holds until CH1 falls below 2400 mV (a deadband, so a hovering hand does not chatter the buzzer). Load it, RUN, then cover RP1.'},
   ctl:CTL,used:{RELAY3:1},expansion:{x:518,y:330,w:100,h:322,used:{'CH1.IN+':1,'CH1.ISO':1}},
-  analogPending:true,
   parts:[
     {id:'RP1',type:'ldr',at:[820,140],span:4,dir:'v',label:{x:776,y:200,t:'RP1  LIGHT',s:'photoresistor',s2:'≈1 kΩ bright · ≈10 kΩ room',anchor:'end'}},
     {id:'R3',type:'resistor',at:[820,300],span:2,value:'10 kΩ'},
@@ -209,7 +208,7 @@ const CIRCUITS=[
   path:{kind:'analog',sensor:'RP1',iw:0,relay:3,contact:'NO',load:'BZ1',loadName:'BZ1 + H1',ma:53,rung:'%IW0 > 3000 mV · < 2400 mV clears'},
   teach:{idea:'The analog signal chain (resistance → volts → I²C → mV → threshold) and alarm hygiene: a deadband stops chatter, an on-delay ignores a passing hand, a range check catches a broken wire.',
     predict:'Write down %IW0 in room light and covered. How many alarm transitions do you expect in 10 s of hovering near the threshold, with and without the deadband?',
-    run:'Physical board with the expansion fitted: cover, hover, uncover; then unplug the 10 kΩ lead. On the twin, use circuit e for now.',
+    run:'Physical board with the expansion fitted: cover, hover, uncover; then unplug the 10 kΩ lead. On the twin, the LIGHT ON RP1 buttons put the same divider voltages on CH1.',
     reconcile:'Count RELAY 3 transitions. What did the cut wire read as, and which rung caught it?',
     mustNot:['that mV equals lux (the divider is uncalibrated and nonlinear)','that a steady reading means a healthy sensor','that an alarm that never fires proves it is bright'],
     consequence:'US water treatment, 2021 (CISA AA21-042A): a chemical setpoint raised more than 100-fold over remote access. Thresholds and setpoints are attack targets (T0836, T0838).'}
@@ -244,7 +243,7 @@ const CIRCUITS=[
     run:'Scan the QR code on your phone, pick a sensor here (tilt works on every phone), then: real reading → spoof → Transmit OFF → back on.',
     reconcile:'List what the controller observed (a message on a topic, when it arrived) and what you inferred (that a phone measured it). Compare with circuit d.',
     mustNot:['that the value is a measurement (it is a claim)','that the QR session key authenticates the data','that “no alarm” means “safe” (it may mean “no data”)'],
-    consequence:'Stuxnet (discovered 2010): machines were driven while operators saw normal-looking values. Your spoof slider does the same to a PLC input; Transmit OFF is the denial-of-view version (T0856, T0832, T0815).'}
+    consequence:'Stuxnet (discovered 2010): machines were driven while operators saw normal-looking values. Your spoof slider does the same to a PLC input; Transmit OFF is the denial-of-view version (T1692.002, T0832, T0815).'}
 }
 ];
 

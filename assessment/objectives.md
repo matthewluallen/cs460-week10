@@ -42,42 +42,9 @@ By the end of Weeks 10–11, a student will be able to:
 
 ## Per-part objectives
 
-### Part 1 — Bus analysis `[offline]`
-**SWBAT** decode a recorded Modbus RTU exchange to its function code, address, and payload,
-and **state** what the exchange does and does not establish about the device's state.
-- **Observable:** the student's decode of the sample frame names FC3, register 25, and the
-  one-register read; the finding separates "a value was read" from "the value is trustworthy."
-- **Anchor:** `verify-lab.py P1` (runs `bus-analysis/decode.sh` on the committed sample and
-  confirms the FC/register decode) · student finding graded by rubric.
-- **Mapping:** ATT&CK **T0861** (Point & Tag Identification), **T0801** (Monitor Process State) · CIE: a read is not a write.
+**Section A · Build** — Parts 1–2
 
-### Part 2 — SBOM `[offline]`
-**SWBAT** generate an SPDX and a CycloneDX SBOM from the same source tree, **explain** why
-their component counts differ, and **classify** a scanner hit as library-present vs.
-reachable-in-code.
-- **Observable:** two SBOMs exist from one tree; the student states the count divergence and
-  picks one CVE to argue reachability for/against using the CWE bridge.
-- **Anchor:** `verify-lab.py P2` (confirms both formats generate and differ; SKIPs if
-  syft/grype absent) · reachability argument graded by rubric.
-- **Mapping:** ATT&CK **T0862** (Supply Chain Compromise, recon side) · CWE: library-vs-reachable · CIE: presence ≠ exploitability.
-
-### Part 3 — HBOM `[both]`
-**SWBAT** enumerate the StampLC's I²C devices and **reconcile** the live bus scan against the
-hardware bill of materials.
-- **Observable:** `i2cscan` reports the six internal devices (0x20, 0x32, 0x40, 0x43, 0x48,
-  0x59) plus the PORT.A device at 0x77, and each is matched to an HBOM line.
-- **Anchor:** `verify-lab.py P3` (asserts the six internal addresses + 0x77 on the running target).
-- **Mapping:** ATT&CK **T0888** (Remote System Information Discovery) · CIE: the parts list must match the bus.
-
-### Part 4 — Ladder logic `[offline]`
-**SWBAT** modify a prebuilt ladder program by enabling one rung (or adding one function) and
-**compile** it to device IR without error, **predicting** the resulting I/O behavior.
-- **Observable:** the edited project loads clean and compiles to IR; the ST↔ladder pairing holds.
-- **Anchor:** `verify-lab.py P4` (compiles the example projects via the Studio compiler and
-  checks IR + pairing; this is the `studio-regression` check) · prediction graded by rubric.
-- **Mapping:** ATT&CK **T0833** (Modify Control Logic) context · CWE-306 (missing auth on a critical function, taught in the rung) · CIE: logic is code and gets reviewed.
-
-### Part 5 — Wire & run (input → logic → output) `[both]`
+### Part 1 — Wire & run (input → logic → output) `[both]`
 **SWBAT** drive one input through the ladder to one output and **observe** the physical relay
 change, then **demonstrate** the fail-safe interlock of the factory motor program
 (`motor-start-stop-estop`: Start `start_pb` = IN1/di0, Stop `stop_pb` = IN2/di1, E-stop
@@ -93,9 +60,48 @@ RELAY 4/relay3).
   until something drives it to 1 — exactly what a real N.C. loop does with a cut wire. The
   check therefore holds `estop_ok` at 1 first (`force estop_ok 1`) and pulses `reset_pb`; a
   student's predesigned circuit must do the same (E-stop slide ON at start-up).
-- **Anchor:** `verify-lab.py P5` (forces the inputs by tag and polls `io` for the relay state
+- **Anchor:** `verify-lab.py P1` (forces the inputs by tag and polls `io` for the relay state
   on the running target — identical on hardware and twin — and releases every force at the end).
-- **Mapping:** ATT&CK **T0831** (Manipulation of Control), **T0855** (Unauthorized Command Message) · CIE: the output is the ground truth.
+- **Mapping:** ATT&CK **T0831** (Manipulation of Control), **T1692.001** (Unauthorized Message: Command Message; formerly T0855) · CIE: the output is the ground truth.
+
+### Part 2 — Ladder logic `[offline]`
+**SWBAT** modify a prebuilt ladder program by enabling one rung (or adding one function) and
+**compile** it to device IR without error, **predicting** the resulting I/O behavior.
+- **Observable:** the edited project loads clean and compiles to IR; the ST↔ladder pairing holds.
+- **Anchor:** `verify-lab.py P2` (compiles the example projects via the Studio compiler and
+  checks IR + pairing; this is the `studio-regression` check) · prediction graded by rubric.
+- **Mapping:** ATT&CK **T0889** (Modify Program) + **T0843** (Program Download) context (Modify Control Logic, formerly T0833, is deprecated in ATT&CK for ICS v19) · CWE-306 (missing auth on a critical function, taught in the rung) · CIE: logic is code and gets reviewed.
+
+**Section B · Analyze** — Parts 3–5
+
+### Part 3 — Bus analysis `[offline]`
+**SWBAT** decode a recorded Modbus RTU exchange to its function code, address, and payload,
+and **state** what the exchange does and does not establish about the device's state.
+- **Observable:** the student's decode of the sample frame names FC3, register 25, and the
+  one-register read; the finding separates "a value was read" from "the value is trustworthy."
+- **Anchor:** `verify-lab.py P3` (runs `bus-analysis/decode.sh` on the committed sample and
+  confirms the FC/register decode) · student finding graded by rubric.
+- **Mapping:** ATT&CK **T0861** (Point & Tag Identification), **T0801** (Monitor Process State) · CIE: a read is not a write.
+
+### Part 4 — HBOM `[both]`
+**SWBAT** enumerate the StampLC's I²C devices and **reconcile** the live bus scan against the
+hardware bill of materials.
+- **Observable:** `i2cscan` reports the six internal devices (0x20, 0x32, 0x40, 0x43, 0x48,
+  0x59) plus the PORT.A device at 0x77, and each is matched to an HBOM line.
+- **Anchor:** `verify-lab.py P4` (asserts the six internal addresses + 0x77 on the running target).
+- **Mapping:** ATT&CK **T0888** (Remote System Information Discovery) · CIE: the parts list must match the bus.
+
+### Part 5 — SBOM `[offline]`
+**SWBAT** generate an SPDX and a CycloneDX SBOM from the same source tree, **explain** why
+their component counts differ, and **classify** a scanner hit as library-present vs.
+reachable-in-code.
+- **Observable:** two SBOMs exist from one tree; the student states the count divergence and
+  picks one CVE to argue reachability for/against using the CWE bridge.
+- **Anchor:** `verify-lab.py P5` (confirms both formats generate and differ; SKIPs if
+  syft/grype absent) · reachability argument graded by rubric.
+- **Mapping:** ATT&CK **T0862** (Supply Chain Compromise, recon side) · CWE: library-vs-reachable · CIE: presence ≠ exploitability.
+
+**Section C · Break** — Parts 6–8
 
 ### Part 6 — Firmware & the unsigned update `[both]`
 **SWBAT** **prove** that the OTA endpoint accepts an unsigned/unauthenticated image and
@@ -104,7 +110,7 @@ RELAY 4/relay3).
   unsigned image; the student names signature verification as the absent control.
 - **Anchor:** `verify-lab.py P6` (confirms the OTA endpoint and the unsigned-accept path on
   the vulnerable build).
-- **Mapping:** ATT&CK **T0857** (System Firmware), **T0845** (Program Upload) · CWE-347 (Improper Verification of Cryptographic Signature) · CIE: an update path is a trust path.
+- **Mapping:** ATT&CK **T1693.001** (Modify Firmware: System Firmware; formerly T0857), **T0845** (Program Upload) · CWE-347 (Improper Verification of Cryptographic Signature) · CIE: an update path is a trust path.
 
 ### Part 7 — Supply-chain kill switch `[twin]`
 **SWBAT** **detonate** a dormant OTA payload through a compromised update source, **trace**
@@ -123,6 +129,8 @@ the 32-bit clock wrapping to 1902, and **prove** the audit log stayed on a monot
   the audit log timestamps remain monotonic (`millis()`), unaffected by the wall-clock wrap.
 - **Anchor:** `verify-lab.py P8` (benign sync shows no truncation, armed sync shows the wrap).
 - **Mapping:** ATT&CK **T0830** (Adversary-in-the-Middle), **T0837** (Loss of Protection) · CWE-190/191 + CWE-197 (signed-32-bit overflow / truncation) · CIE: unauthenticated time is attacker-controlled input.
+
+**Section D · Secure** — Part 9
 
 ### Part 9 — Remediation & compensating controls `[both]`
 **SWBAT** build the hardened (secure) profile and **verify** behaviorally that Parts 6–8 and
@@ -147,13 +155,13 @@ WRITE/FORCE log row — as the signature of an unaudited (memory-corruption) wri
 ### E2 — Signal Journey `[both]`
 **SWBAT** follow one byte across five lenses (Wireshark → sigrok/PulseView → firmware source
 → ladder → physical relay) and **explain** what each lens can and cannot show.
-- **Mapping:** ties Parts 1/4/5/7 together · CIE: one fact, many vantage points.
+- **Mapping:** ties Parts 1/2/3/7 together · CIE: one fact, many vantage points.
 
 ### E3 — Phone-as-sensor false-data injection `[both]`
 **SWBAT** mount an **availability** attack (withhold a sensor the PLC trusts) and an
 **integrity** attack (spoof its value), then **build a plausibility gate** and **prove** the
 legitimate reading still passes.
-- **Mapping:** ATT&CK **T0856** (Spoof Reporting Message), **T0814** (Denial of Service),
+- **Mapping:** ATT&CK **T1692.002** (Unauthorized Message: Reporting Message; formerly T0856 Spoof Reporting Message), **T0814** (Denial of Service),
   **T0815** (Denial of View); ATLAS **AML.T0043** · CIE: every sensor value is a claim, not a fact.
 
 ---

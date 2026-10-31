@@ -1,4 +1,4 @@
-# Part 4 — Ladder logic (the prebuilt block)
+# Part 2 — Ladder logic (the prebuilt block)
 
 A PLC runs a tiny program on a loop: read inputs → evaluate logic → write outputs. You
 won't write one from scratch. You start from a **complete, working program** and make
@@ -40,7 +40,7 @@ lamp := push_button AND enable_sw;  (* output only when BOTH are on *)
 
 ## How it gets onto the device
 
-You don't flash over USB. In **Part 5** you open the class **front end**, pick your
+You don't flash over USB. In **Part 1** you open the class **front end**, pick your
 program, and **Apply** — it loads onto your team's StampLC over the network. Then you
 toggle the input and watch the output. The editor shows the same program as ladder and
 as ST, so you can see the rung you changed either way.
@@ -65,14 +65,14 @@ Logic Studio now opens on a **command-center** layout with two live panels acros
   turns it on with `busstream on` once connected). Each relay/coil write shows up as a mark
   on the *writes* lane, and the panel's relay glance flips with it.
 
-That **Live signal** scope is the same bus you decoded in Part 1's
+That **Live signal** scope is the same bus you decoded in Part 3's
 [`i2c-analyzer.html`](../bus-analysis/i2c-analyzer.html): when a rung drives the output, you
-see the `0x59` AW9523 relay write cross the bus here. The ladder editor and the Part-1 bus
+see the `0x59` AW9523 relay write cross the bus here. The ladder editor and the Part-3 bus
 analyzer are **two views of one device** — the logic you author and the wire it moves.
-Authoring here is optional and offline; your change reaches your team's PLC in **Part 5**
+Authoring here is optional and offline; your change reaches your team's PLC in **Part 1**
 through the class front end, not over USB.
 
-<!-- SHOT: part 4 — Logic Studio command-center: Controller·panel LCD + Live-signal scope showing a coil write -->
+<!-- SHOT: part 2 — Logic Studio command-center: Controller·panel LCD + Live-signal scope showing a coil write -->
 
 ### Active learning
 
@@ -83,7 +83,7 @@ through the class front end, not over USB.
   inputs (watch the ladder coil energize and the **Live signal** scope mark the write).
 - **Reconcile.** Compare your predicted `COIL[0]` against what the live ladder shows and the
   `@BUS … W 0x59 AW9523 relay ON/OFF` event. This establishes your rung's truth table *on this
-  device's output image*; it does **not** prove the LED is physically wired (that's Part 5) or
+  device's output image*; it does **not** prove the LED is physically wired (that's Part 1) or
   that the coil write is authenticated (it isn't — `CWE-306`).
 - **Pair check.** Explain to a partner why `COIL[0]` is the value it is for one input combo.
 
