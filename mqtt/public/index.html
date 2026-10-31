@@ -49,8 +49,8 @@
  .sval.na{color:var(--dim)}
  .sval.spoof{color:var(--spoof);border-color:var(--spoof-brd);background:var(--spoof-bg)}
  .sval.off{color:var(--off-text);border-color:var(--off-brd);background:var(--off-bg)}
- .tp{font:11px ui-monospace,monospace;color:var(--dim)}
- .pill{font:10px ui-monospace,monospace;color:var(--dim);border:1px solid var(--brd);border-radius:999px;padding:2px 7px}
+ .tp{font:11.5px ui-monospace,monospace;color:var(--dim)}
+ .pill{font:11px ui-monospace,monospace;color:var(--dim);border:1px solid var(--brd);border-radius:999px;padding:2px 7px}
  .pill.wired{color:var(--wired);border-color:var(--wired-brd)}
  /* control bar: transmit on/off + override */
  .ctl{display:none;flex-direction:column;gap:10px;border-top:1px dashed var(--brd);padding-top:11px;margin-top:2px}
@@ -65,7 +65,7 @@
  input[type=range]{flex:1;min-width:120px;accent-color:var(--spoof)}
  input[type=number]{width:92px;background:var(--field);border:1px solid var(--brd);color:var(--fg);border-radius:8px;padding:7px 9px;font:13px ui-monospace,monospace}
  input[type=color]{width:46px;height:34px;padding:2px;border:1px solid var(--brd);border-radius:8px;background:var(--field);cursor:pointer}
- .ovhint{font:11px ui-monospace,monospace;color:var(--dim)}
+ .ovhint{font:11.5px ui-monospace,monospace;color:var(--dim)}
  .statechip{font:10px/1 ui-monospace,monospace;padding:3px 8px;border-radius:999px;border:1px solid var(--brd);color:var(--dim)}
  .statechip.live{color:var(--live);border-color:var(--on)}
  .statechip.spoof{color:var(--spoof);border-color:var(--spoof-brd)}
@@ -416,6 +416,10 @@ function wirePhoneIO(){
     const up  =e=>{ e.preventDefault(); b.className='ghost'; pub(topic,{v:0}); };
     b.addEventListener('pointerdown',down); b.addEventListener('pointerup',up);
     b.addEventListener('pointerleave',up); b.addEventListener('pointercancel',up);
+    // keyboard parity: Enter/Space hold the input while pressed, release on key-up (and on blur)
+    b.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&!e.repeat) down(e); });
+    b.addEventListener('keyup',  e=>{ if(e.key==='Enter'||e.key===' ') up(e); });
+    b.addEventListener('blur',   ()=>{ if(b.className==='on') up({preventDefault(){}}); });
   }
 }
 

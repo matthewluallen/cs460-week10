@@ -21,8 +21,10 @@
   a:hover{text-decoration:underline}
   .tabs{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
   .tab{cursor:pointer;border:1px solid var(--edge);background:#222c42;color:var(--ink);
-       border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600}
+       border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:600}
   .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .tab:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
   .card{background:var(--panel);border:1px solid var(--edge);border-radius:var(--radius);padding:16px;margin-bottom:14px}
   .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:0 0 14px}
   .legend span{display:inline-flex;align-items:center;gap:6px}
@@ -67,9 +69,9 @@
   the attack pattern (<b>CAPEC</b>), the ICS technique (<b>ATT&amp;CK for ICS</b>), how a red team emulates it (<b>CALDERA</b>),
   the defensive countermeasure (<b>D3FEND</b>), and — where an AI/ML surface exists — <b>ATLAS</b>.</p>
 
-  <div class="tabs">
-    <div class="tab active" data-view="matrix" id="tab-matrix">Matrix</div>
-    <div class="tab" data-view="stepper" id="tab-stepper">Step through an attack</div>
+  <div class="tabs" role="tablist" aria-label="Threat map view">
+    <button class="tab active" role="tab" aria-selected="true" data-view="matrix" id="tab-matrix">Matrix</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="stepper" id="tab-stepper">Step through an attack</button>
   </div>
 
   <section id="view-matrix">
@@ -303,12 +305,19 @@ function renderStepper(i){
   document.getElementById('atk-steps').innerHTML = steps +
     `<div class="step defense"><h3>Fix in the secure build</h3><p class="fixnote">${a.fix}</p></div>`;
 }
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  t.classList.add('active');
+const TABS=[...document.querySelectorAll('.tab')];
+function selectTab(t){
+  TABS.forEach(x=>{const on=x===t; x.classList.toggle('active',on); x.setAttribute('aria-selected',on?'true':'false');});
   const v=t.dataset.view;
   document.getElementById('view-matrix').style.display = v==='matrix'?'':'none';
   document.getElementById('view-stepper').style.display = v==='stepper'?'':'none';
+}
+TABS.forEach((t,i)=>{
+  t.onclick=()=>selectTab(t);
+  t.addEventListener('keydown',e=>{              // Left/Right move between tabs (ARIA tab pattern)
+    if(e.key==='ArrowRight'||e.key==='ArrowLeft'){ e.preventDefault();
+      const n=TABS[(i+(e.key==='ArrowRight'?1:TABS.length-1))%TABS.length]; n.focus(); selectTab(n); }
+  });
 });
 document.getElementById('atk').onchange = e=>renderStepper(+e.target.value);
 buildMatrix(); buildStepperOptions(); renderStepper(0);

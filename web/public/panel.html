@@ -140,6 +140,13 @@
     padding:1px 5px;border-radius:4px;font-size:11px}
   .kbd{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--dim)}
   .kbd b{color:var(--ink)}
+  /* screen-reader-only live mirror of the canvas LCD (the glass is pixels; this is text) */
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .btn:focus-visible,.chip:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion: reduce){
+    .btn,.lamp,.chip{transition:none !important}
+  }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -185,12 +192,18 @@
           <div class="face">
             <div class="lcol">
               <div class="screen-shell">
-                <canvas id="lcd" width="960" height="540" aria-label="StamPLC LCD"></canvas>
+                <canvas id="lcd" width="960" height="540" role="img"
+                        aria-label="StamPLC LCD — live state is announced in text below"></canvas>
               </div>
+              <!-- text mirror of the glass for screen readers; updated only when state changes -->
+              <div id="lcdtext" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
               <div class="btns">
-                <div class="btn" id="btnA" data-b="A"><div class="k">A</div><div class="fn" id="fnA">–</div><div class="hint">move · hold=prev</div></div>
-                <div class="btn" id="btnB" data-b="B"><div class="k">B</div><div class="fn" id="fnB">–</div><div class="hint">act · hold=force</div></div>
-                <div class="btn" id="btnC" data-b="C"><div class="k">C</div><div class="fn" id="fnC">–</div><div class="hint">back · hold=home</div></div>
+                <div class="btn" id="btnA" data-b="A" role="button" tabindex="0" aria-label="Button A">
+                  <div class="k">A</div><div class="fn" id="fnA">–</div><div class="hint">move · hold=prev</div></div>
+                <div class="btn" id="btnB" data-b="B" role="button" tabindex="0" aria-label="Button B">
+                  <div class="k">B</div><div class="fn" id="fnB">–</div><div class="hint">act · hold=force</div></div>
+                <div class="btn" id="btnC" data-b="C" role="button" tabindex="0" aria-label="Button C">
+                  <div class="k">C</div><div class="fn" id="fnC">–</div><div class="hint">back · hold=home</div></div>
               </div>
             </div>
             <div class="rcol">
@@ -220,10 +233,10 @@
       </div>
 
       <div class="chips">
-        <div class="chip" id="cAdd"><span class="d">module</span> + add IO-EXP #2 @0x23</div>
-        <div class="chip" id="cGrove"><span class="d">module</span> + add Grove ENV</div>
-        <div class="chip danger" id="cAttack"><span class="d">red team</span> ⚡ Modbus writes HR0=PROGRAM</div>
-        <div class="chip" id="cReboot"><span class="d">device</span> ⟳ reboot</div>
+        <div class="chip" id="cAdd" role="button" tabindex="0"><span class="d">module</span> + add IO-EXP #2 @0x23</div>
+        <div class="chip" id="cGrove" role="button" tabindex="0"><span class="d">module</span> + add Grove ENV</div>
+        <div class="chip danger" id="cAttack" role="button" tabindex="0"><span class="d">red team</span> ⚡ Modbus writes HR0=PROGRAM</div>
+        <div class="chip" id="cReboot" role="button" tabindex="0"><span class="d">device</span> ⟳ reboot</div>
       </div>
     </div>
 
@@ -663,6 +676,48 @@ function drawLog(){
   document.getElementById('nowB').textContent='Every write, attributed to PANEL or a NET source IP. After the contested-register drill this is where the class reconstructs exactly how an operator lost control without anyone touching the plant.';
 }
 
+/* ---------- accessible text mirror of the glass ---------- */
+let lastDesc='';
+function valText(e){ return e.kind==='AIN'?((e.value/10).toFixed(1)+' volts')
+  : e.kind==='PWM'?(e.value+' percent') : e.kind==='SENSOR'?((e.value/10).toFixed(1))
+  : (e.value?'on':'off'); }
+function describe(){
+  const fc=forcedCount(); const auth=dev.authority;
+  const authNote = auth==='LOCAL'?'':(', authority '+auth);
+  switch(ui.scr){
+    case SCR.BOOT: return 'Booting: power-on self-test. Press C to skip.';
+    case SCR.HOME: return `Home. Mode ${dev.modeNames[dev.mode]}${authNote}. `
+      + `${fc} point${fc===1?'':'s'} forced. Focus: ${['Mode','I/O summary','Forces'][ui.cursor]||'Mode'}. `
+      + `A moves focus, B enters, long-B opens the event log.`;
+    case SCR.IO: { const e=curBoard().els[ui.cursor];
+      return `I/O browser, ${curBoard().name}. Focus ${e.id} = ${valText(e)}${e.forced?', forced':''}. `
+        + `A moves, B opens the element, long-B forces it.`; }
+    case SCR.ELEM: { const e=curBoard().els[ui.cursor];
+      return `Element ${e.id}, ${valText(e)}${e.forced?', forced by '+e.forceSrc:''}${e.mb?', Modbus '+e.mb:''}. `
+        + `${e.writable?'B toggles it.':'Read-only.'}`; }
+    case SCR.MODE: { const tgt=ui.pend?ui.pend.val:dev.mode;
+      return `Mode select. Current ${dev.modeNames[dev.mode]}, target ${dev.modeNames[tgt]}.`
+        + (ui.pend?' Hold C to commit, C to cancel.':' A changes the target.')
+        + (dev.modeSrc==='NET'?' Contested: last write came from the network.':''); }
+    case SCR.FORCE: { const e=curBoard().els[ui.cursor]; const opts=['force on','force off','remove force'];
+      return `Force ${e.id}. Option: ${opts[ui.pend?ui.pend.val:0]}. A changes it, hold C to commit.`; }
+    case SCR.FORCES: return fc?`Active forces: ${fc}. A removes all.`:'Active forces: none.';
+    case SCR.COMMS: return 'Comms and identity screen. C goes back.';
+    case SCR.LOG: { const L=dev.log[0];
+      return 'Event log. '+(L?`Last write ${L.src} ${L.reg} ${L.from} to ${L.to}.`:'No writes yet.'); }
+  }
+  return '';
+}
+function announce(){
+  const d=describe();
+  if(d===lastDesc) return;
+  lastDesc=d;
+  const lt=document.getElementById('lcdtext'); if(lt) lt.textContent=d;
+  ['A','B','C'].forEach(k=>{ const fn=document.getElementById('fn'+k).textContent;
+    const btn=document.getElementById('btn'+k);
+    if(btn) btn.setAttribute('aria-label','Button '+k+(fn&&fn!=='–'&&fn!=='—'?': '+fn:'')); });
+}
+
 /* ---------- main loop ---------- */
 function frame(now){
   requestAnimationFrame(frame);
@@ -677,6 +732,7 @@ function frame(now){
     case SCR.ELEM:drawElem();break; case SCR.MODE:drawMode();break; case SCR.FORCE:drawForce();break;
     case SCR.FORCES:drawForces();break; case SCR.COMMS:drawComms();break; case SCR.LOG:drawLog();break; }
   g.restore();
+  announce();
   // flash toast
   if(ui.flash && now-ui.flashT<1400){
     g.fillStyle=C.accent; rr(W/2-66,H-34,132,16,4); g.fill();
@@ -693,7 +749,12 @@ function bind(id,b){const el=document.getElementById(id);
   el.addEventListener('mouseup',e=>{e.preventDefault();release(b);});
   el.addEventListener('mouseleave',e=>{if(held[b])release(b);});
   el.addEventListener('touchstart',e=>{e.preventDefault();press(b);},{passive:false});
-  el.addEventListener('touchend',e=>{e.preventDefault();release(b);},{passive:false});}
+  el.addEventListener('touchend',e=>{e.preventDefault();release(b);},{passive:false});
+  // keyboard: Enter/Space on a focused button = press while held, release on key-up
+  // (so hold-to-long-press works from the keyboard too, matching the A/S/D keys).
+  el.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!e.repeat){e.preventDefault();press(b);}});
+  el.addEventListener('keyup',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();release(b);}});
+  el.addEventListener('blur',()=>{if(held[b])release(b);});}
 bind('btnA','A');bind('btnB','B');bind('btnC','C');
 const KEYMAP={a:'A',s:'B',d:'C'};
 addEventListener('keydown',e=>{const b=KEYMAP[e.key.toLowerCase()];if(b&&!e.repeat){e.preventDefault();press(b);}});
@@ -711,6 +772,10 @@ document.getElementById('cAttack').addEventListener('click',attack);
 document.getElementById('cReboot').addEventListener('click',function(){
   dev=freshDevice(); ui=freshUi(); dev._blip=false; setLed('#2a323d','—',false);
   document.getElementById('cAdd').removeAttribute('disabled'); document.getElementById('cGrove').removeAttribute('disabled');});
+
+// chips are role=button: activate on Enter/Space like a real button
+document.querySelectorAll('.chip').forEach(ch=>ch.addEventListener('keydown',e=>{
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); if(!ch.hasAttribute('disabled')) ch.click(); }}));
 
 /* boot */
 dev=freshDevice(); ui=freshUi(); setLed('#2a323d','—',false);
