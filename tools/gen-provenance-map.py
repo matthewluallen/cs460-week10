@@ -20,7 +20,8 @@ import json, os, re, sys, subprocess, datetime
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC  = os.path.join(ROOT, "sbom", "firmware", "src")
-OUT  = os.path.join(ROOT, "web", "public", "firmware-provenance-map.json")
+OUT  = os.path.join(ROOT, "web", "public", "firmware-provenance-map.json")   # committed, source-tree map
+MAPS_DIR = os.path.join(ROOT, "web", "public", "provenance-maps")          # per-build maps (git-ignored)
 
 # WriteSource enum (plc_core.h) -> label shown in the Studio provenance lane.
 SRC_LABEL = {
@@ -144,6 +145,21 @@ def find_tool(name_glob, explicit):
         if hits: return hits[0]
     return None
 
+def _portable(path):
+    """Repo-relative path if inside the repo, else just the file name — never a home/build-host path."""
+    ap_ = os.path.abspath(path)
+    return os.path.relpath(ap_, ROOT) if ap_.startswith(ROOT + os.sep) else os.path.basename(ap_)
+
+
+def _sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
 def enrich_from_elf(rows, elf, objdump=None, addr2line=None):
     """Derive {func, addr} for each row's (file,line) from the ELF's DWARF.
 
@@ -156,7 +172,8 @@ def enrich_from_elf(rows, elf, objdump=None, addr2line=None):
     a2l = find_tool("addr2line", addr2line)
     if not (elf and os.path.exists(elf) and od and a2l):
         return {"enriched": False, "reason": "elf or xtensa toolchain not found",
-                "objdump": od, "addr2line": a2l, "elf": elf}
+                "objdump": od and os.path.basename(od), "addr2line": a2l and os.path.basename(a2l),
+                "elf": elf and _portable(elf)}
     # 1) build (basename,line) -> min address from the DWARF line table
     out = subprocess.run([od, "--dwarf=decodedline", elf],
                          capture_output=True, text=True, errors="replace").stdout
@@ -205,8 +222,8 @@ def enrich_from_elf(rows, elf, objdump=None, addr2line=None):
         row["func"] = func_of(addr)
         row["addr_exact"] = exact
         n_exact += exact; n_near += (not exact)
-    return {"enriched": True, "elf": os.path.abspath(elf),
-            "objdump": od, "addr2line": a2l,
+    return {"enriched": True, "elf": _portable(elf),
+            "objdump": os.path.basename(od), "addr2line": os.path.basename(a2l),
             "resolved_exact": n_exact, "resolved_nearest": n_near, "unresolved": n_miss,
             "build_note": "func+addr re-derived from this ELF's DWARF; rebuild the firmware "
                           "and re-run with --elf to keep them true."}
@@ -250,10 +267,17 @@ def main():
     import argparse
     ap = argparse.ArgumentParser(add_help=False)
     ap.add_argument("--elf"); ap.add_argument("--objdump"); ap.add_argument("--addr2line")
+    ap.add_argument("--out", help="write exactly here (e.g. the committed web/public/firmware-provenance-map.json)")
+    ap.add_argument("--profile", help="build env / profile name recorded in meta (m5stamplc, m5stamplc_secure, ...)")
     args, _ = ap.parse_known_args()
     elf_meta = None
+    elf_sha = None
     if args.elf:
         elf_meta = enrich_from_elf(rows, args.elf, args.objdump, args.addr2line)
+        if os.path.isfile(args.elf):
+            # == esp_app_desc_t.app_elf_sha256 in the image built from this ELF (esptool elf2image
+            # --elf-sha256-offset), which is what /twin/identity and `plc> diag json` report.
+            elf_sha = _sha256(args.elf)
 
     meta = {
         "generated_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00","Z"),
@@ -265,11 +289,34 @@ def main():
                 "An output change with no matching WRITE/FORCE row is the provenance "
                 "gap that reveals an unaudited (memory-corruption) write.",
         "count": len(rows),
+        "elf_sha256": elf_sha,
+        "profile": args.profile,
+        "selection": "Provenance Studio uses the map whose elf_sha256 equals the running twin's app ELF "
+                     "SHA-256 (GET /twin/identity); otherwise it falls back to the committed source-tree "
+                     "map and says so.",
     }
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as f:
+    # Where to write. A firmware build (post-script, --elf) never overwrites the committed map that
+    # matches the twin students normally run: it writes provenance-maps/<elf_sha256>.json + index.
+    if args.out:
+        out = args.out
+    elif elf_sha:
+        out = os.path.join(MAPS_DIR, elf_sha + ".json")
+    else:
+        out = OUT
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    with open(out, "w") as f:
         json.dump({"meta": meta, "events": rows}, f, indent=1)
-    print(f"wrote {OUT}  ({len(rows)} event sites)")
+    print(f"wrote {_portable(out)}  ({len(rows)} event sites)")
+    if elf_sha and not args.out:
+        idx_path = os.path.join(MAPS_DIR, "index.json")
+        try:
+            idx = json.load(open(idx_path))
+        except (OSError, ValueError):
+            idx = {}
+        idx[elf_sha] = {"file": elf_sha + ".json", "profile": args.profile,
+                        "generated_utc": meta["generated_utc"], "elf": elf_meta.get("elf") if elf_meta else None}
+        with open(idx_path, "w") as f:
+            json.dump(idx, f, indent=1)
     # quick category census for sanity
     from collections import Counter
     c = Counter(r["category"] for r in rows)

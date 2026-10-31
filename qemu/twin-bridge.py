@@ -54,9 +54,19 @@ Security model (this server can move a process, so it is locked to its own page)
   * no Access-Control-Allow-Origin: other sites cannot read process values through it either;
   * /field exposes exactly two QMP properties of the twin's AW9523 expander (`di` read/write,
     `relays` read) — never raw QMP, which could reset, pause or reconfigure the emulator.
+  * POST /bus/capture?seconds=N (1-10) records the student's OWN running twin's I2C bus: it sends a
+    fixed sequence of QMP commands — `logfile <fixed path>`, `trace-event-set-state` for the
+    whitelisted I2C observe event only, then (after N s) the same event off and `logfile /dev/null`
+    — and converts the trace with bus-analysis/tools/trace_to_sigrok.py. No query parameter
+    reaches QMP except the clamped duration; tracing is always switched off again (finally:).
+    GET /bus/files/<name> downloads results (strict name pattern); GET /bus/captures lists them.
+  * GET /fw/api/log and GET /fw/api/points are a read-only proxy to the firmware's own HTTP HMI
+    (the twin's W5500, guest port 8080) — exactly those two paths, GET only, no query passthrough.
+  * GET /twin/identity reads the running twin's flash image (partition table, otadata, app
+    descriptor): profile, boot slot, ESP-IDF version, app ELF SHA-256. Read-only.
   Clients without an Origin header (curl, scripts, the console) are not browsers and are allowed.
 """
-import argparse, base64, hashlib, mimetypes, os, posixpath, socket, struct, sys, threading, time
+import argparse, base64, hashlib, mimetypes, os, posixpath, re, socket, struct, sys, threading, time
 import urllib.parse
 import json as _json_mod
 
@@ -488,6 +498,8 @@ def _serve_field(conn, method, path):
             _qmp([("qom-set", {"path": _FIELD_PATH, "property": "di", "value": di})])
         di, relays = _qmp([("qom-get", {"path": _FIELD_PATH, "property": "di"}),
                            ("qom-get", {"path": _FIELD_PATH, "property": "relays"})])
+        if method == "POST":
+            _bus_note_field(di)                    # an open bus capture draws it as IN1..IN4
         result = {"ok": True, "di": di, "relays": relays,
                   "path": "QMP qom-get/qom-set %s (twin only; a physical board has no QMP)" % _FIELD_PATH}
     except FileNotFoundError:
@@ -497,6 +509,431 @@ def _serve_field(conn, method, path):
     body = _json.dumps(result).encode()
     conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n"
                  b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body)
+
+
+def _send_json(conn, result, code=200):
+    body = _json.dumps(result).encode()
+    reason = {200: b"OK", 400: b"Bad Request", 404: b"Not Found", 409: b"Conflict",
+              502: b"Bad Gateway", 503: b"Service Unavailable"}.get(code, b"OK")
+    conn.sendall(b"HTTP/1.1 %d %s\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n"
+                 b"Content-Length: %d\r\nConnection: close\r\n\r\n" % (code, reason, len(body)) + body)
+
+
+# ───────────────────────── the running twin: process, image, identity ─────────────────────────
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import fw_identity as _fwid
+except Exception:                                   # keep the Studio serving even if this is missing
+    _fwid = None
+
+
+def _twin_process():
+    """The qemu process serving this bridge's QMP socket: {pid, image, exe, env}. None if absent."""
+    want = "unix:%s,server" % QMP_SOCK
+    try:
+        pids = [p for p in os.listdir("/proc") if p.isdigit()]
+    except OSError:
+        return None
+    for pid in pids:
+        try:
+            with open("/proc/%s/cmdline" % pid, "rb") as f:
+                args = f.read().split(b"\0")
+        except OSError:
+            continue
+        a = [x.decode("utf-8", "replace") for x in args if x]
+        if not a or "qemu-system-xtensa" not in a[0] or want not in " ".join(a):
+            continue
+        img = None
+        for i, x in enumerate(a[:-1]):
+            if x == "-drive" and "if=mtd" in a[i + 1]:
+                for part in a[i + 1].split(","):
+                    if part.startswith("file="):
+                        img = part[5:]
+        env = {}
+        try:
+            with open("/proc/%s/environ" % pid, "rb") as f:
+                for kv in f.read().split(b"\0"):
+                    if b"=" in kv:
+                        k, v = kv.split(b"=", 1)
+                        if k.endswith(b"_W5_BIND"):
+                            env[k.decode()] = v.decode("utf-8", "replace")
+        except OSError:
+            pass
+        exe = None
+        try:
+            exe = os.readlink("/proc/%s/exe" % pid)
+        except OSError:
+            exe = a[0]
+        return {"pid": int(pid), "image": img, "exe": exe, "env": env}
+    return None
+
+
+_sha_cache = {}
+def _sha256_cached(path):
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = (path, st.st_size, st.st_mtime)
+    if key not in _sha_cache:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for b in iter(lambda: f.read(1 << 20), b""):
+                h.update(b)
+        _sha_cache[key] = h.hexdigest()
+    return _sha_cache[key]
+
+
+def _twin_identity(with_hash=False):
+    tw = _twin_process()
+    if not tw:
+        return {"ok": False, "error": "no running twin on QMP socket %s (start it: ./qemu/studio.sh)" % QMP_SOCK}
+    out = {"ok": True, "pid": tw["pid"], "w5_bind": next(iter(tw["env"].values()), None)}
+    if tw["image"] and _fwid and os.path.isfile(tw["image"]):
+        info = _fwid.identify(tw["image"], with_hash=with_hash)
+        info["image"] = os.path.relpath(info["image"], REPO_ROOT) if info["image"].startswith(REPO_ROOT + os.sep) else info["image_name"]
+        out.update(info)
+    else:
+        out["image"] = tw["image"]
+        out["warning"] = "could not read the twin's flash image"
+    if with_hash and tw["exe"]:
+        out["qemu_sha256"] = _sha256_cached(tw["exe"])
+    return out
+
+
+# ───────────────────────── read-only proxy to the firmware's HTTP HMI ─────────────────────────
+FW_HTTP = os.environ.get("FW_HTTP", "")              # host:port; default derived from the twin
+FW_HMI_PORT = 8080                                   # WEB_HMI_PORT in sbom/firmware/src/config.h
+FW_PROXY_PATHS = ("/fw/api/log", "/fw/api/points")
+_BRIDGE_ADDR = {"bind": "127.0.0.1", "port": 8080}
+
+
+def _fw_target():
+    if FW_HTTP:
+        return FW_HTTP, "FW_HTTP"
+    tw = _twin_process()
+    bind = (next(iter(tw["env"].values()), "") if tw else "") or "127.0.0.1"
+    if bind in ("0.0.0.0", "any"):
+        bind = "127.0.0.1"
+    if bind in ("lo", "loopback"):
+        bind = "127.0.0.1"
+    return "%s:%d" % (bind, FW_HMI_PORT), "twin W5500 bind"
+
+
+def _shadowed(target):
+    host, port = target.rsplit(":", 1)
+    if int(port) != _BRIDGE_ADDR["port"]:
+        return False
+    b = _BRIDGE_ADDR["bind"]
+    return b in ("0.0.0.0", "", host) or (b.startswith("127.") and host.startswith("127.") and b == host)
+
+
+def _serve_fw_proxy(conn, path):
+    target, why = _fw_target()
+    sub = path.split("?", 1)[0][3:]                  # /fw/api/log -> /api/log (no query passthrough)
+    if _shadowed(target):
+        return _send_json(conn, {
+            "ok": False, "shadowed": True, "target": target,
+            "error": "the firmware's HTTP HMI (guest port %d) binds %s, which this Studio server already "
+                     "holds, so the firmware page is not reachable from the host" % (FW_HMI_PORT, target),
+            "fallback": "read the same audit log over the console: plc> log (Provenance Studio does this "
+                        "automatically through the Studio's /ws console)",
+            "fix": "run the Studio on another port so the firmware keeps 8080: "
+                   "./qemu/twin-status.sh stop; BRIDGE_PORT=8088 ./qemu/studio.sh"}, 503)
+    host, port = target.rsplit(":", 1)
+    try:
+        s = socket.create_connection((host, int(port)), timeout=4)
+        s.settimeout(4)
+        s.sendall(("GET %s HTTP/1.0\r\nHost: %s\r\nX-Studio-Proxy: 1\r\nConnection: close\r\n\r\n"
+                   % (sub, target)).encode())
+        data = b""
+        while len(data) < 2 * 1024 * 1024:
+            c = s.recv(65536)
+            if not c:
+                break
+            data += c
+        s.close()
+        head, _, body = data.partition(b"\r\n\r\n")
+        status = head.split(b"\r\n", 1)[0].decode("latin1", "replace")
+        parts = status.split(" ")
+        if len(parts) < 2 or parts[1] != "200":
+            return _send_json(conn, {"ok": False, "target": target, "error": "firmware answered: " + status}, 502)
+        conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\n"
+                     b"X-Source: firmware HTTP " + target.encode() + b"\r\n"
+                     b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body)
+    except OSError as e:
+        _send_json(conn, {"ok": False, "target": target, "via": why,
+                          "error": "firmware HTTP not reachable at %s (%s) - is the twin up and its HTTP "
+                                   "service on?  plc> proto" % (target, e)}, 502)
+
+
+# ───────────────────────── live I2C capture of the running twin ─────────────────────────
+OBS_EVENT = "esp32_i2c_observe"                      # released twin (qemu-twin-v1)
+GENERIC_EVENTS = ("i2c_event", "i2c_send", "i2c_recv")   # fallback for other builds
+BUS_OUT_DIR = os.environ.get("BUS_OUT_DIR", os.path.join(REPO_ROOT, "bus-analysis", "out"))
+BUS_TRACE_FILE = os.environ.get("BUS_TRACE_FILE", "/tmp/plc-bustap-%d.log" % os.getuid())
+BUS_MAX_SECONDS = 10
+BUS_MAX_TRACE = 256 * 1024 * 1024
+STUDIO_MAX_EVENTS = 50000
+STUDIO_EVENTS = {"reset", "fsm_reset", "address", "write", "read", "stop", "rstart_command", "end_command",
+                 "ack_mismatch_stop", "tx_wait", "rx_wait", "invalid_write_count", "invalid_opcode"}
+_FILE_RE = re.compile(r"^bus-\d{8}-\d{6}-i2c[01]\.(vcd|sr|json|studio\.json|decode\.txt|"
+                                    r"manifest\.json|trace\.log\.gz)$")
+_bus_lock = threading.Lock()
+_bus_tap = {"active": False, "writes": []}
+
+
+def _bus_note_field(di):
+    if _bus_tap["active"]:
+        _bus_tap["writes"].append({"t": time.time(), "di": int(di)})
+
+
+def _hmp(cmd):
+    """One FIXED human-monitor command (only the two logfile forms below are ever sent)."""
+    r = _qmp([("human-monitor-command", {"command-line": cmd})])[0]
+    if isinstance(r, str) and r.strip():
+        raise RuntimeError("monitor: " + r.strip())
+
+
+def _load_converter():
+    import importlib.util
+    p = os.path.join(REPO_ROOT, "bus-analysis", "tools", "trace_to_sigrok.py")
+    spec = importlib.util.spec_from_file_location("trace_to_sigrok", p)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def _sigrok_summary(src, out_txt):
+    import shutil as _sh, subprocess as _sp
+    _re = re
+    if not _sh.which("sigrok-cli"):
+        return {"ok": False, "error": "sigrok-cli not installed (sudo apt-get install sigrok-cli)"}
+    r = _sp.run(["sigrok-cli", "-i", src, "-P", "i2c:scl=SCL:sda=SDA",
+                 "-A", "i2c=start:repeat-start:stop:address-read:address-write:data-read:data-write",
+                 "--protocol-decoder-samplenum"], capture_output=True, text=True, timeout=180)
+    with open(out_txt, "w") as f:
+        f.write(r.stdout)
+    addrs, changes, last = {}, [], None
+    state = []                                            # tokens of the current frame
+    for line in r.stdout.splitlines():
+        m = _re.match(r"^(\d+)-(\d+) i2c-\d+: (.*)$", line)
+        if not m:
+            continue
+        s0, ann = int(m.group(1)), m.group(3)
+        if ann in ("Start", "Start repeat"):
+            state = [s0]
+        elif ann.startswith("Address "):
+            k = ann.replace("Address ", "")
+            addrs[k] = addrs.get(k, 0) + 1
+            state.append(k)
+        elif ann.startswith("Data write: ") and state:
+            state.append(ann[12:])
+            if len(state) >= 4 and state[1] == "write: 59" and state[2].upper() == "02" and len(state) == 4:
+                v = state[3].upper()
+                if v != last:
+                    changes.append({"t_s": round(state[0] / 4e6, 6), "value": "0x" + v.lower()})
+                    last = v
+    return {"ok": r.returncode == 0, "decoder": "sigrok-cli i2c", "addresses": addrs,
+            "relay_write_changes_0x59_reg02": changes, "file": os.path.basename(out_txt),
+            "time_base": "sample number / 4 MHz (drawn timeline)"}
+
+
+def _studio_bundle(obs_lines, identity, session, t_start, t_end):
+    _re = re
+    trace, mapping, n, cut = [], {}, 0, False
+    for ln in obs_lines:
+        body = ln.split(":", 1)[1] if _re.match(r"^\d+@\d+\.\d+:", ln) else ln
+        m = _re.search(r"controller=(0x[0-9a-f]+) path=(\S+) .* event=(\S+) ", body)
+        if not m:
+            continue
+        if m.group(3) not in STUDIO_EVENTS:
+            return None, "event %r is outside the Studio importer's vocabulary" % m.group(3)
+        if n >= STUDIO_MAX_EVENTS:
+            cut = True
+            break
+        mapping[m.group(1)] = m.group(2)
+        trace.append(body)
+        n += 1
+    if not trace:
+        return None, "no observe events"
+    text = "\n".join(trace) + "\n"
+    if len(text.encode()) > 16 * 1024 * 1024:
+        return None, "trace larger than the Studio's 16 MiB import limit"
+    manifest = {"schema": "qemu-i2c-observation-capture/v1", "source_kind": "qemu-peripheral-transactions",
+                "machine": "esp32s3", "session": session, "records": n,
+                "identity": identity, "files": {"trace.log": hashlib.sha256(text.encode()).hexdigest()},
+                "controller_mapping": mapping, "captured_wall": [t_start, t_end],
+                "origin": "live capture of the student's running twin via the Studio server (/bus/capture)",
+                "truncated_to_first_events": STUDIO_MAX_EVENTS if cut else None}
+    return {"schema": "studio-qemu-bus/v1", "manifest": manifest, "trace": text}, ("first %d events only" % n if cut else None)
+
+
+def _bus_capture(qs):
+    import gzip, uuid
+    try:
+        secs = max(1, min(BUS_MAX_SECONDS, int(qs.get("seconds", ["6"])[0])))
+    except ValueError:
+        return {"ok": False, "error": "seconds must be an integer 1-%d" % BUS_MAX_SECONDS}, 400
+    bus = qs.get("bus", ["i2c0"])[0]
+    if bus not in ("i2c0", "i2c1"):
+        return {"ok": False, "error": "bus must be i2c0 (relays/DI/sensors) or i2c1 (Grove)"}, 400
+    if not os.path.exists(QMP_SOCK):
+        return {"ok": False, "error": "no QMP socket at %s - start the twin with ./qemu/studio.sh" % QMP_SOCK}, 503
+    if not _bus_lock.acquire(blocking=False):
+        return {"ok": False, "error": "a bus capture is already running - wait for it to finish"}, 409
+    try:
+        try:
+            _qmp([("trace-event-get-state", {"name": OBS_EVENT})])
+            names, fmt = [OBS_EVENT], "observe"
+        except RuntimeError:
+            names, fmt = [], "generic"
+            for n in GENERIC_EVENTS:
+                try:
+                    _qmp([("trace-event-get-state", {"name": n})]); names.append(n)
+                except RuntimeError:
+                    pass
+            if not names:
+                return {"ok": False, "error": "this twin build has no I2C trace events"}, 503
+        di0, rel0 = _qmp([("qom-get", {"path": _FIELD_PATH, "property": "di"}),
+                          ("qom-get", {"path": _FIELD_PATH, "property": "relays"})])
+        try:
+            os.unlink(BUS_TRACE_FILE)
+        except FileNotFoundError:
+            pass
+        _hmp("logfile " + BUS_TRACE_FILE)
+        t_start = time.time()
+        _bus_tap.update(active=True, writes=[], di_start=di0)
+        off_error = None
+        try:
+            _qmp([("trace-event-set-state", {"name": n, "enable": True}) for n in names])
+            time.sleep(secs)
+        finally:
+            _bus_tap["active"] = False
+            for attempt in range(3):              # tracing must never stay on
+                try:
+                    _qmp([("trace-event-set-state", {"name": n, "enable": False}) for n in names])
+                    _hmp("logfile /dev/null")
+                    off_error = None
+                    break
+                except Exception as e:            # noqa: BLE001
+                    off_error = str(e); time.sleep(0.3)
+        t_end = time.time()
+        di1, rel1 = _qmp([("qom-get", {"path": _FIELD_PATH, "property": "di"}),
+                          ("qom-get", {"path": _FIELD_PATH, "property": "relays"})])
+        truncated = False
+        lines = []
+        try:
+            with open(BUS_TRACE_FILE, "r", errors="replace") as f:
+                size = 0
+                for ln in f:
+                    size += len(ln)
+                    if size > BUS_MAX_TRACE:
+                        truncated = True
+                        break
+                    if "esp32_i2c_observe" in ln or ln.split(":", 1)[-1].startswith("i2c_"):
+                        lines.append(ln.rstrip("\n"))
+        finally:
+            try:
+                os.unlink(BUS_TRACE_FILE)
+            except FileNotFoundError:
+                pass
+        os.makedirs(BUS_OUT_DIR, exist_ok=True)
+        cid = "bus-%s-%s" % (time.strftime("%Y%m%d-%H%M%S", time.localtime(t_start)), bus)
+        base = os.path.join(BUS_OUT_DIR, cid)
+        T = _load_converter()
+        field = {"di_start": di0, "writes": list(_bus_tap["writes"])}
+        summ, txns = T.convert(lines, bus, base, "virtual", field, None, fmt)
+        with gzip.open(base + ".trace.log.gz", "wt") as g:
+            g.write("\n".join(lines) + "\n")
+        files = {"vcd": cid + ".vcd", "json": cid + ".json", "trace": cid + ".trace.log.gz"}
+        sig = {"ok": False, "error": "skipped"}
+        try:
+            import shutil as _sh, subprocess as _sp
+            if _sh.which("sigrok-cli") and txns:
+                r = _sp.run(["sigrok-cli", "-I", "vcd", "-i", base + ".vcd", "-o", base + ".sr"],
+                            capture_output=True, text=True, timeout=180)
+                if r.returncode == 0 and os.path.isfile(base + ".sr"):
+                    files["sr"] = cid + ".sr"
+                sig = _sigrok_summary(base + (".sr" if "sr" in files else ".vcd"), base + ".decode.txt")
+                files["decode"] = cid + ".decode.txt"
+            elif not txns:
+                sig = {"ok": False, "error": "nothing to decode (0 transactions)"}
+            else:
+                sig = {"ok": False, "error": "sigrok-cli not installed (sudo apt-get install sigrok-cli)"}
+        except Exception as e:                    # noqa: BLE001
+            sig = {"ok": False, "error": "sigrok-cli failed: %s" % e}
+        ident = _twin_identity(with_hash=True)
+        session = str(uuid.uuid4())
+        bundle_note = None
+        if fmt == "observe" and lines and ident.get("flash_sha256") and ident.get("qemu_sha256"):
+            bundle, bundle_note = _studio_bundle(lines, {"qemu_sha256": ident["qemu_sha256"],
+                                                         "flash_sha256": ident["flash_sha256"]},
+                                                 session, t_start, t_end)
+            if bundle:
+                with open(base + ".studio.json", "w") as f:
+                    _json.dump(bundle, f)
+                files["studio"] = cid + ".studio.json"
+        manifest = {
+            "id": cid, "session": session, "bus": bus, "seconds": secs, "format": fmt, "trace_events": names,
+            "captured": {"start": t_start, "end": t_end,
+                         "start_local": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t_start))},
+            "twin": {k: ident.get(k) for k in ("pid", "profile", "image", "selected_slot", "flash_sha256",
+                                                "qemu_sha256", "w5_bind")},
+            "firmware": ident.get("app"),
+            "field": {"di_start": di0, "di_end": di1, "relays_start": rel0, "relays_end": rel1,
+                      "writes": field["writes"],
+                      "how": "chip-level /field writes during the capture, drawn as IN1..IN4 at the first "
+                             "bus event logged after each write (host clock)"},
+            "summary": summ, "sigrok": sig, "files": files,
+            "studio_bundle_note": bundle_note, "trace_truncated": truncated, "tracing_off_error": off_error}
+        with open(base + ".manifest.json", "w") as f:
+            _json.dump(manifest, f, indent=1)
+        files["manifest"] = cid + ".manifest.json"
+        result = {"ok": bool(txns), **manifest,
+                  "download": {k: "/bus/files/" + v for k, v in files.items()},
+                  "repo_path": os.path.relpath(BUS_OUT_DIR, REPO_ROOT) if BUS_OUT_DIR.startswith(REPO_ROOT) else BUS_OUT_DIR}
+        if not txns:
+            result["error"] = "the trace held no I2C transactions for %s" % bus
+        return result, 200
+    except Exception as e:                        # noqa: BLE001
+        return {"ok": False, "error": "%s: %s" % (type(e).__name__, e)}, 500
+    finally:
+        _bus_lock.release()
+
+
+def _serve_bus_file(conn, path):
+    name = urllib.parse.unquote(path.split("?", 1)[0][len("/bus/files/"):])
+    full = os.path.join(BUS_OUT_DIR, name)
+    if not _FILE_RE.match(name) or not os.path.isfile(full):
+        return _send_json(conn, {"ok": False, "error": "no such capture file"}, 404)
+    ctype = {"json": "application/json", "txt": "text/plain; charset=utf-8", "vcd": "text/plain"}.get(
+        name.rsplit(".", 1)[-1], "application/octet-stream")
+    with open(full, "rb") as f:
+        body = f.read()
+    conn.sendall(("HTTP/1.1 200 OK\r\nContent-Type: %s\r\nCache-Control: no-store\r\n"
+                  "Content-Disposition: attachment; filename=\"%s\"\r\nContent-Length: %d\r\n"
+                  "Connection: close\r\n\r\n" % (ctype, name, len(body))).encode() + body)
+
+
+def _bus_list():
+    out = []
+    try:
+        names = sorted((n for n in os.listdir(BUS_OUT_DIR) if n.endswith(".manifest.json")), reverse=True)
+    except OSError:
+        names = []
+    for n in names[:20]:
+        try:
+            with open(os.path.join(BUS_OUT_DIR, n)) as f:
+                m = _json.load(f)
+            out.append({"id": m.get("id"), "captured": m.get("captured", {}).get("start_local"),
+                        "seconds": m.get("seconds"), "frames": m.get("summary", {}).get("frames"),
+                        "relay_write_changes": m.get("summary", {}).get("relay_write_changes"),
+                        "download": {k: "/bus/files/" + v for k, v in m.get("files", {}).items()}})
+        except Exception:                         # noqa: BLE001
+            continue
+    return {"ok": True, "captures": out}
 
 
 def handle(conn, hub, root):
@@ -522,6 +959,31 @@ def handle(conn, hub, root):
                 _deny(conn, 403, "cross-origin write refused")
             else:
                 _serve_modbus(conn, path)
+            conn.close()
+        elif path.split("?", 1)[0] == "/bus/capture":
+            if method != "POST":
+                _deny(conn, 405, "use POST /bus/capture?seconds=6 (e.g. curl -X POST); results: GET /bus/captures")
+            elif not origin_ok(headers):
+                print("[bridge] refused bus capture from origin %r" % headers.get("origin"), flush=True)
+                _deny(conn, 403, "cross-origin capture refused")
+            else:
+                result, code = _bus_capture(_up.parse_qs(_up.urlparse(path).query))
+                _send_json(conn, result, code)
+            conn.close()
+        elif path.startswith("/bus/files/") and method in ("GET", "HEAD"):
+            _serve_bus_file(conn, path); conn.close()
+        elif path.split("?", 1)[0] == "/bus/captures" and method in ("GET", "HEAD"):
+            _send_json(conn, _bus_list()); conn.close()
+        elif path.split("?", 1)[0] == "/twin/identity" and method in ("GET", "HEAD"):
+            qs = _up.parse_qs(_up.urlparse(path).query)
+            _send_json(conn, _twin_identity(with_hash=qs.get("hash", ["0"])[0] == "1")); conn.close()
+        elif path.split("?", 1)[0] in FW_PROXY_PATHS:
+            if method not in ("GET", "HEAD"):
+                _deny(conn, 405, "read-only: GET only")
+            elif headers.get("x-studio-proxy"):
+                _send_json(conn, {"ok": False, "error": "proxy loop"}, 502)
+            else:
+                _serve_fw_proxy(conn, path)
             conn.close()
         elif path.split("?", 1)[0] == "/field":
             if method == "POST" and not origin_ok(headers):
@@ -577,11 +1039,16 @@ def main(argv=None):
                     help="address the Studio port listens on (default 127.0.0.1)")
     ap.add_argument("--qmp", default=os.environ.get("QMP_SOCK", "/tmp/plc-qmp"),
                     help="the twin's QMP socket, used only by the whitelisted /field endpoint")
+    ap.add_argument("--fw-http", default=os.environ.get("FW_HTTP", ""),
+                    help="firmware HTTP HMI host:port for the read-only /fw/api/* proxy "
+                         "(default: the twin's W5500 bind address, port 8080)")
     a = ap.parse_args(argv)
     root = os.path.realpath(a.dir)
-    global MODBUS_TARGET, QMP_SOCK
+    global MODBUS_TARGET, QMP_SOCK, FW_HTTP
     MODBUS_TARGET = a.modbus
     QMP_SOCK = a.qmp
+    FW_HTTP = a.fw_http
+    _BRIDGE_ADDR.update(bind=a.bind, port=a.port)
 
     hub = TwinHub(a.serial)
 

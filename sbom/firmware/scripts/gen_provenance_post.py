@@ -1,10 +1,12 @@
-"""POST extra script: regenerate the Logic-Studio provenance map from THIS build.
+"""POST extra script: generate the Logic-Studio provenance map for THIS build.
 
-After the ELF is linked, run tools/gen-provenance-map.py with --elf <firmware.elf>
-so web/public/firmware-provenance-map.json carries the current source file:lines
-AND the current function + load address per event (re-derived from the ELF's
-DWARF). This is what keeps the static<->dynamic map true across firmware changes:
-every build refreshes it. Fails soft -- a problem here never breaks the build.
+After the ELF is linked, run tools/gen-provenance-map.py with --elf <firmware.elf>.
+It writes web/public/provenance-maps/<ELF SHA-256>.json (+ index.json): the current
+source file:lines AND the function + load address per event, re-derived from the
+ELF's DWARF, keyed by the same ELF SHA-256 the image carries in its app descriptor.
+Provenance Studio picks the map whose hash equals the RUNNING twin's (GET
+/twin/identity), so building the secure profile no longer overwrites the committed
+map that matches the vulnerable twin. Fails soft -- never breaks the build.
 """
 import os
 import subprocess
@@ -38,7 +40,7 @@ def _regen(*args, **kwargs):
     if not os.path.exists(GEN):
         print("[provenance] generator not found, skipping:", GEN)
         return
-    cmd = [sys.executable, GEN, "--elf", elf]
+    cmd = [sys.executable, GEN, "--elf", elf, "--profile", env.subst("$PIOENV")]  # noqa: F821
     od, a2l = _tool("objdump"), _tool("addr2line")
     if od:
         cmd += ["--objdump", od]
@@ -51,7 +53,7 @@ def _regen(*args, **kwargs):
             print("[provenance] non-fatal: generator exited", r.returncode)
             sys.stderr.write(r.stderr)
         else:
-            print("[provenance] map refreshed from", os.path.relpath(elf, REPO))
+            print("[provenance] per-build map written for", os.path.relpath(elf, REPO))
     except Exception as e:  # never break the build over the teaching map
         print("[provenance] non-fatal: could not refresh map:", e)
 

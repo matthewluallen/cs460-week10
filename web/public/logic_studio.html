@@ -856,7 +856,8 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
       <button id="bConsoleToggle" title="Collapse or expand the console to give the ladder more room">▾</button></div>
     <div id="log"></div>
     <div id="busView">
-      <div class="bus-tools"><span id="busState" role="status">Trace state unknown</span><button class="btn" id="bBusRead">Read retained</button><button class="btn" id="bBusOff">Request trace OFF</button><button class="btn" id="bBusFile">Open capture</button><button class="btn" id="bBusExport">Export capture</button></div>
+      <div class="bus-tools"><span id="busState" role="status">Trace state unknown</span><button class="btn" id="bBusRead">Read retained</button><button class="btn" id="bBusOff">Request trace OFF</button><button class="btn" id="bBusTwinTap" title="Record YOUR running twin's I²C bus for 6 s through the Studio server (QEMU's own I²C controller trace, outside the firmware). Press an input while it records. Saves .sr for PulseView + .vcd in bus-analysis/out/.">● Record twin bus (6 s)</button><button class="btn" id="bBusFile">Open capture</button><button class="btn" id="bBusExport">Export capture</button></div>
+      <p class="bus-note" id="busTapNote" hidden></p>
       <p class="bus-note" id="busEvidenceNote">Software annotations show selected firmware calls, not electrical transactions. <b>Capture 1 s</b> changes diagnostic tracing in Author; <b>Read retained</b> is read-only. Only the latest 16 diagnostic records survive. USB loss can leave tracing enabled; reconnect and request OFF.</p>
       <p class="bus-note" id="busSummary" role="status">No capture loaded. Select a record to see its meaning and limitations beside the original evidence.</p>
       <div id="qemuBusTools" class="bus-tools" hidden><label id="qemuWindowLabel" hidden>Test interval <select id="qemuWindow"></select></label><label>Controller <select id="qemuController"></select></label><label>Event <select id="qemuEvent"></select></label><button class="btn" id="qemuPrev">Previous</button><span id="qemuPage" role="status"></span><button class="btn" id="qemuNext">Next</button></div>
@@ -4292,6 +4293,43 @@ function renderBusControls(){
   document.getElementById('bBusOff').disabled=busBusy||!conn||MODE!=='edit';
   document.getElementById('bBusFile').disabled=busBusy;
   document.getElementById('bBusExport').disabled=busBusy||!busCapture;
+  const tap=document.getElementById('bBusTwinTap');if(tap)tap.disabled=busBusy||!/^https?:$/.test(location.protocol);
+}
+/* ===== live I2C tap of the student's OWN running twin (Studio server POST /bus/capture) =====
+   The server switches QEMU's I2C controller trace on for N s over QMP, then off, and converts it
+   (bus-analysis/tools/trace_to_sigrok.py): .vcd/.sr for PulseView, a sigrok-cli decode, and a
+   Studio bundle that loads here through the same importer as "Open capture". */
+async function recordTwinBus(secs=6){
+  if(busBusy)return;
+  const btn=document.getElementById('bBusTwinTap'),note=document.getElementById('busTapNote'),label=btn.textContent;
+  busBusy=true;renderBusControls();showConTab('bus');
+  note.hidden=false;note.textContent=`Recording your twin's I²C bus for ${secs} s — press an input now (Circuit tab, or POST /field). Nothing is replayed: these are the bytes your twin's emulated I²C controller moves right now.`;
+  let left=secs;btn.textContent=`● recording… ${left} s`;
+  const tick=setInterval(()=>{left--;btn.textContent=left>0?`● recording… ${left} s`:'● converting…';},1000);
+  let j=null;
+  try{
+    const r=await fetch(`/bus/capture?seconds=${secs}`,{method:'POST',cache:'no-store'});
+    j=await r.json();
+    if(!j.ok)throw new Error(j.error||('HTTP '+r.status));
+  }catch(e){
+    clearInterval(tick);btn.textContent=label;busBusy=false;renderBusControls();
+    note.textContent='Bus capture failed: '+e.message+' — run the twin with ./qemu/studio.sh and open the Studio from it (or use ./bus-analysis/tap.sh).';
+    log('Bus capture failed: '+e.message,'er');return;
+  }
+  clearInterval(tick);btn.textContent=label;busBusy=false;renderBusControls();
+  const ch=(j.summary.relay_write_changes||[]).map(c=>`${c.value} @${c.t_ms} ms`).join(' → ')||'none';
+  const sg=j.sigrok&&j.sigrok.ok?`sigrok-cli decoded ${Object.entries(j.sigrok.addresses).map(([k,v])=>k+'×'+v).join(', ')}`:`sigrok: ${(j.sigrok&&j.sigrok.error)||'not run'}`;
+  note.replaceChildren();
+  const add=(t)=>note.append(document.createTextNode(t));
+  add(`LIVE TAP of your twin · ${j.captured.start_local} · ${j.seconds} s · ${j.summary.frames} transactions on ${j.bus}. RELAY byte (0x59 reg 0x02) changes: ${ch}. ${sg}. Files in ${j.repo_path}/: `);
+  for(const [k,u] of Object.entries(j.download)){if(k==='trace')continue;const a=document.createElement('a');a.href=u;a.textContent=u.split('/').pop();a.download='';a.style.marginRight='8px';note.append(a);}
+  add(' — open the .sr in PulseView (add the I²C decoder: SCL, SDA). '+j.summary.fidelity);
+  log(`bus tap: ${j.summary.frames} transactions, relay writes ${ch}`,'ok');
+  if(j.download.studio){
+    try{const text=await (await fetch(j.download.studio,{cache:'no-store'})).text();
+        await importBusFile({size:new TextEncoder().encode(text).length,text:async()=>text});}
+    catch(e){log('Studio view of the capture failed: '+e.message,'er');}
+  }else if(j.studio_bundle_note){log('Capture saved; Studio view skipped: '+j.studio_bundle_note,'er');}
 }
 /* ===== embedded lane timeline (week-10 inspector view) — renders the SAME records the
    table does, by address lane, R(read)/W(write) colored; click proxies to the record detail ===== */
@@ -4966,6 +5004,7 @@ document.getElementById('bBusRead').onclick=()=>collectBus('retained');
 document.getElementById('bBusOff').onclick=()=>collectBus('trace-off');
 document.getElementById('bBusExport').onclick=()=>{if(busCapture&&!busBusy)downloadText('studio-bus-capture.json',JSON.stringify(busCapture,null,2),'application/json');};
 document.getElementById('bBusFile').onclick=openBusCapture;
+document.getElementById('bBusTwinTap').onclick=()=>recordTwinBus(6);
 document.querySelectorAll('.contabs button').forEach(b=>b.onclick=()=>showConTab(b.dataset.tab));
 document.getElementById('bTheme').onclick=()=>{const c=document.documentElement.getAttribute('data-theme');setTheme(c==='dark'?'light':'dark');};
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));

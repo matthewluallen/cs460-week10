@@ -4,9 +4,9 @@
   "source": "sbom/firmware/src/*.cpp plc_log() call sites",
   "elf": {
    "enriched": true,
-   "elf": "/workspaces/cs460-week10/sbom/firmware/.pio/build/m5stamplc/firmware.elf",
-   "objdump": "/home/vscode/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump",
-   "addr2line": "/home/vscode/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-addr2line",
+   "elf": "sbom/firmware/.pio/build/m5stamplc/firmware.elf",
+   "objdump": "xtensa-esp32s3-elf-objdump",
+   "addr2line": "xtensa-esp32s3-elf-addr2line",
    "resolved_exact": 51,
    "resolved_nearest": 5,
    "unresolved": 0,
@@ -14,7 +14,10 @@
   },
   "live_feed": "/api/log  (web_api_log_json) and serial 'log' / busstream",
   "note": "STATIC half of the Logic-Studio association. A live /api/log line is matched to a row by its 'match' regex -> source file:line + CWE. An output change with no matching WRITE/FORCE row is the provenance gap that reveals an unaudited (memory-corruption) write.",
-  "count": 56
+  "count": 56,
+  "elf_sha256": null,
+  "profile": "m5stamplc",
+  "selection": "Committed source-tree map for the vulnerable teaching build. func/addr come from an m5stamplc build whose ELF hash was not recorded, so Provenance Studio treats it as 'source-tree map' unless a per-build map in provenance-maps/ matches the running twin's ELF SHA-256 (GET /twin/identity). Refresh it from the image students run: python3 tools/gen-provenance-map.py --elf <firmware.elf> --profile m5stamplc --out web/public/firmware-provenance-map.json"
  },
  "events": [
   {
