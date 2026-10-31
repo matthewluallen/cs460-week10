@@ -466,7 +466,7 @@ function guideText(c,v){
   if(isAnalog(c))return['live','Twin live: the light buttons put the divider voltage on CH1 at the chip; the firmware reads it over I²C @0x20. Load light-alarm and RUN, then go from Room light to Covered and back through Hand hovering.'];
   return['live','Twin live: switches set the AW9523 input bit at the chip; the firmware reads it over I²C on its next scan.'];}
 function render(force){const c=circuit();ST.conn=connKind();const v=buildVm(c);const T=SK.THEMES[themeName()];
-  const key=JSON.stringify([ST.cur,ST.view,ST.trace,ST.sub,ST.phoneSel,T.name,v.live,v.conn,v.in,v.relay,v.inForced,v.cmd,v.act,v.mode,ST.sw,ST.held,v.mirror,v.regs&&[50,51,52].map(r=>v.regs[r]),v.monitorIW&&v.monitorIW.IW,v.busR,v.busW,v.fieldErr,lcdSource().kind,ST.light,ST.field.analog&&[ST.field.analog.ch1_mv,ST.field.analog.ch1_source],ST.field.analogNote]);
+  const key=JSON.stringify([ST.cur,ST.view,ST.trace,ST.sub,ST.phoneSel,T.name,v.live,v.conn,v.in,v.relay,v.inForced,v.cmd,v.act,v.mode,ST.sw,ST.held,v.mirror,v.regs&&[140,141,146].map(r=>v.regs[r]),v.monitorIW&&v.monitorIW.IW,v.busR,v.busW,v.fieldErr,lcdSource().kind,ST.light,ST.field.analog&&[ST.field.analog.ch1_mv,ST.field.analog.ch1_source],ST.field.analogNote]);
   if(!force&&key===ST.renderKey)return;ST.renderKey=key;
   const stage=$('cwStage');if(!stage)return;
   const focusId=document.activeElement&&document.activeElement.closest&&document.activeElement.closest('[data-ctl],[data-phone],[data-light],[data-lcd-key],[data-lcd-open][tabindex="0"]');const fsel=focusId?(focusId.dataset.lcdKey?`[data-lcd-key="${focusId.dataset.lcdKey}"]`:focusId.dataset.lcdOpen?'[data-lcd-open][tabindex="0"]':focusId.dataset.ctl?`[data-ctl="${focusId.dataset.ctl}"]`:focusId.dataset.light?`[data-light="${focusId.dataset.light}"]`:`[data-phone="${focusId.dataset.phone}"]`):null;
@@ -528,7 +528,7 @@ async function pollField(){if(ST.field.busy)return;ST.field.busy=true;try{const 
   if(j&&j.ok){ST.field.ok=true;ST.field.err='';ST.field.di=j.di;ST.field.relays=j.relays;ST.field.analog=j.analog||null;ST.field.analogNote=j.analog_note||'';ST.field.at=performance.now();}else{ST.field.ok=false;ST.field.err=(j&&j.error)||'unavailable';ST.field.next=performance.now()+3000;}}
   catch(e){ST.field.ok=false;ST.field.err=e.message||'unreachable';ST.field.next=performance.now()+3000;}finally{ST.field.busy=false;}}
 async function pollModbus(){const now=performance.now();if(now<ST.mirror.next)return;ST.mirror.next=now+1000;try{const d=await window.mbFetch('fc=1&addr=100&count=8');if(d&&d.ok){ST.mirror.di=d.values;ST.mirror.at=performance.now();}}catch(e){ST.mirror.next=now+4000;}
-  if(circuit().phone){try{const r=await window.mbFetch('fc=3&addr=50&count=3');if(r&&r.ok){ST.regs.v={50:r.values[0],51:r.values[1],52:r.values[2]};ST.regs.at=performance.now();}}catch(e){}}}
+  if(circuit().phone){try{const r=await window.mbFetch('fc=3&addr=140&count=8');if(r&&r.ok){ST.regs.v={140:r.values[0],141:r.values[1],146:r.values[6]};ST.regs.at=performance.now();}}catch(e){}}}
 function onIo(line){let m=/^DI\s*:\s*(.*)$/.exec(line);
   if(m){const tok=m[1].trim().split(/\s+/);if(tok.length>=8){ST.io.di=tok.slice(0,8).map(t=>t[0]==='1'?1:0);ST.io.forced=tok.slice(0,8).map(t=>/F/.test(t)?1:0);ST.io.at=performance.now();}return;}
   m=/^relay([0-3])\s+cmd=([01])\s+act=([01])/.exec(line);if(m){ST.io.cmd=ST.io.cmd||[0,0,0,0];ST.io.act=ST.io.act||[0,0,0,0];ST.io.cmd[+m[1]]=+m[2];ST.io.act[+m[1]]=+m[3];ST.io.at=performance.now();}}

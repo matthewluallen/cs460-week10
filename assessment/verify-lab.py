@@ -205,6 +205,10 @@ def P1_wire(c):
     for t in ("start_pb", "stop_pb", "reset_pb"):
         c.cmd(f"force {t} 0", 0.4)
     c.cmd("mode run", 2.0)
+    # The motor may still be sealed in from the student's own Part 1 sequence (it ends on
+    # Start): press Stop once so every check below starts from the same idle state.
+    c.cmd("force stop_pb 1", 0.8)
+    c.cmd("force stop_pb 0", 0.4)
     ev = []
     def expect(label, cmds, want, hold=False, timeout=20):
         for x in cmds:
