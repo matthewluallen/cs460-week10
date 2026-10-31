@@ -105,3 +105,18 @@ jobs:
         run: ./qemu/fetch-qemu.sh
       - name: Verify lab parts on the twin
         run: python assessment/verify-lab.py --boot-twin P1 P3 P5 P6 P8
+
+  formal-verify:
+    # Week 12 / Level 3: Z3 must prove every security control on the verified build. This is the
+    # formal-verify stage of the assurance pipeline running as a CI gate — a regression that
+    # re-opens a control (makes its violation satisfiable again) fails the build here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Z3
+        run: pip install z3-solver
+      - name: Prove the controls (verified build)
+        run: python formal-verify/verify_controls.py --profile verified --assert-proven

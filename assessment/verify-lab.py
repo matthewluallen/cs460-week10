@@ -233,6 +233,20 @@ def P9_secure(c):
     ok = overflow_blocked and no_wrap
     return (PASS if ok else FAIL), f"overflow_blocked={overflow_blocked}, clock_no_wrap={no_wrap}"
 
+def W12_formal(_c):
+    """Offline (Week 12): Z3 proves all six security controls on the verified build (Level 3)."""
+    script = os.path.join(ROOT, "formal-verify", "verify_controls.py")
+    if not os.path.exists(script):
+        return SKIP, "formal-verify/verify_controls.py not present"
+    r = subprocess.run([sys.executable, script, "--profile", "verified", "--assert-proven"],
+                       capture_output=True, text=True)
+    blob = (r.stdout or "") + (r.stderr or "")
+    if "No module named 'z3'" in blob or "ModuleNotFoundError" in blob:
+        return SKIP, "z3-solver not installed (pip install z3-solver)"
+    if r.returncode == 0:
+        return PASS, "Z3 proved all six controls on the verified build"
+    return FAIL, (r.stdout.strip().splitlines() or ["proof assertion failed"])[-1]
+
 CHECKS = {
     "P1": (P1_bus,    False, "Bus analysis — Modbus decode"),
     "P2": (P2_sbom,   False, "SBOM — SPDX vs CycloneDX"),
@@ -243,6 +257,7 @@ CHECKS = {
     "P7": (P7_supply, False, "Supply-chain kill switch (twin, manual)"),
     "P8": (P8_ntp,    True,  "NTP AiTM / Y2038 wrap"),
     "P9": (P9_secure, True,  "Remediation — secure build refuses the attacks"),
+    "W12":(W12_formal,False, "Formal verification — Z3 proves all controls (Level 3)"),
 }
 # Default set when none named: everything except P9 (which needs the secure target).
 DEFAULT = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]

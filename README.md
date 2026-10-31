@@ -66,6 +66,19 @@ are graded the same way and their objectives + MITRE/CWE mapping are in
 | **E2 — Signal Journey** | 1 · 4 · 5 · 7 | Follow one byte across five lenses — Wireshark → sigrok → firmware source → ladder → relay — and say what each lens can and cannot show | [`web/public/signal_journey.html`](web/public/signal_journey.html) |
 | **E3 — Phone-as-sensor false-data injection** | 5 · 8 | Withhold a sensor the PLC trusts (availability) and spoof its value (integrity), then build a plausibility gate that still passes the real reading | [`docs/assignment-phone-sensor-fdi.html`](docs/assignment-phone-sensor-fdi.html) |
 
+### Week 12 — Level 3: formally verified updates
+
+A third security level beyond vulnerable/secure: each control is **proven** with the Z3 SMT
+solver (no device — the proofs are about models of the firmware controls) and carried through a
+CI/CD assurance pipeline reasoned in cyber-informed-engineering terms. The in-class lab and
+assignment are in [`week12/`](week12/); the proof engine and the pipeline model are in
+[`formal-verify/`](formal-verify/):
+
+```bash
+pip install z3-solver
+python formal-verify/verify_controls.py        # vuln (VIOLATED) → secure → verified (all PROVEN)
+```
+
 ## Browser tools (served from `web/public/`)
 
 Several parts use small browser apps that run straight from this repo — no build step, no
