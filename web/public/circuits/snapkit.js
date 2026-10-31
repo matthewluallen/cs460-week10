@@ -88,6 +88,9 @@ function defs(T){
 <linearGradient id="skFerr" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8d96a2"/><stop offset=".45" stop-color="#f2f4f6"/><stop offset="1" stop-color="#7f8894"/></linearGradient>
 <linearGradient id="skPlc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${T.plcBody0}"/><stop offset="1" stop-color="${T.plcBody1}"/></linearGradient>
 <linearGradient id="skTstrip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8dde3"/><stop offset="1" stop-color="#c4cbd3"/></linearGradient>
+<linearGradient id="w5Body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#454c56"/><stop offset=".55" stop-color="#31373f"/><stop offset="1" stop-color="#22272d"/></linearGradient>
+<linearGradient id="w5PoE" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4e555f"/><stop offset=".55" stop-color="#363c44"/><stop offset="1" stop-color="#282d34"/></linearGradient>
+<linearGradient id="w5Jack" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dde2e8"/><stop offset="1" stop-color="#a7afb9"/></linearGradient>
 ${Object.entries(CAT).map(([k,c])=>`<linearGradient id="skC_${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset="1" stop-color="${c[1]}"/></linearGradient>`).join('')}
 <linearGradient id="skStripV" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3b4452"/><stop offset=".35" stop-color="#566173"/><stop offset="1" stop-color="#2f3743"/></linearGradient>
 <linearGradient id="skStripH" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#566173"/><stop offset=".4" stop-color="#46505f"/><stop offset="1" stop-color="#2f3743"/></linearGradient>
@@ -461,6 +464,81 @@ function expansion(o,vm,T){const W=EXP_W,H=EXP_H,used=o.used||{},ink='#262b33',s
   s+=`</g>`;return s;
 }
 
+/* ---------------------------------------------------------------- W5500 Ethernet / PoE expansion module X2 (docks on the controller's side)
+ * Drawn after the real module's product photos, in the same snap-kit style and charcoal housing as the
+ * controller and the IO module (X1); no company name, logo or trade dress is copied. "PoE", "W5500",
+ * "Ethernet", the chip/regulator part numbers and the pin names are the part's own printed markings.
+ *   - dark charcoal housing (77 × 38 × 27 mm): a raised top section with "PoE" embossed into the plastic,
+ *     and a lower flat front carrying a white printed label;
+ *   - the printed label reproduces the real one: a blue W5500 badge with an SPI arrow into it; the DC/DC
+ *     power path (SYS VIN → regulators → 3V3 / 5V / 12V rails, with a purple "DC/DC 13W" badge); the HBJ6118
+ *     magnetics badge; the SPI pin map printed vertically (G8:MOSI … G14:INT); and a grey RJ45 jack with a
+ *     yellow indicator at its lower-left and a green one at its lower-right;
+ *   - the 2×8 StamPLC-Bus header mates in the seam (SPI CS 11 · SCK 7 · MISO 9 · MOSI 8; RST held at −1 so it
+ *     never resets the LCD; INT G14 shared with the IO expander), with a pass-through so modules chain.
+ * Live state (vm): vm.live gates any lit indicator; vm.link lights the green LINK; vm.act lights the yellow
+ * ACT; vm.eth.ip, if a string, is printed under the jack. w5500Terms() exposes the jack centre as a network
+ * anchor (never a screw) so a drawing can run a dashed net link to the plant LAN. */
+const W5X_W=208,W5X_H=372,W5X_BUS=[96,184],W5X_RJ=[150,252];   // body size; bus header span; RJ45 jack centre (local)
+function w5500Terms(o){return{
+  rj45:{x:o.x+W5X_RJ[0],y:o.y+W5X_RJ[1],net:true},
+  bus:{x:o.x,y:o.y+(W5X_BUS[0]+W5X_BUS[1])/2} };}
+function w5500(o,vm,T){const W=W5X_W,H=W5X_H,used=o.used||{};
+  const live=!!(vm&&vm.live),link=live&&!!vm.link,act=live&&!!vm.act,wired=!!(used.eth||used.rj45);
+  const ip=vm&&vm.eth&&typeof vm.eth.ip==='string'?vm.eth.ip:null;
+  const dink='#1b2430',dsub='#4a5565';   // dark ink on the white printed label
+  const badge=(x,y,w,h,fill,top,bot,ts)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}"/>`+
+    txt(x+w/2,y+(bot?h/2-1:h/2+4),top,{anchor:'middle',size:ts||12,weight:800,fill:'#fff',mono:1})+
+    (bot?txt(x+w/2,y+h-4,bot,{anchor:'middle',size:9.5,weight:700,fill:'#fff',mono:1}):'');
+  let s=`<g transform="translate(${o.x},${o.y})" data-hop-target="x2"><title>X2 · Ethernet / PoE expansion — W5500 over SPI (CS 11 · SCK 7 · MISO 9 · MOSI 8), PoE in the cable</title>`;
+  // bus header, mated: its shell shows in the seam between the controller (or X1) and this module
+  s+=`<rect x="-9" y="${W5X_BUS[0]}" width="14" height="${W5X_BUS[1]-W5X_BUS[0]}" rx="2" fill="#15181d"/>`;
+  for(let i=0;i<8;i++)s+=`<rect x="-8" y="${W5X_BUS[0]+6+i*10.5}" width="6" height="2.4" fill="#c9a227"/>`;
+  // charcoal housing (its OWN gradient, not the shared skPlc — the controller and IO module are white)
+  s+=`<g filter="url(#skSh)"><rect x="0" y="0" width="${W}" height="${H}" rx="16" fill="url(#w5Body)" stroke="#5a636e" stroke-width="1.5"/></g>`;
+  s+=`<path d="M12,2.5 H${W-12}" stroke="#757d88" stroke-opacity=".5" stroke-width="1.2"/>`;   // raised top-edge sheen
+  s+=`<rect x="${W-3}" y="${W5X_BUS[0]+6}" width="5" height="${W5X_BUS[1]-W5X_BUS[0]-12}" rx="1.5" fill="#15181d" opacity=".85"/>`;  // pass-through socket (right)
+  // raised top section with "PoE" embossed into the plastic
+  s+=`<rect x="8" y="8" width="${W-16}" height="86" rx="12" fill="url(#w5PoE)" stroke="#1b1f25" stroke-width="1"/>`;
+  s+=`<rect x="12" y="11" width="${W-24}" height="3" rx="1.5" fill="#757d88" opacity=".5"/>`;
+  s+=txt(W/2,68,'PoE',{anchor:'middle',size:46,weight:900,fill:'#5b636e',op:.5})+txt(W/2,66,'PoE',{anchor:'middle',size:46,weight:900,fill:'#23282e'});
+  // ---- white printed front label ----
+  const Lx=8,Ly=100,Lw=W-16,Lh=H-Ly-8;
+  s+=`<rect x="${Lx}" y="${Ly}" width="${Lw}" height="${Lh}" rx="12" fill="#fbfcfd" stroke="#c9ced6"/>`;
+  // W5500 chip badge (blue) + SPI arrow into it, HBJ6118 magnetics below
+  s+=`<rect x="16" y="110" width="48" height="44" rx="7" fill="#1f5fbf"/>`+
+     txt(40,136,'W',{anchor:'middle',size:21,weight:900,fill:'#fff'})+txt(40,149,'5500',{anchor:'middle',size:11,weight:800,fill:'#fff',mono:1});
+  s+=`<path d="M16,170 H40 V156" fill="none" stroke="#2b7fd4" stroke-width="2.2"/><path d="M40,158 l-3.6,7 h7.2 z" fill="#2b7fd4"/>`+
+     txt(48,174,'SPI',{size:11,weight:800,fill:'#2b7fd4',mono:1});
+  s+=badge(16,178,48,24,'#7a3338','HBJ','6118',11.5);
+  // DC/DC power path (right): SYS VIN -> regulators -> 3V3 / 5V / 12V -> DC/DC 13W
+  s+=txt(W-14,122,'SYS',{anchor:'end',size:10,weight:800,fill:'#c0392b',mono:1})+txt(W-14,132,'VIN',{anchor:'end',size:10,weight:800,fill:'#c0392b',mono:1});
+  s+=`<path d="M150,138 H${W-14} M150,138 V196 M110,150 H150 M110,168 H150 M110,186 H150" fill="none" stroke="#c0392b" stroke-width="1.4"/>`;
+  s+=badge(148,140,42,20,'#c0392b','LP5907',null,9)+txt(108,154,'3V3',{anchor:'end',size:10,weight:800,fill:'#c0392b',mono:1});
+  s+=badge(148,164,42,20,'#8a7a3a','TPS',null,10.5)+txt(108,172,'5V',{anchor:'end',size:10,weight:800,fill:'#c0392b',mono:1});
+  s+=txt(108,190,'12V',{anchor:'end',size:10,weight:800,fill:'#c0392b',mono:1});
+  s+=badge(148,188,42,28,'#7a2f6e','DC/DC','13W',11);
+  // SPI pin map, printed vertically (lower-left of the label)
+  const PINS=[['G8','MOSI'],['G9','MISO'],['G7','SCK'],['G11','CS'],['G3','RST'],['G14','INT']];
+  PINS.forEach(([g,n],i)=>{const y=230+i*13;s+=`<text x="16" y="${y}" font-family="${MONO}" font-size="11.5"><tspan font-weight="800" fill="${dink}">${g}</tspan><tspan font-weight="600" fill="${dsub}">:${n}</tspan></text>`;});
+  // RJ45 jack (grey outline) with the yellow (lower-left) and green (lower-right) indicators
+  { const jw=84,jh=66,jx=W5X_RJ[0]-jw/2,jy=W5X_RJ[1]-jh/2;
+    s+=`<rect x="${jx}" y="${jy}" width="${jw}" height="${jh}" rx="5" fill="url(#w5Jack)" stroke="#49525d" stroke-width="2"/>`;
+    const px=jx+15,py=jy+8,pw=jw-30,ph=jh-26;
+    s+=`<rect x="${px}" y="${py}" width="${pw}" height="${ph}" rx="2" fill="#eef1f4" stroke="#49525d" stroke-width="1.5"/>`;
+    s+=`<rect x="${W5X_RJ[0]-7}" y="${py-4}" width="14" height="7" rx="1.5" fill="#eef1f4" stroke="#49525d" stroke-width="1.5"/>`;   // tab channel
+    for(let i=0;i<8;i++){const cx=px+6+i*((pw-12)/7);s+=`<rect x="${cx-1.3}" y="${py+3}" width="2.6" height="${ph-8}" fill="#9aa3ae"/>`;}
+    const led=(cx,hue,on)=>`<rect x="${cx-7}" y="${jy+jh-14}" width="14" height="11" rx="2" fill="${on?LED_HUE[hue][2]:'#2b3038'}" stroke="${on?LED_HUE[hue][1]:'#5b6470'}"/>`+(on?`<rect x="${cx-9}" y="${jy+jh-16}" width="18" height="15" rx="3" fill="url(#skGlow_${hue})"/>`:'');
+    s+=led(jx+13,'amber',act)+led(jx+jw-13,'green',link);
+  }
+  // label footer: course name + live status
+  s+=`<line x1="${Lx+6}" y1="306" x2="${Lx+Lw-6}" y2="306" stroke="#d8dde3"/>`;
+  s+=txt(16,326,'X2',{size:20,weight:900,fill:dink})+txt(46,326,'Ethernet · PoE',{size:12.5,weight:800,fill:dink});
+  s+=txt(16,344,live?(link?(ip||'link up'):'no link'):(wired?'cable in · waiting':'RJ45 · 10/100'),{size:11.5,weight:live?800:600,fill:live&&link?'#0c7a4a':dsub,mono:1});
+  s+=txt(W-14,326,'802.3af',{anchor:'end',size:11,weight:800,fill:dsub,mono:1})+txt(W-14,344,'37–57 V',{anchor:'end',size:10.5,fill:dsub,mono:1});
+  s+=`</g>`;return s;
+}
+
 /* ---------------------------------------------------------------- leads (flying jumper wires) */
 /* A lead: casing 10 / core 7 / sheen 2 (α .55) with a drop shadow; a second, separate supply gets a white
  * tracer instead of the sheen. Screw end: ferrule + insulation collar + marker sleeve. Snap end: clip. */
@@ -528,6 +606,6 @@ SCH.coil=(x,y,c,on)=>`<rect x="${x-20}" y="${y-11}" width="40" height="22" fill=
 
 /* ---------------------------------------------------------------- export */
 const api={P,THEMES,TAGS,CAT,LED_HUE,MONO,esc,txt,tag,tagWidth,stud,roundPath,along,polyLen,flowDur,flowWidth,wireColours,defs,partPins,PARTS,strip,stripFlow,stripStuds,
-  stampTerms,stamplc,wifiBadge,xrayPath,expTerms,expansion,EXP_PINS,EXP_OUT,EXP_W,EXP_H,leadPoints,leadBody,leadFlow,sleeve,clip,screwEnd,netLink,netJack,card,noteCard,legend,SCH};
+  stampTerms,stamplc,wifiBadge,xrayPath,expTerms,expansion,EXP_PINS,EXP_OUT,EXP_W,EXP_H,w5500Terms,w5500,W5X_W,W5X_H,W5X_BUS,leadPoints,leadBody,leadFlow,sleeve,clip,screwEnd,netLink,netJack,card,noteCard,legend,SCH};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.SnapKit=api;
 })(typeof window!=='undefined'?window:globalThis);
