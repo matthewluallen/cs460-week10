@@ -38,6 +38,10 @@ if twin_detect "$SERIAL_SOCK" 15; then
     exit 3
   else
     echo "twin already running — reusing it, not booting ($TWIN_WHICH, pid $TWIN_PID)."
+    if [ "${FIELD_ANALOG:-0}" = "1" ] && ! tr '\0' '\n' < "/proc/$TWIN_PID/environ" 2>/dev/null | grep -q '^TBD_NOPHYS=1$'; then
+      echo "NOTE: FIELD_ANALOG=1 applies when the twin boots; the running one keeps its process model."
+      echo "      Replace it:   RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh"
+    fi
   fi
 elif [ "$TWIN_STATE" = "starting" ] || [ "$TWIN_STATE" = "orphaned" ]; then
   if [ "${RESTART:-0}" = "1" ]; then

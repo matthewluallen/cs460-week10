@@ -19,6 +19,10 @@
 #   SERIAL_SOCK / QMP_SOCK   unix socket paths (defaults /tmp/plc-serial, /tmp/plc-qmp)
 #   RESTART=1          stop an already-running twin on SERIAL_SOCK and boot fresh
 #                      (without it, a twin that is already running is reused, not rebooted)
+#   FIELD_ANALOG=1     the IO expansion's CH1/CH2 are YOURS: the twin's built-in process model
+#                      (tank level on CH1, pump current, skid temperature) is switched off, and the
+#                      Studio's Circuit tab / POST /field?ch1_mv= put a wired sensor's voltage on
+#                      them (the photoresistor circuit). Default: the process model owns them.
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -135,11 +139,20 @@ if command -v getcap >/dev/null 2>&1 && ! getcap "$QEMU" 2>/dev/null | grep -q c
   fi
 fi
 
+# The IO expansion reports the module revision the bench StampLC's pack reports (1), so a project
+# that names its module identity (light-alarm, io-expansion: address 0x20, revision 1) validates on
+# the twin exactly as on the board.
+IOEXP_ARGS=(-global tbd-ioexp.firmware-revision=1)
+PHYS_ENV=()
+if [ "${FIELD_ANALOG:-0}" = "1" ]; then
+  PHYS_ENV=(TBD_NOPHYS=1)
+  echo "      FIELD_ANALOG=1: process model off — CH1/CH2 take the voltage your circuit puts on them"
+fi
 echo "twin: icount='${ICOUNT}'  reboot=$([ ${#REBOOT_ARGS[@]} -eq 0 ] && echo on || echo off)  W5500->$W5_BIND"
 echo "      serial=$SERIAL_SOCK  qmp=$QMP_SOCK   (console:  nc -U $SERIAL_SOCK )"
-exec env TBD_W5_BIND="$W5_BIND" \
+exec env TBD_W5_BIND="$W5_BIND" "${PHYS_ENV[@]}" \
   "$QEMU" -L "$BDIR/pc-bios" -M esp32s3 -m 8M \
-  -drive file="$IMG",if=mtd,format=raw \
+  -drive file="$IMG",if=mtd,format=raw "${IOEXP_ARGS[@]}" \
   "${ICOUNT_ARGS[@]}" -accel tcg,thread=single \
   -serial null -serial null -serial "unix:$SERIAL_SOCK,server=on,wait=off" \
   -qmp "unix:$QMP_SOCK,server=on,wait=off" \

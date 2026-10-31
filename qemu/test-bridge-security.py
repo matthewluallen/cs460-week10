@@ -119,20 +119,27 @@ def main():
     check(st == 403, "/field CH1 write from another site refused", "HTTP %d" % st)
     st, _, body = req("POST", "/field?ch1_mv=99999", origin=SELF)
     check('"ok": false' in body and "0-12000" in body, "/field refuses an out-of-range CH1 voltage", body[:90])
-    st, _, body = req("POST", "/field?ch1_mv=4100", origin=SELF)
-    check(st == 200 and '"ch1_mv": 4100' in body and '"ch1_source": "field"' in body,
-          "/field holds CH1 at 4100 mV (source = field)", body[:160])
-    time.sleep(1.5)
-    seen = ""
-    for _ in range(3):
-        seen = console("devices samples")
-        if '"ch1_mv"' in seen: break
-    m = re.search(r'"ch1_mv":(-?\d+)', seen)
-    check(bool(m) and abs(int(m.group(1)) - 4100) <= 5,
-          "the firmware reads CH1 = 4100 mV over the emulated I2C bus",
-          ("ch1_mv=%s" % m.group(1)) if m else "no ch1_mv in `devices samples`: %r" % seen[:120])
-    st, _, body = req("POST", "/field?ch1_mv=physics", origin=SELF)
-    check(st == 200 and '"ch1_source": "physics"' in body, "/field hands CH1 back to the process model", body[:160])
+    st, _, body = req("GET", "/field")
+    if '"ch1_source": "field"' not in body:
+        # default twin: the process model owns CH1; the bridge says how to take it over
+        st, _, body = req("POST", "/field?ch1_mv=4100", origin=SELF)
+        check('"ok": false' in body and "FIELD_ANALOG=1" in body,
+              "process-model twin: CH1 write refused with the FIELD_ANALOG=1 instruction", body[:140])
+    else:
+        st, _, body = req("POST", "/field?ch1_mv=4100", origin=SELF)
+        check(st == 200 and '"ch1_mv": 4100' in body and '"ch1_source": "field"' in body,
+              "FIELD_ANALOG twin: /field holds CH1 at 4100 mV", body[:160])
+        time.sleep(1.5)
+        seen = ""
+        for _ in range(3):
+            seen = console("devices samples")
+            if '"ch1_mv"' in seen: break
+        m = re.search(r'"ch1_mv":(-?\d+)', seen)
+        check(bool(m) and abs(int(m.group(1)) - 4100) <= 5,
+              "the firmware reads CH1 = 4100 mV over the emulated I2C bus",
+              ("ch1_mv=%s" % m.group(1)) if m else "no ch1_mv in `devices samples`: %r" % seen[:120])
+        st, _, body = req("POST", "/field?ch1_mv=open", origin=SELF)
+        check(st == 200 and '"ch1_mv": 0' in body, "/field opens CH1 again (nothing wired: 0 mV)", body[:160])
 
     n_ok = sum(results)
     print("\n== %d passed, %d failed ==" % (n_ok, len(results) - n_ok))

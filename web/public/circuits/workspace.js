@@ -217,8 +217,8 @@ function lightCard(c,v,T){const x=1240,y=318,W=304,sel=lightSel(),a=ST.field.ana
   s+=txt(16,py+20,'WHAT THE CONTROLLER SEES',{size:12.5,weight:800,fill:T.mut,ls:'.4'});
   const iw=v.monitorIW&&Array.isArray(v.monitorIW.IW)?v.monitorIW.IW[0]:null;
   let big='CH1 = —',sub2=v.conn==='none'?'not connected':'no reading yet',tag=null;
-  if(tw&&v.fieldFresh&&a){big=`CH1 = ${a.ch1_mv} mV`;sub2='chip register · '+(a.ch1_source==='field'?'set by the buttons':'the twin’s tank model');tag='OBSERVED';}
-  else if(tw&&v.fieldFresh&&ST.field.analogNote){big='CH1 = n/a';sub2='this twin build cannot set CH1 — update it';tag='PENDING';}
+  if(tw&&v.fieldFresh&&a&&a.writable){big=`CH1 = ${a.ch1_mv} mV`;sub2='chip register · your circuit owns CH1';tag='OBSERVED';}
+  else if(tw&&v.fieldFresh&&a){big=`CH1 = ${a.ch1_mv} mV`;sub2='tank model owns CH1 · see the guide line';tag='PENDING';}
   else if(v.conn==='usb'&&iw!=null){big=`%IW0 = ${iw} mV`;sub2='Studio monitor (the real CH1)';tag='OBSERVED';}
   else if(v.conn==='usb'){sub2='start Monitor in Logic to read %IW0';}
   s+=txt(16,py+52,big,{size:26,weight:800,fill:tag==='OBSERVED'?T.ink:T.mut,mono:1})+txt(16,py+72,sub2,{size:12.5,fill:T.sub});
@@ -238,8 +238,8 @@ function readoutRows(c,v){const rows=[];const L=v.live;
       val=cm!=null?`cmd ${cm}·act ${ac}`:(chip!=null?'chip '+chip:'—');}   // cmd/act from io; else the 0x59 output register
     rows.push({l:`RELAY ${n} (relay${n-1})`,val,tag:L&&val!=='—'?'OBSERVED':null});}
   if(isAnalog(c)){let val='—',tag=null;const a=ST.field.analog;
-    if(v.conn==='twin'&&v.fieldFresh&&a){val=a.ch1_mv+' mV · '+(a.ch1_source==='field'?'light':'tank model');tag='OBSERVED';}
-    else if(v.conn==='twin'&&v.fieldFresh&&ST.field.analogNote){val='update the twin';tag='PENDING';}
+    if(v.conn==='twin'&&v.fieldFresh&&a&&a.writable){val=a.ch1_mv+' mV · light';tag='OBSERVED';}
+    else if(v.conn==='twin'&&v.fieldFresh&&a){val=a.ch1_mv+' mV · tank model';tag='PENDING';}
     else if(L&&v.monitorIW&&Array.isArray(v.monitorIW.IW)){val=v.monitorIW.IW[0]+' mV';tag='OBSERVED';}
     rows.push({l:'CH1 → %IW0 (divider)',val,tag});}
   if(c.phone){const sel=CC.PHONE_MAP.find(x=>x.id===ST.phoneSel)||CC.PHONE_MAP[1];const pv=phoneValue(sel,v);rows.push({l:`phone · ${sel.name}`,val:pv.text.replace(/^.* = /,''),tag:pv.tag});}
@@ -413,7 +413,7 @@ function hops(c,v){const P=c.path;if(!P)return[];const L=v.live,k=v.conn;const o
   }else{const twin=k==='twin';const iw=v.monitorIW&&Array.isArray(v.monitorIW.IW)?v.monitorIW.IW[0]:null;const a=ST.field.analog,sel=lightSel(),tw=twin&&v.fieldFresh&&a;
     H('light on RP1',twin?`${sel.name} · ≈${fmtR(sel.r)}`:'cover / uncover',twin?'MODELLED':'INFERRED','part-RP1',twin?'a chosen light level: the twin has no photoresistor':'the real photoresistor on your bench');
     H('divider → CH1','V = 4.45·RP1/(RP1+10k)'+(twin?' = '+lightMv(sel.r)+' mV':''),'MODELLED','part-R3','arithmetic, not a reading');
-    H('X1 ADC · I²C 0x20',tw?`CH1 = ${a.ch1_mv} mV`:'—',tw?'OBSERVED':(twin&&ST.field.analogNote?'PENDING':'INFERRED'),'part-R3',tw?'QMP read of the expansion’s CH1 register; the firmware polls it @0x20':(twin&&ST.field.analogNote?'this twin build cannot set CH1: ./qemu/fetch-qemu.sh':'the firmware polls @0x20'));
+    H('X1 ADC · I²C 0x20',tw?`CH1 = ${a.ch1_mv} mV`:'—',tw&&a.writable?'OBSERVED':(tw?'PENDING':'INFERRED'),'part-R3',tw&&a.writable?'QMP read of the expansion’s CH1 register; the firmware polls it @0x20':(tw?'the twin’s tank model owns CH1: RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh':'the firmware polls @0x20'));
     H('%IW0 (mV)',iw!=null?String(iw):'—',iw!=null?'OBSERVED':'INFERRED','part-R3','Studio monitor (start Monitor in Logic)');
     H('rung',P.rung,'INFERRED',`relay${P.relay}`,'deadband + on-delay in your ladder');}
   H(`${qx} = ${cmd==null?'—':cmd}`,L?'io cmd':'—',cmd!=null?'OBSERVED':'INFERRED',`relay${P.relay}`,'the commanded output image');
@@ -444,7 +444,7 @@ function guideText(c,v){
   if(!v.live)return['wait','Connected — waiting for the first readback (field / io).'];
   if(v.conn==='usb')return['force','Physical board over USB: the drawn switches send force IXn (a software override of the input image). Your real snap switches still work — an input that reads 1 without “F” came through the wire. Leaving this view releases every force it set.'];
   if(v.fieldErr)return['force','Twin without the chip endpoint (/field: '+v.fieldErr+'). Falling back to force: hops 1–4 are bypassed.'];
-  if(isAnalog(c)&&v.conn==='twin'&&ST.field.analogNote)return['mode','This twin build cannot set CH1 yet, so its CH1 is the built-in tank model, not this photoresistor. Update the twin: ./qemu/twin-status.sh stop && ./qemu/fetch-qemu.sh, then ./qemu/studio.sh.'];
+  if(isAnalog(c)&&v.conn==='twin'&&ST.field.analogNote)return['mode','CH1 belongs to the twin’s built-in tank model, so this photoresistor cannot drive it yet. In the terminal run: RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh — then Connect twin again. (The process model is switched off while you own CH1.)'];
   if(v.mode&&v.mode!=='RUN'&&v.mode!=='REMOTE')return['mode','Twin live. The controller is in '+v.mode+': outputs stay off until you load the paired program and select RUN.'];
   if(isAnalog(c))return['live','Twin live: the light buttons put the divider voltage on CH1 at the chip; the firmware reads it over I²C @0x20. Load light-alarm and RUN, then go from Room light to Covered and back through Hand hovering.'];
   return['live','Twin live: switches set the AW9523 input bit at the chip; the firmware reads it over I²C on its next scan.'];}
@@ -475,14 +475,14 @@ function note(m){ST.msg=m;ST.msgAt=performance.now();render(true);}
 async function postField(q){const r=await fetch('/field?'+q,{method:'POST',cache:'no-store',signal:AbortSignal.timeout(3000)});if(!r.ok)throw Error('http '+r.status);const j=await r.json();if(!j.ok)throw Error(j.error||'refused');ST.field.ok=true;ST.field.di=j.di;ST.field.relays=j.relays;ST.field.analog=j.analog||null;ST.field.analogNote=j.analog_note||'';ST.field.at=performance.now();return j;}
 async function setLight(id){if(!LIGHT.some(x=>x.id===id))return;ST.light=id;save();ST.conn=connKind();const sel=lightSel(),mv=lightMv(sel.r);
   if(ST.conn==='twin'){try{const j=await postField('ch1_mv='+mv);ST.ch1Set=true;
-      if(!j.analog)note('This twin build cannot set CH1 — update it: ./qemu/twin-status.sh stop && ./qemu/fetch-qemu.sh');
+      if(!j.analog)note('This twin has no IO-expansion analog frame.');
       else{try{log&&log(`Circuit d: ${sel.name} → RP1 ≈ ${fmtR(sel.r)} → ${mv} mV on CH1 at the chip (QMP); the firmware reads it over I²C @0x20.`,'ok');}catch(e){}}}
     catch(e){note('CH1: '+e.message);}}
   else if(ST.conn==='usb')note('Physical board: shade or light the real photoresistor — these buttons drive only the twin.');
   else note('Not connected — Connect twin to put this light level on CH1.');
   render(true);}
 function releaseCh1(){if(!ST.ch1Set)return;ST.ch1Set=false;
-  try{fetch('/field?ch1_mv=physics',{method:'POST',cache:'no-store',keepalive:true}).catch(()=>{});}catch(e){}}
+  try{fetch('/field?ch1_mv=open',{method:'POST',cache:'no-store',keepalive:true}).catch(()=>{});}catch(e){}}
 function busy(){try{return typeof busBusy!=='undefined'&&busBusy;}catch(e){return false;}}
 function send(cmd){if(busy())return false;try{return typeof rawSend==='function'&&rawSend(cmd);}catch(e){return false;}}
 async function drive(p,val){const c=circuit();const n=+p.in.slice(2)-1;ST.conn=connKind();
@@ -501,7 +501,7 @@ function releaseAll(){releaseCh1();Object.keys(ST.held).forEach(id=>{if(ST.held[
  * once per connection and circuit. Every drive awaits it, so a press can never be overwritten by it. */
 function ensureRest(c){const key=ST.epoch+'|'+c.id;if(ST.restKey===key)return ST.restP||Promise.resolve();
   if(ST.conn!=='twin'||ST.field.ok===false)return Promise.resolve();ST.restKey=key;const di=c.restDi||0;
-  ST.restP=postField('di='+di).then(()=>isAnalog(c)?postField('ch1_mv='+lightMv(lightSel().r)).then(j=>{if(j.analog)ST.ch1Set=true;}).catch(()=>{}):null).then(()=>{if(!Object.values(ST.held).some(Boolean))resetSwitches(c);
+  ST.restP=postField('di='+di).then(()=>isAnalog(c)&&ST.field.analog&&ST.field.analog.writable?postField('ch1_mv='+lightMv(lightSel().r)).then(j=>{if(j.analog)ST.ch1Set=true;}).catch(()=>{}):null).then(()=>{if(!Object.values(ST.held).some(Boolean))resetSwitches(c);
       try{log&&log(`Circuit ${c.id}: twin field inputs set to this circuit’s rest state at the chip (di = 0x${di.toString(16).padStart(2,'0')}${di?': '+c.parts.filter(p=>p.control&&p.rest).map(p=>p.in+' = 1').join(', '):''}).`,'ok');}catch(e){}})
     .catch(e=>{ST.field.ok=false;ST.field.err=e.message;});
   return ST.restP;}
