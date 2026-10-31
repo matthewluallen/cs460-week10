@@ -250,8 +250,8 @@ storage seam. They do not exercise the ESP32 flash journal, physical power loss 
 flash durability. Verify the persisted project identity after an actual restart;
 retain separate evidence for recovery from an interrupted write.
 
-The existing `twin-smoke` workflow (`.github/workflows/twin-smoke.yml`) runs
-`qemu/smoke-test.py`, which asserts **nine lab invariant categories** — boot, i2cscan,
+The CI workflow (`.github/workflows/ci.yml`) runs `qemu/smoke-test.py` in its **twin-smoke**
+job, which asserts **nine lab invariant categories** — boot, i2cscan,
 di0→relay0/1 control, e-stop interlock, OTA :80, HMI :8080, sigrok bus decode, NTP/Y2038
 wrap, and the CWE-787 `/api/tag` overflow. Counted individually those are **16 `check()`
 assertions** in CI (where `sigrok-cli` is installed and the bus leg contributes three),
@@ -279,3 +279,11 @@ release provenance remain separate work.
 changed in B or C, which positive control still passed, and what remains possible.
 A build named "secure", an HTTP error from the wrong gate, or a list of intended
 fixes is not a substitute for that evidence.
+
+---
+
+**Next — Level 3 (Week 12): prove it.** This part *tests* that the secure build refuses each
+attack. [Week 12](../week12/) goes further: it **proves** each control with the Z3 SMT solver
+(the violation becomes unreachable for all inputs, not just the inputs you tried) and reasons
+about the CI/CD assurance pipeline and the compensating controls for the system-of-systems
+boundaries you can't prove. The engine is in [`formal-verify/`](../formal-verify/).
