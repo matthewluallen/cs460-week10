@@ -99,6 +99,8 @@ jobs:
         run: python assessment/verify-lab.py --boot-twin P1 P3 P5 P6 P8
       - name: Already-running twin is reused, not re-booted
         run: ./qemu/test-twin-status.sh
+      - name: Studio server only obeys its own page (bind, Origin, no GET writes, /field)
+        run: python3 qemu/test-bridge-security.py
 
   formal-verify:
     # Week 12 / Level 3: Z3 must prove every security control on the verified build. This is the
