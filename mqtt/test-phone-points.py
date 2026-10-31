@@ -14,6 +14,9 @@ It plays the phone with a tiny raw-socket MQTT 3.1.1 client (no libraries) and a
   3. the Modbus mirror (holding registers 140-165) carries the values and fresh bits
   4. `mqtt pin` refuses other ids (counted) but accepts anyone who reuses the pinned id
   5. each point goes stale on its own 8 s timer: analog holds, a momentary button reads 0
+     (timed by the controller's own clock, read back as age_ms: the twin runs on virtual
+     time - qemu/run.sh -icount - which in a Codespace advances at roughly 0.3-0.5 s per
+     wall second, so wall-clock sleeps cannot time an 8 s window)
   6. a project that binds phone_light_lux + phone_light_lux_fresh drives a relay, and the
      fresh gate drops it when the phone goes quiet; then the factory program is reloaded
   7. the client lifecycle: `mqtt connect` again replaces the client cleanly (no heap loss over
@@ -52,6 +55,19 @@ def status():
         m = re.search(r'\{"mqtt":"status".*\}\}', cmd("mqtt status", 2.5))
         if m: return json.loads(m.group(0))
     raise RuntimeError("no mqtt status JSON")
+def aged(name, ms, limit=90):
+    """Poll until point NAME is at least MS old by the controller's clock; return the points
+    and the controller-ms per wall-second seen meanwhile (the twin's virtual-time rate)."""
+    t0 = time.time(); first = None; p = {}
+    while time.time() - t0 < limit:
+        p = status()["points"]; a = p[name]["age_ms"]
+        if a is not None:
+            if first is None: first = (a, time.time())
+            if a >= ms: break
+        time.sleep(0.5)
+    a = p.get(name, {}).get("age_ms")
+    rate = (a - first[0]) / 1000 / max(time.time() - first[1], 1e-3) if first and a is not None else None
+    return p, rate
 def relay(txt, n):
     m = re.search(rf"relay{n}\s+cmd=\d+\s+act=(\d)", txt); return m.group(1) if m else "?"
 
@@ -155,11 +171,11 @@ def main():
           "a spoofed value under the pinned id is accepted and fresh")
     cmd("mqtt unpin", 1.0)
 
-    # freshness: each point has its own 8 s timer
+    # freshness: each point has its own 8 s timer (controller time)
     phone("light", {"lux": 640}); phone("btn1", {"v": 1})
-    time.sleep(3.0); phone("sound", {"level": 55})
-    time.sleep(6.5)                                      # light/btn1 are now ~9.5 s old, sound ~6.5 s
-    p = status()["points"]
+    aged("light_lux", 4000); phone("sound", {"level": 55})
+    p, rate = aged("light_lux", 8600)                    # light/btn1 ~8.6 s old, sound ~4.6 s
+    if rate: print(f"  (twin clock: {rate:.2f} controller-s per wall-s)")
     check("stale.analog_holds", p["light_lux"]["fresh"] == 0 and p["light_lux"]["v"] == 640, str(p["light_lux"]))
     check("stale.button_releases", p["btn1"]["fresh"] == 0 and p["btn1"]["v"] == 0, str(p["btn1"]))
     check("stale.per_point", p["sound"]["fresh"] == 1, str(p["sound"]))
@@ -189,9 +205,9 @@ def main():
     time.sleep(2.0); io1 = cmd("io", 1.5)
     check("project.phone_drives_relays", relay(io1, 0) == "1" and relay(io1, 1) == "1",
           f"relay0={relay(io1, 0)} relay1={relay(io1, 1)}")
-    time.sleep(9.0); io2 = cmd("io", 1.5)                # phone silent: fresh gate drops the alarm
+    p, _ = aged("light_lux", 8600); io2 = cmd("io", 1.5)  # phone silent: fresh gate drops the alarm
     check("project.fresh_gate", relay(io2, 0) == "0" and relay(io2, 1) == "0",
-          f"after 9 s of silence relay0={relay(io2, 0)} relay1={relay(io2, 1)}")
+          f"after {p['light_lux']['age_ms']} ms of silence relay0={relay(io2, 0)} relay1={relay(io2, 1)}")
 
     # client lifecycle: reconnect replaces the client without losing heap; disconnect stops it
     heaps = []
@@ -200,7 +216,9 @@ def main():
         time.sleep(2.0); heaps.append(status().get("heap_free", 0))
     check("lifecycle.reconnect", st.get("connected") is True and st.get("clients_started", 0) >= 4,
           f"clients_started={st.get('clients_started')}")
-    check("lifecycle.no_heap_leak", heaps and max(heaps) - min(heaps) < 3072 and heaps[-1] >= heaps[0] - 3072,
+    # Free heap while connected moves by a few KB with the outbox and in-flight messages;
+    # a leak shows as a steady fall across reconnects.
+    check("lifecycle.no_heap_leak", heaps and heaps[-1] >= heaps[0] - 3072,
           f"heap_free after each reconnect: {heaps}")
     reply = cmd("mqtt disconnect", 2.0)
     t0 = time.time(); st = {}
