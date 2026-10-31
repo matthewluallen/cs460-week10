@@ -1,6 +1,6 @@
 # Test your logic on the running controller — the Studio Test bench
 
-You built a rung in Part 4. Now **drive it** on the running firmware with a simple
+You built a rung in Part 2. Now **drive it** on the running firmware with a simple
 virtual circuit — a pushbutton and an LED — and watch your logic move a real output.
 No hardware required: everything here runs against the **QEMU twin**, and every step
 below was validated on a physical M5StampLC as well (the bench is the reference, not
@@ -162,7 +162,7 @@ is already lit, press Reset once. On the console the same start-up is `force est
 
 Reconcile each row against `io`. Then answer: why must step 4 *not* restart the motor? What
 does a cut wire on IN3 do, and what would a cut wire on IN2 (the N.O. Stop) do? `verify-lab.py
-P5` asserts exactly these rows.
+P1` asserts exactly these rows.
 
 > Forcing `estop_ok` to 1 defeats the E-stop in software. A real E-stop also opens the motor
 > supply directly (a second, hard-wired channel), so no program, force or unauthenticated

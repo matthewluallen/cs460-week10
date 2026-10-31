@@ -1,4 +1,4 @@
-# Part 2 — Software Bill of Materials (SBOM)
+# Part 5 — Software Bill of Materials (SBOM)
 
 An **SBOM** lists what's *inside the software*: the libraries, packages and versions
 a build pulls in. Security teams use it to answer "do we ship anything with a known

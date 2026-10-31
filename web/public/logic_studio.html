@@ -266,7 +266,7 @@ textarea#stl{flex:1;border:0;resize:none;padding:12px 14px 40px;font-family:var(
 .app.circuit-active #viewCircuit{display:flex}
 .circ-body{flex:1;min-height:0;display:grid;grid-template-columns:1.25fr .9fr .9fr;gap:0;overflow:auto}
 .circ-body[hidden],.cw-wire[hidden],.cw-parts[hidden]{display:none!important}
-/* ----- Part 5 wire & run: predesigned snap-kit circuits (circuits/workspace.js) ----- */
+/* ----- Part 1 wire & run: predesigned snap-kit circuits (circuits/workspace.js) ----- */
 .cw-wire{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column}
 #cwSub button,#cwView button{white-space:nowrap}
 .cw-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel2)}
@@ -651,7 +651,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
           <button class="btn" id="bReadStatus" disabled>Read controller status</button>
           <button class="btn" id="bReadProject" disabled>Read installed application</button>
           <button class="btn" id="bExportProjectReadback" disabled>Export readback evidence</button>
-          <button class="btn" id="bBench" title="Open the predesigned Part 5 circuits (Circuit tab · Wire &amp; run) and drive them on the twin or a board">⚡ Test bench</button>
+          <button class="btn" id="bBench" title="Open the predesigned Part 1 circuits (Circuit tab · Wire &amp; run) and drive them on the twin or a board">⚡ Test bench</button>
           <button class="btn" id="bNetCfg" title="Configure the device network (WiFi STA/setup-AP, and W5500 Ethernet if fitted), static or DHCP">⚙ Network</button>
           <button class="btn" id="bSensors">Grove devices</button>
           <div class="menu-sep"></div>
@@ -865,7 +865,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
 
   <section id="viewCircuit" aria-label="Circuit Studio — wire and run predesigned circuits">
     <div class="proto-head">
-      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">Part 5 · wire &amp; run · snap-kit parts on the StampLC</span></div>
+      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">Part 1 · wire &amp; run · snap-kit parts on the StampLC</span></div>
       <span class="seg" id="cwSub" role="tablist" aria-label="Circuit Studio views"><button type="button" role="tab" data-sub="wire" class="on">Wire &amp; run</button><button type="button" role="tab" data-sub="paths">Input paths</button><button type="button" role="tab" data-sub="parts">Parts</button></span>
       <span class="spacer" style="flex:1"></span>
       <span class="flow-hint" id="circuitHint"></span>
@@ -3400,8 +3400,8 @@ function openProject(){
 }
 function openExampleProjects(){
   showModal(`<h3>Example project files</h3><div class="body"><p>Each file supplies its own logic, names and I/O mappings. All use the same generic runtime and can be loaded into either firmware profile. Choose an example explicitly; opening one never installs it. The factory and twin images ship with only Motor start/stop + E-stop installed.</p>
-    <p><b>Part 5 factory default:</b> <button class="btn" data-example="motor-start-stop-estop">Open Motor start/stop + E-stop</button> <a href="projects/motor-start-stop-estop.csco" download>.csco</a> — the program the factory and twin images ship installed (PROGRAM mode). Start seals the motor in; Stop drops it; the N.C. E-stop (estop_ok, 1 = healthy) latches the fault lamp; restoring the E-stop never restarts the motor; Reset clears the fault; Start must be pressed again. On the twin every input reads 0 at boot, so the E-stop reads tripped until you drive estop_ok to 1.</p>
-    <p><b>Part 5 Test-bench pair:</b> <button class="btn" data-example="pushbutton">Open Pushbutton → green LED</button> <a href="projects/pushbutton.csco" download>.csco</a> · <button class="btn" data-example="two-led-nonc">Open Two LEDs — NO / NC</button> <a href="projects/two-led-nonc.csco" download>.csco</a></p>
+    <p><b>Part 1 factory default:</b> <button class="btn" data-example="motor-start-stop-estop">Open Motor start/stop + E-stop</button> <a href="projects/motor-start-stop-estop.csco" download>.csco</a> — the program the factory and twin images ship installed (PROGRAM mode). Start seals the motor in; Stop drops it; the N.C. E-stop (estop_ok, 1 = healthy) latches the fault lamp; restoring the E-stop never restarts the motor; Reset clears the fault; Start must be pressed again. On the twin every input reads 0 at boot, so the E-stop reads tripped until you drive estop_ok to 1.</p>
+    <p><b>Part 1 Test-bench pair:</b> <button class="btn" data-example="pushbutton">Open Pushbutton → green LED</button> <a href="projects/pushbutton.csco" download>.csco</a> · <button class="btn" data-example="two-led-nonc">Open Two LEDs — NO / NC</button> <a href="projects/two-led-nonc.csco" download>.csco</a></p>
     <p><button class="btn" data-example="indicator">Open Input indicator</button> <a href="projects/indicator.csco" download>Download indicator.csco</a></p>
     <p><button class="btn" data-example="interlocked-pair">Open Ventilation interlock</button> <a href="projects/interlocked-pair.csco" download>Download interlocked-pair.csco</a></p>
     <p><button class="btn" data-example="io-expansion">Open IO expansion level alarm</button> <a href="projects/io-expansion.csco" download>Download io-expansion.csco</a></p>
@@ -5125,7 +5125,7 @@ initTheme();modeChips();setMode('edit');rebuildFromModel();openProject();
 log('Open a project, validate its settings, then load and read back the application. RUN is a separate controller command.','ok');
 if(inFrame)log('Embedded preview: authoring works here. For USB access, open student/logic_studio.html standalone in Chrome/Edge.','rx');
 </script>
-<!-- Part 5 "Wire & run": snap-kit circuit views (Circuit tab). Loaded after the main script so the
+<!-- Part 1 "Wire & run": snap-kit circuit views (Circuit tab). Loaded after the main script so the
      console transport (rawSend, lineListeners, wsSock/port) and AppView already exist. -->
 <script src="circuits/snapkit.js"></script>
 <script src="circuits/catalog.js"></script>

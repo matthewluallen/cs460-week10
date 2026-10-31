@@ -126,8 +126,8 @@ no inbound firewall rule would see — **nothing connected inbound at all**.
 
 ## Exercise 3 — the bus, and the four lenses
 
-The relay actuation is the same `0x59` write you decoded in Part 1. If you want the
-bus-level proof, capture and decode it with the Part-1 tooling while the switch fires
+The relay actuation is the same `0x59` write you decoded in Part 3. If you want the
+bus-level proof, capture and decode it with the Part-3 tooling while the switch fires
 (see [`bus-analysis/`](../bus-analysis/)); you'll see the AW9523 write go `data 0 → 1`.
 
 **Do:** in a short paragraph, place this one attack on the four analysis lenses from the

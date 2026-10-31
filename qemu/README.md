@@ -31,7 +31,7 @@ on every write), Modbus writes need POST (so a link or image on another site can
 other sites can't read values through it. Circuit views set the twin's inputs **at the chip** through
 `/field` — exactly two expander properties, never raw QMP. `python3 qemu/test-bridge-security.py`
 checks all of this (CI runs it). A real attacker on the *plant network* is a different story — the
-twin's own Modbus port is unauthenticated on the vulnerable build on purpose (Parts 1 and 6).
+twin's own Modbus port is unauthenticated on the vulnerable build on purpose (Parts 3 and 6).
 
 **Already running? Nothing is booted twice.** `studio.sh`, `run.sh` and
 `assessment/verify-lab.py --boot-twin` all check first. A twin counts as running when its

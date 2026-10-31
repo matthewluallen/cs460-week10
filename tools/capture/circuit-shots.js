@@ -1,4 +1,4 @@
-// Part 5 "Wire & run" circuit screenshots — every predesigned circuit, bench + schematic view.
+// Part 1 "Wire & run" circuit screenshots — every predesigned circuit, bench + schematic view.
 //
 //   node tools/capture/circuit-shots.js [--url http://localhost:8088/logic_studio.html]
 //        [--out docs/img] [--no-connect] [--hold] [--theme dark|light] [--scale 1.5] [--only a,c]

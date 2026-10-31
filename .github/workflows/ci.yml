@@ -84,7 +84,7 @@ jobs:
     # Runs the per-part assessment anchors (assessment/verify-lab.py) against the twin, so
     # the gradeable checks students rely on are proven to pass on a clean build. Same checks
     # run on a physical StampLC over USB (SERIAL_PORT=...). Part 9 needs the secure build and
-    # is exercised separately; P2/P4/P7 SKIP here (no SBOM outputs / Playwright / malicious image).
+    # is exercised separately; P5/P2/P7 SKIP here (no SBOM outputs / Playwright / malicious image).
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -100,7 +100,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: ./qemu/fetch-qemu.sh
       - name: Verify lab parts on the twin
-        run: python assessment/verify-lab.py --boot-twin P1 P3 P5 P6 P8
+        run: python assessment/verify-lab.py --boot-twin P1 P3 P4 P6 P8
       - name: Already-running twin is reused, not re-booted
         run: ./qemu/test-twin-status.sh
       - name: Studio server only obeys its own page (bind, Origin, no GET writes, /field)

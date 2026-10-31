@@ -8,7 +8,7 @@ and the controller's clock jumps to **1902** — and the audit trail that says *
 what, when* is now dated to the Roosevelt administration.
 
 The protocol is the attack surface — the same thesis as the unauthenticated-Modbus write
-in Part 1, now applied to time.
+in Part 3, now applied to time.
 
 > **No hardware, no device network.** Everything runs inside your Codespace against the
 > QEMU twin, the same `plc>` console and W5500 services as the bench.

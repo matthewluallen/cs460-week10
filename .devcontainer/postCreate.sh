@@ -22,7 +22,7 @@ curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/ins
        && sudo tar -xzf /tmp/trivy.tgz -C "$BIN" trivy 2>/dev/null && echo "   trivy installed (tarball fallback)"; } \
   || echo "   (trivy optional — skipped; syft+grype cover Exercise 2)"
 
-echo "==> Installing cve-bin-tool (binary CVE scanner — Part 2 Exercise 3) + gsutil (for the CVE mirror)…"
+echo "==> Installing cve-bin-tool (binary CVE scanner — Part 5 Exercise 3) + gsutil (for the CVE mirror)…"
 # cve-bin-tool fingerprints a compiled .bin for component versions. pipx keeps it isolated; fall
 # back to pip. gsutil lets it pull CVE data from the json-mirror (a public GCS bucket) instead of
 # the NVD API — so Exercise 3 needs NO NVD key and works even when nvd.nist.gov is down. Non-fatal.
@@ -33,7 +33,7 @@ pipx install cve-bin-tool >/dev/null 2>&1 \
 pip3 install --quiet gsutil 2>/dev/null || pip3 install --quiet --break-system-packages gsutil 2>/dev/null \
   || echo "   (gsutil install skipped — Exercise 3 notes the fallback)"
 
-echo "==> Installing SAST tools for Part 2 Exercise 4 (flawfinder; cppcheck came via apt above)…"
+echo "==> Installing SAST tools for Part 5 Exercise 4 (flawfinder; cppcheck came via apt above)…"
 # flawfinder = CWE-tagged risky-C/C++ pattern scanner. cppcheck (apt, above) = bug/style SAST.
 # Exercise 4 runs both to show SAST finds code-pattern weaknesses but MISSES the firmware's
 # architectural CWEs (no-auth / cleartext / unsigned-OTA / default creds). Non-fatal.

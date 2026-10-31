@@ -14,11 +14,17 @@ transport differs:
 Usage:
   ./qemu/run.sh                              # boot the twin (vulnerable) in one shell
   python assessment/verify-lab.py            # all applicable parts, in another shell
-  python assessment/verify-lab.py P5         # one or more parts: P1 P3 P5 ...
+  python assessment/verify-lab.py P1         # one or more parts: P1 P3 P4 ...
   python assessment/verify-lab.py --boot-twin           # boot a twin if none is running, then verify
   RESTART=1 ./qemu/run.sh secure ; python assessment/verify-lab.py P9   # Part 9 needs the secure build
   SERIAL_PORT=/dev/ttyACM0 OTA_HOST=10.0.0.5:80 HMI_HOST=10.0.0.5:8080 \
       python assessment/verify-lab.py        # physical board over USB + Ethernet
+
+Part IDs follow the lab page (Build → Analyze → Break → Secure):
+  A · Build    P1 wire & run · P2 ladder logic
+  B · Analyze  P3 bus & network · P4 HBOM · P5 SBOM
+  C · Break    P6 unsigned update · P7 supply chain · P8 NTP / Y2038
+  D · Secure   P9 harden (secure build)
 
 Verdicts:  PASS (observable achieved) · FAIL (not achieved) · SKIP (tool/target not available).
 Exit 0 iff no requested check FAILed (a SKIP is not a failure). The printed verdict is the
@@ -157,48 +163,6 @@ def http(url, timeout=6):
 # Each returns (verdict, evidence). device=True checks need a running target.
 PASS, FAIL, SKIP = "PASS", "FAIL", "SKIP"
 
-def P1_bus(_c):
-    """Offline: the recorded request decodes to FC3, register 25."""
-    dec = os.path.join(ROOT, "bus-analysis", "tools", "decode.js")
-    req = os.path.join(ROOT, "bus-analysis", "serial", "physical-0-request.bin")
-    if not (shutil.which("node") and os.path.exists(dec) and os.path.exists(req)):
-        return SKIP, "node / decoder / sample not available"
-    out = subprocess.run(["node", dec, "rtu-request", req],
-                         capture_output=True, text=True).stdout
-    ok = '"status": "valid"' in out and '"value": 3' in out and '"value": 25' in out
-    return (PASS if ok else FAIL), "sample decodes to status=valid, FC03, register 25"
-
-def P2_sbom(_c):
-    """Offline: an SPDX and a CycloneDX SBOM both exist from the same tree and differ."""
-    cand = []
-    for base in ("sbom/out", "sbom"):
-        d = os.path.join(ROOT, base)
-        if os.path.isdir(d):
-            cand += [os.path.join(d, f) for f in os.listdir(d)]
-    spdx = [f for f in cand if "spdx" in f.lower()]
-    cdx  = [f for f in cand if "cyclonedx" in f.lower() or "cdx" in f.lower()]
-    if not (spdx and cdx):
-        return SKIP, "no SPDX+CycloneDX outputs yet — run sbom/run_sbom.sh first"
-    return PASS, f"both SBOM formats present ({os.path.basename(spdx[0])}, {os.path.basename(cdx[0])})"
-
-def P3_hbom(c):
-    """Device: i2cscan matches the HBOM — six internal devices + PORT.A 0x77."""
-    scan = c.cmd("i2cscan", 2.5).lower().replace("0X", "0x")
-    internal = [a for a in ("0x20", "0x32", "0x40", "0x43", "0x48", "0x59") if a in scan]
-    w1 = "0x77" in scan
-    ok = len(internal) == 6 and w1
-    return (PASS if ok else FAIL), f"{len(internal)}/6 internal I2C + PORT.A 0x77={w1}"
-
-def P4_ladder(_c):
-    """Offline: the example projects compile to IR with the ST<->ladder pairing intact."""
-    probe = subprocess.run(["node", "-e", "require('playwright')"], cwd=ROOT,
-                           capture_output=True, text=True)
-    if shutil.which("node") is None or probe.returncode != 0:
-        return SKIP, "node/playwright not installed (run `npm i playwright` to enable)"
-    r = subprocess.run(["node", os.path.join(ROOT, "tools", "studio-regression.js")],
-                       cwd=ROOT, capture_output=True, text=True)
-    return (PASS if r.returncode == 0 else FAIL), (r.stdout.strip().splitlines() or ["(no output)"])[-1]
-
 # The factory default program (web/public/projects/motor-start-stop-estop.csco, seeded into
 # the factory and twin images). Tag names are what `force <tag>` accepts:
 #   start_pb  = IN1/di0  N.O. momentary          motor      = RELAY 1/relay0
@@ -216,14 +180,14 @@ def steady(c, want, dur=2.5):
             return False, last
     return seen > 0, last
 
-def P5_wire(c):
+def P1_wire(c):
     """Device: the fail-safe motor program — seal-in, stop, E-stop trip latches the fault, no
     restart when the E-stop is restored, reset clears the fault without restarting, start runs."""
     r = c.cmd("force estop_ok 1", 1.0)
     if "unknown tag" in r:
         return FAIL, ("the running program has no estop_ok tag — the factory motor program "
                       "(motor-start-stop-estop) is not installed on this target. In the Logic Studio: "
-                      "Example projects -> Motor start/stop + E-stop, Load application (PROGRAM), then re-run P5 "
+                      "Example projects -> Motor start/stop + E-stop, Load application (PROGRAM), then re-run P1 "
                       "(or boot the factory image: --boot-twin with no twin running)")
     # A NC E-stop reads 0 when nothing holds it closed — and the twin's DI byte boots as 0 —
     # so the check first drives estop_ok = 1 (the slide switch ON), releases every button,
@@ -262,6 +226,48 @@ def P5_wire(c):
         for t in MOTOR_INPUTS:
             c.cmd(f"unforce {t}", 0.4)
     return (PASS if ok else FAIL), "; ".join(ev)
+
+def P2_ladder(_c):
+    """Offline: the example projects compile to IR with the ST<->ladder pairing intact."""
+    probe = subprocess.run(["node", "-e", "require('playwright')"], cwd=ROOT,
+                           capture_output=True, text=True)
+    if shutil.which("node") is None or probe.returncode != 0:
+        return SKIP, "node/playwright not installed (run `npm i playwright` to enable)"
+    r = subprocess.run(["node", os.path.join(ROOT, "tools", "studio-regression.js")],
+                       cwd=ROOT, capture_output=True, text=True)
+    return (PASS if r.returncode == 0 else FAIL), (r.stdout.strip().splitlines() or ["(no output)"])[-1]
+
+def P3_bus(_c):
+    """Offline: the recorded request decodes to FC3, register 25."""
+    dec = os.path.join(ROOT, "bus-analysis", "tools", "decode.js")
+    req = os.path.join(ROOT, "bus-analysis", "serial", "physical-0-request.bin")
+    if not (shutil.which("node") and os.path.exists(dec) and os.path.exists(req)):
+        return SKIP, "node / decoder / sample not available"
+    out = subprocess.run(["node", dec, "rtu-request", req],
+                         capture_output=True, text=True).stdout
+    ok = '"status": "valid"' in out and '"value": 3' in out and '"value": 25' in out
+    return (PASS if ok else FAIL), "sample decodes to status=valid, FC03, register 25"
+
+def P4_hbom(c):
+    """Device: i2cscan matches the HBOM — six internal devices + PORT.A 0x77."""
+    scan = c.cmd("i2cscan", 2.5).lower().replace("0X", "0x")
+    internal = [a for a in ("0x20", "0x32", "0x40", "0x43", "0x48", "0x59") if a in scan]
+    w1 = "0x77" in scan
+    ok = len(internal) == 6 and w1
+    return (PASS if ok else FAIL), f"{len(internal)}/6 internal I2C + PORT.A 0x77={w1}"
+
+def P5_sbom(_c):
+    """Offline: an SPDX and a CycloneDX SBOM both exist from the same tree and differ."""
+    cand = []
+    for base in ("sbom/out", "sbom"):
+        d = os.path.join(ROOT, base)
+        if os.path.isdir(d):
+            cand += [os.path.join(d, f) for f in os.listdir(d)]
+    spdx = [f for f in cand if "spdx" in f.lower()]
+    cdx  = [f for f in cand if "cyclonedx" in f.lower() or "cdx" in f.lower()]
+    if not (spdx and cdx):
+        return SKIP, "no SPDX+CycloneDX outputs yet — run sbom/run_sbom.sh first"
+    return PASS, f"both SBOM formats present ({os.path.basename(spdx[0])}, {os.path.basename(cdx[0])})"
 
 def P6_ota(c):
     """Device: the OTA endpoint is present and advertises an unauthenticated upload path."""
@@ -335,14 +341,18 @@ def W12_formal(_c):
     return FAIL, (r.stdout.strip().splitlines() or ["proof assertion failed"])[-1]
 
 CHECKS = {
-    "P1": (P1_bus,    False, "Bus analysis — Modbus decode"),
-    "P2": (P2_sbom,   False, "SBOM — SPDX vs CycloneDX"),
-    "P3": (P3_hbom,   True,  "HBOM — i2cscan reconciliation"),
-    "P4": (P4_ladder, False, "Ladder — compiles to IR, pairing holds"),
-    "P5": (P5_wire,   True,  "Wire & run — fail-safe motor: seal-in, stop, E-stop latch, reset"),
+    # Section A · Build
+    "P1": (P1_wire,   True,  "Wire & run — fail-safe motor: seal-in, stop, E-stop latch, reset"),
+    "P2": (P2_ladder, False, "Ladder logic — compiles to IR, pairing holds"),
+    # Section B · Analyze
+    "P3": (P3_bus,    False, "Bus & network — Modbus decode"),
+    "P4": (P4_hbom,   True,  "HBOM — i2cscan reconciliation"),
+    "P5": (P5_sbom,   False, "SBOM — SPDX vs CycloneDX"),
+    # Section C · Break
     "P6": (P6_ota,    True,  "Unsigned OTA — endpoint accepts"),
     "P7": (P7_supply, False, "Supply-chain kill switch (twin, manual)"),
     "P8": (P8_ntp,    True,  "NTP AiTM / Y2038 wrap"),
+    # Section D · Secure
     "P9": (P9_secure, True,  "Remediation — secure build refuses the attacks"),
     "W12":(W12_formal,False, "Formal verification — Z3 proves all controls (Level 3)"),
 }
@@ -371,7 +381,7 @@ def boot_twin():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("parts", nargs="*", help="e.g. P1 P3 P5 (default: P1–P8)")
+    ap.add_argument("parts", nargs="*", help="e.g. P1 P3 P4 (default: P1–P8; P9 needs the secure build)")
     ap.add_argument("--boot-twin", action="store_true",
                     help="boot the QEMU twin if none is already running, verify, and tear down only a twin it booted")
     args = ap.parse_args()

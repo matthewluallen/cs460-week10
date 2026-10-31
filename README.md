@@ -25,19 +25,19 @@ QEMU firmware twin for Parts 6–7 — built for x86-64 (Codespaces) or arm64 (l
 
 ## What you'll do
 
-| # | Part | Folder | Device? |
-|---|------|--------|---------|
-| 1 | **Bus analysis** — decode a real recorded Modbus RTU exchange and reason about what it does (and doesn't) establish | [`bus-analysis/`](bus-analysis/) | No |
-| 2 | **SBOM** — generate and compare software bills of materials (SPDX vs CycloneDX), then scan for CVEs | [`sbom/`](sbom/) | No |
-| 3 | **HBOM** — map the StampLC's hardware components and reconcile them with what the bus actually shows | [`hbom/`](hbom/) | No |
-| 4 | **Ladder logic** — start from a prebuilt program; enable one rung (or add one function) | [`ladder/`](ladder/) | No (apply on your twin in Part 5) |
-| 5 | **Wire & run** — one input → your logic → one output, driven from the **Logic Studio** against **your own twin** (every step validated on a real StampLC too) | [`wiring/`](wiring/) | Twin |
-| 6 | **Firmware & the unsigned update** — boot the *real* firmware in the twin; find and prove an unsigned-OTA weakness | [`firmware-ota/`](firmware-ota/) | No (twin) |
-| 7 | **Supply-chain kill switch** — detonate a dormant OTA payload through a compromised update source; trace it to a relay | [`supply-chain/`](supply-chain/) | No (twin) |
-| 8 | **NTP adversary-in-the-middle & Y2038** — spoof the unauthenticated network time the controller trusts; wrap its 32-bit clock to 1902 | [`ntp-aitm/`](ntp-aitm/) | No (twin) |
-| 9 | **Direct remediation and compensating controls** — preserve the vulnerable/secure build switch, compare a specific changed path or exposure control, and record its evidence and remaining limits | [`remediation/`](remediation/) | No (twin) |
+| Section | # | Part | Folder | Device? |
+|---|---|------|--------|---------|
+| A · Build | 1 | **Wire & run** — one input → your logic → one output, driven from the **Logic Studio** against **your own twin** (every step validated on a real StampLC too) | [`wiring/`](wiring/) | Twin |
+| A · Build | 2 | **Ladder logic** — start from a prebuilt program; enable one rung (or add one function) | [`ladder/`](ladder/) | No (apply on your twin, running since Part 1) |
+| B · Analyze | 3 | **Bus analysis** — decode a real recorded Modbus RTU exchange and reason about what it does (and doesn't) establish | [`bus-analysis/`](bus-analysis/) | No |
+| B · Analyze | 4 | **HBOM** — map the StampLC's hardware components and reconcile them with what the bus actually shows | [`hbom/`](hbom/) | No |
+| B · Analyze | 5 | **SBOM** — generate and compare software bills of materials (SPDX vs CycloneDX), then scan for CVEs | [`sbom/`](sbom/) | No |
+| C · Break | 6 | **Firmware & the unsigned update** — boot the *real* firmware in the twin; find and prove an unsigned-OTA weakness | [`firmware-ota/`](firmware-ota/) | No (twin) |
+| C · Break | 7 | **Supply-chain kill switch** — detonate a dormant OTA payload through a compromised update source; trace it to a relay | [`supply-chain/`](supply-chain/) | No (twin) |
+| C · Break | 8 | **NTP adversary-in-the-middle & Y2038** — spoof the unauthenticated network time the controller trusts; wrap its 32-bit clock to 1902 | [`ntp-aitm/`](ntp-aitm/) | No (twin) |
+| D · Secure | 9 | **Direct remediation and compensating controls** — preserve the vulnerable/secure build switch, compare a specific changed path or exposure control, and record its evidence and remaining limits | [`remediation/`](remediation/) | No (twin) |
 
-Work the parts in order; each builds on the last. In Part 5 you run **your own twin** and
+Work the parts in order; each builds on the last. In Part 1 you run **your own twin** and
 drive it from the **Logic Studio** in your browser — no teams, no shared bench, no hardware:
 
 ```bash
@@ -62,9 +62,9 @@ are graded the same way and their objectives + MITRE/CWE mapping are in
 
 | Ext | Builds on | What you do | Where |
 |---|---|---|---|
-| **E1 — Provenance Studio** | 1 · 5 · 9 | Match a live `/api/log` event to the firmware **source line + CWE**, and spot the **provenance gap** — an output change with no WRITE/FORCE row (the signature of an unaudited, memory-corruption write) | [`web/public/provenance_studio.html`](web/public/provenance_studio.html) |
-| **E2 — Signal Journey** | 1 · 4 · 5 · 7 | Follow one byte across five lenses — Wireshark → sigrok → firmware source → ladder → relay — and say what each lens can and cannot show | [`web/public/signal_journey.html`](web/public/signal_journey.html) |
-| **E3 — Phone-as-sensor false-data injection** | 5 · 8 | Withhold a sensor the PLC trusts (availability) and spoof its value (integrity), then build a plausibility gate that still passes the real reading | [`docs/assignment-phone-sensor-fdi.html`](docs/assignment-phone-sensor-fdi.html) |
+| **E1 — Provenance Studio** | 1 · 3 · 9 | Match a live `/api/log` event to the firmware **source line + CWE**, and spot the **provenance gap** — an output change with no WRITE/FORCE row (the signature of an unaudited, memory-corruption write) | [`web/public/provenance_studio.html`](web/public/provenance_studio.html) |
+| **E2 — Signal Journey** | 1 · 2 · 3 · 7 | Follow one byte across five lenses — Wireshark → sigrok → firmware source → ladder → relay — and say what each lens can and cannot show | [`web/public/signal_journey.html`](web/public/signal_journey.html) |
+| **E3 — Phone-as-sensor false-data injection** | 1 · 8 | Withhold a sensor the PLC trusts (availability) and spoof its value (integrity), then build a plausibility gate that still passes the real reading | [`docs/assignment-phone-sensor-fdi.html`](docs/assignment-phone-sensor-fdi.html) |
 
 ### Week 12 — Level 3: formally verified updates
 
@@ -91,11 +91,11 @@ tools alone you can instead run:
 
 | Tool | File | Where it fits |
 |------|------|---------------|
-| **TBD Logic Studio** — ladder / Structured Text authoring; drives **your twin** (Connect twin) or a **real board over USB** (Connect USB); embedded **Bus monitor** | `web/public/logic_studio.html` | Parts 4 & 5 |
-| **Protocol Studio** — follow one captured or live frame field-by-field, from the wire up | `web/public/protocol_studio.html` | Parts 1 & 6 |
+| **TBD Logic Studio** — ladder / Structured Text authoring; drives **your twin** (Connect twin) or a **real board over USB** (Connect USB); embedded **Bus monitor** | `web/public/logic_studio.html` | Parts 1 & 2 |
+| **Protocol Studio** — follow one captured or live frame field-by-field, from the wire up | `web/public/protocol_studio.html` | Parts 3 & 6 |
 | **Operator panel** — the StampLC HMI / operator view | `web/public/panel.html` | Parts 6–7 |
 
-Logic Studio's **Bus monitor** and Part 1's I²C analyzer (`bus-analysis/i2c-analyzer.html`)
+Logic Studio's **Bus monitor** and Part 3's I²C analyzer (`bus-analysis/i2c-analyzer.html`)
 share one lane-timeline engine, so the same capture decodes identically in either — the
 ladder editor and the bus analyzer are two views of the one device.
 
@@ -127,7 +127,7 @@ drive it, attack it, and watch the consequence on the I²C bus with **no hardwar
 container fetches it for you (`qemu/fetch-qemu.sh`).
 
 **Run a firmware version, then control it like it's plugged in over USB.** You already
-started the twin for Parts 4–5 with one command:
+started the twin for Parts 1–2 with one command:
 
 ```bash
 ./qemu/studio.sh           # boots the twin, serves the Studio on :8088, AND muxes the console

@@ -1,4 +1,4 @@
-# Part 1 — Bus analysis: follow a bus exchange into the controller
+# Part 3 — Bus analysis: follow a bus exchange into the controller
 
 Your task is to explain what a recorded exchange establishes, what remains
 unknown, and which observation would distinguish a competing explanation. Keep
@@ -11,12 +11,12 @@ There are two different runs: September 12 serial exchanges and September 19
 software-hook diagnostics. Do not combine their timestamps or firmware identities.
 Nothing in the CLI connects to a device or the network — it runs entirely in your Codespace.
 
-> **New here? Read this first.** Part 1 is one task: decode a recorded Modbus exchange with a
+> **New here? Read this first.** Part 3 is one task: decode a recorded Modbus exchange with a
 > single command and write a short finding about what it does — and does *not* — prove. That is
 > the **required core** (the next three sections). The decoder needs no device, network, or
 > setup. Everything under **Going deeper** further down is optional: it shows the same bus other
 > ways (a logic-analyzer waveform, a live capture, the virtual tap). Do none, some, or all of it
-> — skipping all of it still completes Part 1.
+> — skipping all of it still completes Part 3.
 
 ## Start with the evidence
 
@@ -87,7 +87,7 @@ Internet references are optional:
 [Modbus application specification](https://www.modbus.org/file/secure/modbusprotocolspecification.pdf)
 and [serial guide](https://www.modbus.org/file/secure/modbusoverserial.pdf).
 
-**That is the required core of Part 1.** With your finding written, you're done.
+**That is the required core of Part 3.** With your finding written, you're done.
 
 ---
 
@@ -96,7 +96,7 @@ and [serial guide](https://www.modbus.org/file/secure/modbusoverserial.pdf).
 Everything below is **optional depth** — the same bus exchange seen other ways (a
 logic-analyzer waveform, a live capture from the twin, the one-command virtual tap, and the
 model finding exhibit). Pick any that interest you; skip them all and you have still completed
-Part 1. None of it is graded beyond the finding you already recorded.
+Part 3. None of it is graded beyond the finding you already recorded.
 
 ### Logic Studio — ladder authoring + bus monitor
 

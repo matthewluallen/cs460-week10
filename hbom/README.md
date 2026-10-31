@@ -1,4 +1,4 @@
-# Part 3 — Hardware Bill of Materials (HBOM)
+# Part 4 — Hardware Bill of Materials (HBOM)
 
 If an SBOM is "what's in the code," an **HBOM** is "what's on the board." It lists the
 physical parts — chips, sensors, transceivers — with their maker and part number, so you
@@ -12,7 +12,7 @@ as identified from the vendor's own driver library, but several cells say `FILL 
 Complete them:
 
 - **i2c_address** — most of these chips share one I²C bus. Fill the address from the
-  datasheet (and confirm it against Part 1 / the live scan in Part 5).
+  datasheet (and confirm it against Part 3 / the live scan in Part 1).
 - **datasheet_or_nvd** — link the datasheet, or an NVD search for the part.
 - **known_risk_or_cve** — a chip rarely has a "CVE," so describe the *operational* risk
   instead: what breaks if this part fails, is swapped for a counterfeit, or is tampered
@@ -33,11 +33,11 @@ Two cross-checks that are the real skill here:
    *detect* on the bus. Note in your finding how you would tell the difference.
 
    Note also the **BME680/688 at `0x77`**: it sits on the secondary I²C bus (**Wire1**),
-   so it is a legitimate HBOM entry that will **not** appear in the Part 1 primary-bus
+   so it is a legitimate HBOM entry that will **not** appear in the Part 3 primary-bus
    (Wire0) capture. That is expected-and-unlisted-on-that-capture, not a missing part —
    reconciling it means checking the *right* bus segment, not concluding it is absent.
 
-2. **HBOM ↔ bus.** In Part 1 you decoded a Modbus read of **register 25**. Which HBOM
+2. **HBOM ↔ bus.** In Part 3 you decoded a Modbus read of **register 25**. Which HBOM
    component ultimately produces that value? Trace the chain: physical chip → firmware
    driver → register → the bytes on the wire. State what you can confirm and what you're
    inferring.
@@ -47,8 +47,8 @@ Two cross-checks that are the real skill here:
   your HBOM and write the set of addresses it *implies* should be on the bus (e.g.
   `0x40` INA226, `0x48` LM75B, `0x77` BME680 on Wire1, plus the ones you filled in for
   the AW9523B, RX8130 and PI4IOE5V). Note which bus (Wire0 vs Wire1) each should be on.
-- **Run** — reconcile against the Part 1 evidence: `./bus-analysis/decode.sh` for the
-  decoded register, and the Part 1 capture / `i2c-analyzer.html` lanes for the addresses
+- **Run** — reconcile against the Part 3 evidence: `./bus-analysis/decode.sh` for the
+  decoded register, and the Part 3 capture / `i2c-analyzer.html` lanes for the addresses
   actually seen. (Live form: `busstream on` on the firmware console.)
 - **Reconcile** — compare predicted addresses vs observed. A match confirms the chip is
   *present and responding at that address*; it does **not** by itself confirm the part is

@@ -1,4 +1,4 @@
-# Part 6.5 — Firmware reverse-engineering (static analysis)
+# Part 5 (the firmware image) — Firmware reverse-engineering (static analysis)
 
 Read-only static analysis of the prebuilt teaching image
 `sbom/firmware/prebuilt/firmware.bin`. Nothing here flashes or runs the device —

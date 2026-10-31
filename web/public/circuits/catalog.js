@@ -1,4 +1,4 @@
-/* CircuitCatalog — the Part 5 "Wire & run" predesigned circuits as DATA.
+/* CircuitCatalog — the Part 1 "Wire & run" predesigned circuits as DATA.
  *
  * Each circuit lists its parts (snap-kit modules placed on the 40-unit base grid), conductor strips,
  * flying leads (with hand-routed waypoints that follow the routing rules: perpendicular exits, nested-L
@@ -118,7 +118,7 @@ const CIRCUITS=[
 /* ------------------------------------------------------------------ c */
 {id:'c',key:'motor-estop',name:'Motor start/stop + E-stop',
   title:'Motor start / stop + fail-safe E-stop',subtitle:'START IN1 · STOP IN2 · E-STOP IN3 (NC, ON = healthy) · RESET IN4 → RELAY 1 motor on its own 3 V pack',
-  project:{file:null,name:'your Part 5 motor latch',reads:['%IX0 START','%IX1 STOP','%IX2 E-STOP (1 = healthy)','%IX3 RESET'],writes:['%QX0 motor (RELAY 1)','%QX1 run light (RELAY 2)','%QX3 fault lamp (RELAY 4)'],
+  project:{file:null,name:'your Part 1 motor latch',reads:['%IX0 START','%IX1 STOP','%IX2 E-STOP (1 = healthy)','%IX3 RESET'],writes:['%QX0 motor (RELAY 1)','%QX1 run light (RELAY 2)','%QX3 fault lamp (RELAY 4)'],
     note:'Build it in Logic: seal-in on %QX0, permissives %IX1 and %IX2, a latched fault (%MX) on %IX2 = 0, reset on %IX3. ladder/latch_with_estop.st still trips on %IX2 = 1 (energise-to-trip); the fail-safe version trips on 0.'},
   ctl:CTL,used:{IN1:1,IN2:1,IN3:1,IN4:1,RELAY1:1,RELAY2:1,RELAY4:1},
   restDi:0x04,

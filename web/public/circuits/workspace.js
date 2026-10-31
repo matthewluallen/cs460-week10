@@ -1,4 +1,4 @@
-/* Circuit workspace — Part 5 "Wire & run": the predesigned snap-kit circuits, full width in the Studio's
+/* Circuit workspace — Part 1 "Wire & run": the predesigned snap-kit circuits, full width in the Studio's
  * Circuit tab. Bench view and schematic view of the same netlist, a live signal-path strip with honest
  * provenance tags, and keyboard-operable switches.
  *

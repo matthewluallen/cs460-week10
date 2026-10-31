@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Part 2, Exercise 3 — scan the COMPILED firmware binary for embedded components + CVEs.
+# Part 5, Exercise 3 — scan the COMPILED firmware binary for embedded components + CVEs.
 #
 # Exercise 2 read build *manifests* (a source SBOM). This reads the shipped artifact
 # itself: cve-bin-tool fingerprints well-known components inside the .bin and maps them to
@@ -34,7 +34,7 @@ echo "============================================================"
 echo
 echo "== Offline proof the components are really in the image (no network needed) =="
 strings "$BIN" | grep -iE 'mbedtls|lwip|wpa_supplicant|esp-idf|esp-tls' | sort -u | head -20 || true
-echo "   ^ these are the crypto + TCP/IP stacks the Part-2 note said 'most embedded CVEs live in'."
+echo "   ^ these are the crypto + TCP/IP stacks the Part-5 note said 'most embedded CVEs live in'."
 
 echo
 if ! command -v cve-bin-tool >/dev/null 2>&1; then

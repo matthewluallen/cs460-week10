@@ -135,7 +135,7 @@ const FW = {
 // framework cell = {id,title,url?} | [cells] | null. url overrides the builder (D3FEND/CALDERA).
 const ATTACKS = [
   {
-    key:'default-creds', name:'Default / hardcoded web credentials', phase:'Part 6 · firmware',
+    key:'default-creds', name:'Default / hardcoded web credentials', phase:'Part 5 · firmware',
     intro:`The StampLC web console ships with a built-in login <code>admin:openplc</code>. You recover it without touching the device — just by reading the firmware image: <code>strings stamplc-factory-8MB.bin | grep -iE 'admin|passw|login'</code>. A credential baked into the binary is identical on every unit and can't be rotated per-device.`,
     evidence:`$ strings sbom/firmware/prebuilt/stamplc-factory-8MB.bin | grep -iE 'admin|openplc'\nadmin\nopenplc        # default console login, identical on every unit`,
     fix:`Secure build: no built-in account; first boot provisions a unique credential, stored hashed. CWE-798/1392 closed.`,
@@ -150,7 +150,7 @@ const ATTACKS = [
     }
   },
   {
-    key:'hardcoded-key', name:'Hardcoded cryptographic key', phase:'Part 6 · firmware',
+    key:'hardcoded-key', name:'Hardcoded cryptographic key', phase:'Part 5 · firmware',
     intro:`Carving the firmware turns up a PEM private key compiled into the image. Any attacker with the (public) firmware holds the device's "secret" key, so any TLS/signing that relies on it is worthless. A key shared across every unit behaves as a predictable key.`,
     evidence:`$ binwalk -e stamplc-factory-8MB.bin\n...  PEM RSA private key\n$ grep -R 'BEGIN .*PRIVATE KEY' _stamplc-factory-8MB.bin.extracted/`,
     fix:`Secure build: keys generated per-device at provisioning, kept out of the image (ideally eFuse/secure element), never in source.`,
@@ -165,7 +165,7 @@ const ATTACKS = [
     }
   },
   {
-    key:'modbus-unauth', name:'Unauthenticated Modbus/TCP control', phase:'Part 5 · protocol',
+    key:'modbus-unauth', name:'Unauthenticated Modbus/TCP control', phase:'Part 3 · protocol',
     intro:`Modbus :502 on the plant LAN (10.20.30.0/24) authenticates nothing. Anyone who can reach the controller reads and writes coils and holding registers directly — force a relay, move the temperature setpoint — with a one-line client. This is the defining weakness of legacy OT protocols.`,
     evidence:`# from the engineer station on the plant net\nmbpoll -0 -t0 -r1 10.20.30.10          # read coils\nmbpoll -0 -t0 -r2 10.20.30.10 1        # WRITE coil1 (RELAY0)=ON — no creds asked`,
     fix:`Segment the Modbus zone, gateway with auth, or wrap in TLS; alert on writes from unexpected hosts.`,
@@ -180,7 +180,7 @@ const ATTACKS = [
     }
   },
   {
-    key:'modbus-spoof', name:'Modbus command injection / spoofing', phase:'Part 5 · analyzer',
+    key:'modbus-spoof', name:'Modbus command injection / spoofing', phase:'Part 3 · analyzer',
     intro:`In the Wireshark/spoofer exercise you watch legitimate Modbus traffic, then forge your own write frames (or replay captured ones). Because the protocol has no message authenticity or replay protection, the PLC can't tell your injected write from the HMI's.`,
     evidence:`# observe, then inject a crafted FC16 write-multiple-registers frame\n# plant.pcap shows HMI polls; the spoofer replays a setpoint write from .2`,
     fix:`Message authenticity (signed/sequenced commands) and detection of duplicate/forged transaction IDs.`,
@@ -195,7 +195,7 @@ const ATTACKS = [
     }
   },
   {
-    key:'mqtt-dcmd', name:'MQTT Sparkplug DCMD → coil write (no broker auth)', phase:'Part 5 · protocol',
+    key:'mqtt-dcmd', name:'MQTT Sparkplug DCMD → coil write (no broker auth)', phase:'Part 3 · protocol',
     intro:`The controller subscribes to Sparkplug <code>DCMD</code> and a legacy decoder writes a raw output coil when it sees a boolean-value byte — and the broker has no authentication or topic ACLs. Publish one crafted DCMD and the relay moves.`,
     evidence:`# broker has no auth; publish a DCMD with a boolean-value (0x70) byte\nmosquitto_pub -h 10.20.30.40 -t 'spBv1.0/CS460/DCMD/stamplc/#' -m <payload>\n# PLC's on_message() writes coil0`,
     fix:`Broker auth + per-topic ACLs; require Sparkplug host/state session; drop the legacy raw-coil decoder in the secure build.`,
@@ -225,7 +225,7 @@ const ATTACKS = [
     }
   },
   {
-    key:'firmware-re', name:'Firmware extraction & reverse engineering', phase:'Part 6 · RE',
+    key:'firmware-re', name:'Firmware extraction & reverse engineering', phase:'Part 5 · RE',
     intro:`Dump the flash with esptool, carve it with binwalk, and disassemble with Ghidra/objdump to recover the default login, the embedded key, and the control logic. The extraction itself is the enabling step for most of the weaknesses above.`,
     evidence:`esptool.py read_flash 0 0x800000 dump.bin\nbinwalk -e dump.bin\nxtensa-esp32s3-elf-objdump -d firmware.elf | less`,
     fix:`Secure/verified boot + flash encryption so a dump yields ciphertext; no secrets in the image to recover.`,
@@ -240,7 +240,7 @@ const ATTACKS = [
     }
   },
   {
-    key:'phone-inject', name:'Unauthenticated phone-sensor → PLC input injection', phase:'Part 5 · MQTT bridge',
+    key:'phone-inject', name:'Unauthenticated phone-sensor → PLC input injection', phase:'Part 8 · MQTT bridge',
     intro:`Phones publish light, motion, gyro, orientation, sound, location, battery and button data over MQTT. The PLC keeps each value as a network-only phone point (Modbus 140–165, each with its own 8 s freshness flag) that a project can bind to a word input (<code>phone_&lt;point&gt;</code>) — with no authentication. Pinning one phone id (<code>mqtt pin</code>) is identity by claim: a rogue publisher that reuses the id is accepted, and a spoofed value is just as fresh as a real one. A false-data-injection surface on the process inputs.`,
     evidence:`# impersonate a phone, inject a bright-light reading that trips the logic\nmosquitto_pub -h 10.20.30.40 -t 'phone/ph-abc12/light' -m '{"lux":60000}'\n# PLC: phone_light_lux = 60000, phone_light_lux_fresh = 1 (mqtt status shows "authentication":"none"); same for btn1 -> phone_btn1`,
     fix:`Authenticate publishers (TLS client certificates, broker ACLs per topic, signed payloads); plausibility-gate the value in the ladder and act only while its _fresh flag is 1; never let a network value feed a stop or safety function.`,
