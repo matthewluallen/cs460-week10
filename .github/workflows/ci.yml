@@ -1,0 +1,85 @@
+name: CI
+
+# Runs the test harnesses that already live in the repo so a firmware / image /
+# Studio regression is caught automatically, and the committed prebuilt binaries are
+# verified on every change. Before this workflow the harnesses existed but nothing ran
+# them (smoke-test.py even claimed "caught in CI" while no CI existed).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prebuilt-integrity:
+    # Fast gate: the committed firmware prebuilts must match their recorded hashes,
+    # so a stale or accidentally-changed image can't ship unnoticed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify prebuilt firmware checksums
+        working-directory: sbom/firmware/prebuilt
+        run: sha256sum -c SHA256SUMS.txt
+
+  bench-tests:
+    # Offline byte-stream unit tests for the capture/USB-install tooling.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: capture tests
+        working-directory: tools/bench
+        run: python -m unittest -v test_capture
+      - name: prepare_usb_install tests (only when the generic-runtime is present)
+        working-directory: tools/bench
+        run: |
+          if [ -f ../../qemu/generic-project-smoke.py ]; then
+            python -m unittest -v test_prepare_usb_install
+          else
+            echo "skip: qemu/generic-project-smoke.py not in this checkout (generic-runtime path)"
+          fi
+
+  studio-regression:
+    # Headless Playwright check of the Logic Studio: every example project loads clean,
+    # compiles to IR, builds deployment text, and keeps the ST<->ladder pairing.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Playwright + Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright
+          npx playwright install --with-deps chromium
+      - name: Run Studio regression harness
+        run: node tools/studio-regression.js
+
+  twin-smoke:
+    # Boots the committed prebuilt firmware in the QEMU twin and asserts the Week-10
+    # invariants (boot, i2cscan, control, interlock, OTA, HMI, bus decode, NTP/Y2038,
+    # overflow). This is the "caught in CI" check smoke-test.py refers to.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install sigrok-cli + xz (bus-decode leg + twin unpack)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq sigrok-cli xz-utils
+      - name: Fetch the QEMU twin for this release
+        env:
+          GH_TOKEN: ${{ github.token }}   # lets gh download the (same-repo) release asset
+        run: ./qemu/fetch-qemu.sh
+      - name: Smoke-test the twin
+        run: python qemu/smoke-test.py

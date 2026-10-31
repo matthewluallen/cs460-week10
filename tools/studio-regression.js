@@ -38,4 +38,12 @@ const ROOT=fs.existsSync('logic_studio.html')?'.':'web/public';
  }
  console.log(JSON.stringify(results,null,0).replace(/},/g,'},\n'));
  await b.close();srv.close();
+ // CI gate: a regression must fail the build, not just print. Each example must load
+ // clean (no page errors), compile to IR, build deployment text, and keep the ST<->ladder
+ // pairing (at least one shared data-eid between the two columns).
+ const bad = results.filter(r =>
+   r.load!=='ok' || typeof r.ir!=='string' || r.ir.startsWith('FAIL') || r.ir==='empty' ||
+   typeof r.dtext!=='number' || (r.pageerrors&&r.pageerrors.length) || !(r.sharedEids>0));
+ if(bad.length){ console.log('REGRESSION in: '+bad.map(r=>r.name).join(', ')); process.exit(1); }
+ console.log('studio-regression: all '+results.length+' examples OK');
 })().catch(e=>{console.log('HARNESS FAIL '+e.message);process.exit(1);});
