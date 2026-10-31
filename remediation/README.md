@@ -5,8 +5,10 @@ Students can investigate a weakness, change its implementation, or contain its
 exposure with a compensating control. The prepared application project is shared
 between those experiments. A project cannot turn `ENABLE_CWE_DEMOS` on or off.
 
-The two existing build environments remain. Build either one with the wrapper (it prints
-the exact `pio run -e …` line and where the artifact lands) instead of typing it:
+The two existing build environments remain. `build.sh` compiles one profile (it prints the
+exact `pio run -e …` line and where the artifact lands); to then *run* it in the twin, the core
+steps below use `./qemu/build-twin.sh <profile>`, which compiles **and** packages a bootable
+8 MB image. Build a profile with the wrapper instead of typing the command:
 
 ```bash
 ./remediation/build.sh vuln      # pio run -e m5stamplc        (ENABLE_CWE_DEMOS present: teaching behavior)
@@ -29,16 +31,23 @@ macros, and some controls are mode gates or service removal rather than peer
 authentication. The matrix describes what the current source does and how to test
 its limits. It is not a record of successful device tests.
 
+> **New here? Read this first.** Part 9 is one task: build the **secure** firmware, boot it,
+> and watch the Part 6–8 attacks you already ran get *refused* — then write a finding that
+> states the boundary (what the fix closes, and what it does **not**). The **required core** is
+> the next section, "Re-run the Part 6–8 attacks" — two commands and a verifier. Everything
+> under **Going deeper** below (the comparison framework and the full weakness → fix → control
+> matrix) is optional reference: consult the row for the weakness you chose — you don't complete
+> every row.
+
 ## Re-run the Part 6-8 attacks against the secure build
 
 The sharpest evidence that a fix works is the attack that *stops* working. Build and boot
 the secure profile, then replay the earlier parts' attacks and watch each one be refused:
 
 ```bash
-./remediation/build.sh secure                        # build the hardened profile
-# merge/flash per ../docs/QEMU-Twin.md, then:
-FLASH_IMG=<your-secure-8MB-image> ./qemu/run.sh      # boot it, leave it running
-./remediation/verify-secure.sh                       # re-run Part 6-8 attacks; each should be REFUSED
+./qemu/build-twin.sh secure      # compile + package the hardened 8MB image
+./qemu/run.sh secure             # boot it, leave it running
+./remediation/verify-secure.sh   # re-run Part 6-8 attacks; each should be REFUSED
 ```
 
 `verify-secure.sh` drives the live console and HTTP services (it does not read a banner)
@@ -90,6 +99,21 @@ branch this image *compiled*. Establish hardening **behaviorally** (admin login 
 lockout fires on the 5th attempt, `clk` does not wrap, the overflow leaves relay0 off) or by
 the secure-only salt prefix `stamplc-secure-v2:` used by `hash_pw()` — never by the presence
 of a CWE string.
+
+**That is the required core of Part 9.** Boot the secure build, run `verify-secure.sh`, and
+record one finding stating the demonstrated boundary: what failed on the vulnerable build, what
+the secure build refused, which positive control still passed, and what remains possible (for
+example, the HMAC key is a repo constant; cleartext transport and the separate Wi-Fi OTA path
+are unchanged). A build named "secure" is not a substitute for that evidence.
+
+---
+
+## Going deeper (optional reference)
+
+Everything below is **optional reference depth** — you have completed the required core above.
+The comparison framework and the weakness → fix → compensating-control matrix are here to
+consult for the specific weakness you chose or were assigned; you do **not** complete every row.
+The validation-levels section at the end records how far the current tests actually go.
 
 ## Controlled comparison experiments
 

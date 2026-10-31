@@ -11,6 +11,13 @@ There are two different runs: September 12 serial exchanges and September 19
 software-hook diagnostics. Do not combine their timestamps or firmware identities.
 Nothing in the CLI connects to a device or the network — it runs entirely in your Codespace.
 
+> **New here? Read this first.** Part 1 is one task: decode a recorded Modbus exchange with a
+> single command and write a short finding about what it does — and does *not* — prove. That is
+> the **required core** (the next three sections). The decoder needs no device, network, or
+> setup. Everything under **Going deeper** further down is optional: it shows the same bus other
+> ways (a logic-analyzer waveform, a live capture, the virtual tap). Do none, some, or all of it
+> — skipping all of it still completes Part 1.
+
 ## Start with the evidence
 
 Open `serial/exchanges.csv` in a text editor or spreadsheet. It lists exact
@@ -70,7 +77,28 @@ sender or establish freshness. In this format, address/data words put the high
 byte first; the CRC puts the low byte first. The files are decoded serial bytes,
 not a PCAP or sampled logic-analyzer channels. Do not invent an Ethernet layer.
 
-## Optional Logic Studio — ladder authoring + bus monitor
+## Finish the core — record your finding
+
+Record one supported interpretation, an alternative cause, and the next useful
+measurement: endpoints, signal/reference limits, instrument, common timing marker,
+uncertainty and restoration. Extra downloads and time spent viewing do not establish mastery.
+Keep the original files unchanged and write notes or generated output elsewhere.
+Internet references are optional:
+[Modbus application specification](https://www.modbus.org/file/secure/modbusprotocolspecification.pdf)
+and [serial guide](https://www.modbus.org/file/secure/modbusoverserial.pdf).
+
+**That is the required core of Part 1.** With your finding written, you're done.
+
+---
+
+## Going deeper (optional)
+
+Everything below is **optional depth** — the same bus exchange seen other ways (a
+logic-analyzer waveform, a live capture from the twin, the one-command virtual tap, and the
+model finding exhibit). Pick any that interest you; skip them all and you have still completed
+Part 1. None of it is graded beyond the finding you already recorded.
+
+### Logic Studio — ladder authoring + bus monitor
 
 The **TBD Logic Studio** ships in this repo at `../web/public/logic_studio.html`:
 a ladder / Structured-Text editor with a **Bus monitor** whose lane-timeline view
@@ -100,21 +128,7 @@ independent electrical measurements. A separate meter, sampled channels and cloc
 alignment are needed for an actual bus-to-load timing claim. Retained evidence
 supports interpretation; it does not establish your physical probing competence.
 
-## Finish or revisit
-
-Record one supported interpretation, an alternative cause, and the next useful
-measurement: endpoints, signal/reference limits, instrument, common timing marker,
-uncertainty and restoration. Revisit a different interface later if transfer is
-the objective. Extra downloads and time spent viewing do not establish mastery.
-
-Keep the original files unchanged and write notes or generated output elsewhere.
-Internet references are optional:
-[Modbus application specification](https://www.modbus.org/file/secure/modbusprotocolspecification.pdf)
-and [serial guide](https://www.modbus.org/file/secure/modbusoverserial.pdf).
-`manifest.json` lists file sizes/hashes. Hashes detect corruption but do not
-authenticate a source.
-
-## Optional: a sigrok-style I²C view of the capture
+### A sigrok-style I²C view of the capture
 
 `tools/bus_to_vcd.py` reconstructs a protocol-faithful **I²C logic-analyzer
 capture (VCD)** from the `[BUS]` diagnostic records, so you can open the bus in
@@ -132,7 +146,7 @@ Each transaction decodes back to its device and value — e.g. address `0x48`
 on its device lane, stepped per ladder scan, with the input→logic→output
 correlation and a freeze/force control that mirrors the twin's QMP register injection.
 
-## Live sampling from the running twin (slow it down first)
+### Live sampling from the running twin (slow it down first)
 
 `tools/twin_sampler.py` polls the firmware's `/api/points` over the emulated
 W5500 stack and reconstructs the per-scan I²C transactions into a growing VCD +
@@ -159,7 +173,7 @@ live SDA/SCL view legible, and it pairs with register injection (`qom-set
 /machine/soc/aw9523 di=…` while stopped) to stage an input and watch the next
 scan react.
 
-## Parity: the virtual tap == a physical tap (same sigrok, same answers)
+### Parity: the virtual tap == a physical tap (same sigrok, same answers)
 
 Remote students have no bench, so the emulated bus must decode **identically** to a
 physical logic-analyzer tap. A logic analyzer is a *digital* sampler (logic
@@ -186,7 +200,7 @@ You don't drive QEMU or `trace_to_sigrok.py` by hand: the **one-command virtual
 tap** below (`tools/twin_tap.sh`) launches the traced twin and runs the
 reconstruction for you, writing `bus.vcd` + `bus.json`.
 
-## One-command virtual tap → analyzer / PulseView
+### One-command virtual tap → analyzer / PulseView
 
 ```bash
 ./qemu/fetch-qemu.sh                     # once
@@ -200,7 +214,7 @@ The analyzer's **Load capture** button renders a real controller-model (or
 physical-tap) capture on the device lanes; the seeded scenario stays the default
 correlation demo.
 
-## The chain in one page (graded exhibit)
+### The chain in one page (the model finding exhibit)
 
 `finding-exhibit.html` is the model deliverable: one weakness traced the whole way —
 the SBOM library CVE (CWE‑295 / CWE‑522) → the CWE class (CWE‑319 cleartext +
