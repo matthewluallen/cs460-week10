@@ -377,7 +377,7 @@ function renderBar(){
   const fieldOk = Date.now()-lastFieldOk < 5000;
   if(!logSrc && !fieldOk){
     pill.className='pill off'; pill.textContent='NO TWIN';
-    bar.innerHTML='Live needs your running twin: start <code>./qemu/studio.sh</code> and open this page from the Studio server (port 8080, <code>/provenance_studio.html</code>). Nothing is shown until real events arrive. To learn the page without a twin, use the <b>offline walkthrough</b> (scripted).';
+    bar.innerHTML='Live needs your running twin: start <code>./qemu/studio.sh</code> and open this page from the Studio server (port 8088, <code>/provenance_studio.html</code>). Nothing is shown until real events arrive. To learn the page without a twin, use the <b>offline walkthrough</b> (scripted).';
     return;
   }
   pill.className='pill live'; pill.textContent='LIVE · your twin';

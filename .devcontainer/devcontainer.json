@@ -9,9 +9,10 @@
     "ghcr.io/devcontainers/features/sshd:1": {}
   },
   "postCreateCommand": "bash .devcontainer/postCreate.sh",
-  "forwardPorts": [8080, 8090, 8800],
+  "forwardPorts": [8088, 8080, 8090, 8800],
   "portsAttributes": {
-    "8080": { "label": "Logic Studio (drive the twin)", "onAutoForward": "notify" },
+    "8088": { "label": "Logic Studio (drive the twin)", "onAutoForward": "notify" },
+    "8080": { "label": "PLC web HMI (the firmware's own page)", "onAutoForward": "silent" },
     "8090": { "label": "Phone sensor bridge (scan the QR)", "onAutoForward": "silent" },
     "8800": { "label": "Plant HMI (stations lab)", "onAutoForward": "silent" }
   },

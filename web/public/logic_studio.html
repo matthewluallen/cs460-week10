@@ -4626,7 +4626,7 @@ async function disconnect(){
 function twinDefaultUrl(){
   if(location.protocol==='http:'||location.protocol==='https:')
     return (location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws';
-  return 'ws://localhost:8080/ws';
+  return 'ws://localhost:8088/ws';
 }
 function connectTwin(url){
   if(connecting||port||wsSock)return;

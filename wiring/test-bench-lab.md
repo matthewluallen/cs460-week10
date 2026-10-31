@@ -20,11 +20,11 @@ Relay 1** — so this tests *your logic*, not a hard-wired shortcut.
 
 ## Connect the Studio to a controller
 
-Start your twin and the Studio with one command, then open port **8080** and click
+Start your twin and the Studio with one command, then open port **8088** and click
 **Connect twin**:
 
 ```
-./qemu/studio.sh          # twin + Studio on http://localhost:8080 (Codespaces: forwarded 8080)
+./qemu/studio.sh          # twin + Studio on http://localhost:8088 (Codespaces: forwarded 8088)
 ```
 
 The server serves the page and bridges it to your twin on the same origin, so there is

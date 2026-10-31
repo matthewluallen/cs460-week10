@@ -14,7 +14,7 @@ github.dev port with an external browser.**
 - Chrome's `save_to_disk` screenshots land on **whatever host runs Chrome, not the Mac**,
   so the `Control your Mac` osascript bridge can't read them. Dead end.
 
-## A. Web tool served in the Codespace (Studio :8080, HMI :8800, QR page, …)
+## A. Web tool served in the Codespace (Studio :8088, HMI :8800, QR page, …)
 Headless **Playwright/Chromium inside the Codespace against `localhost`** — fast, no
 freeze, no interstitial, and the PNG lands straight in `docs/img/`.
 
@@ -79,6 +79,6 @@ text is genuine tool output; only the chrome is styled. Examples produced this w
 
 ## Environment pointers
 - Codespace: `mysterious-phantom-pvqwwxpxg99h9vj` on `matthewluallen/cs460-week10` main.
-- Studio+twin: `./qemu/studio.sh` (serves :8080, binds the twin's Modbus :502 via W5500).
+- Studio+twin: `./qemu/studio.sh` (serves :8088, binds the twin's Modbus :502 via W5500).
 - Build ELF (for objdump RE): `sbom/firmware/.pio/build/m5stamplc/firmware.elf` on the Mac;
   disassembler `~/.platformio/packages/toolchain-xtensa-esp-elf/bin/xtensa-esp32s3-elf-objdump`.

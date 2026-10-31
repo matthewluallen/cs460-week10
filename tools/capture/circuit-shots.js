@@ -1,9 +1,9 @@
 // Part 5 "Wire & run" circuit screenshots — every predesigned circuit, bench + schematic view.
 //
-//   node tools/capture/circuit-shots.js [--url http://localhost:8080/logic_studio.html]
+//   node tools/capture/circuit-shots.js [--url http://localhost:8088/logic_studio.html]
 //        [--out docs/img] [--no-connect] [--hold] [--theme dark|light] [--scale 1.5] [--only a,c]
 //
-// Run it in the Codespace against the live Studio (./qemu/studio.sh serves it on :8080 with the twin):
+// Run it in the Codespace against the live Studio (./qemu/studio.sh serves it on :8088 with the twin):
 // it presses Connect twin headlessly (connectTwin(twinDefaultUrl()), no prompt dialog), opens the Circuit
 // tab, and for each circuit waits for real readback before capturing docs/img/part5-circuit-<id>-<view>.png.
 // --hold also holds the circuit's traced switch (e.g. S1 START) while capturing, then releases it.
@@ -11,7 +11,7 @@
 // The drawing never animates anything that is not reported live, so a capture shows what the twin did.
 const {chromium}=require('playwright'),path=require('path'),fs=require('fs');
 const arg=(k,d)=>{const i=process.argv.indexOf('--'+k);return i<0?d:(process.argv[i+1]&&!process.argv[i+1].startsWith('--')?process.argv[i+1]:true);};
-const URL=arg('url','http://localhost:8080/logic_studio.html'),OUT=path.resolve(arg('out',path.join(__dirname,'../../docs/img')));
+const URL=arg('url','http://localhost:8088/logic_studio.html'),OUT=path.resolve(arg('out',path.join(__dirname,'../../docs/img')));
 const CONNECT=!process.argv.includes('--no-connect'),HOLD=process.argv.includes('--hold'),THEME=arg('theme','dark'),SCALE=+arg('scale',1.5),ONLY=arg('only',null);
 (async()=>{
   fs.mkdirSync(OUT,{recursive:true});

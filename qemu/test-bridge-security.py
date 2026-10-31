@@ -14,7 +14,7 @@ Leaves the twin and server running (stop: ./qemu/twin-status.sh stop). Exit 0 if
 import base64, http.client, os, re, socket, subprocess, sys, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PORT = int(os.environ.get("BRIDGE_PORT", "8080"))
+PORT = int(os.environ.get("BRIDGE_PORT", "8088"))
 HOST = "127.0.0.1"
 SELF = "http://localhost:%d" % PORT          # what the Studio page's Origin looks like
 EVIL = "http://evil.example"

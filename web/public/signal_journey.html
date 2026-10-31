@@ -419,7 +419,7 @@ const hx=(n,w=2)=>'0x'+Number(n).toString(16).padStart(w,'0');
 const bit=(v,b)=>(v>>b)&1;
 async function getJSON(url,opt){
   let r,j; try{ r=await fetch(url,Object.assign({cache:'no-store'},opt||{})); j=await r.json(); }
-  catch(_){ throw new Error('the Studio server did not answer '+url.split('?')[0]+' — open this page from ./qemu/studio.sh (port 8080)'); }
+  catch(_){ throw new Error('the Studio server did not answer '+url.split('?')[0]+' — open this page from ./qemu/studio.sh (port 8088)'); }
   if(j && j.ok===false) throw new Error(j.error||(j.exception!=null?'Modbus exception '+j.exception+' from the controller':'HTTP '+r.status));
   return j; }
 const READERS={
@@ -508,7 +508,7 @@ document.getElementById('capJson').onclick=()=>{ const blob=new Blob([JSON.strin
 document.getElementById('capClear').onclick=()=>{ if(confirm('Clear every row of your evidence chain in this browser?')){ CAP={}; saveCap(); renderCap(); } };
 (async()=>{ const el=document.getElementById('capTwin');
   try{ const j=await getJSON('/twin/identity'); el.innerHTML=`<span style="color:var(--good)">● your twin is reachable</span> · ${esc(j.profile)} profile · ${esc(j.image||'')}`; }
-  catch(e){ el.innerHTML='<span style="color:var(--warn)">● twin not reachable</span> — start <code>./qemu/studio.sh</code> and open this page from it (port 8080). You can still type evidence you collected yourself.'; } })();
+  catch(e){ el.innerHTML='<span style="color:var(--warn)">● twin not reachable</span> — start <code>./qemu/studio.sh</code> and open this page from it (port 8088). You can still type evidence you collected yourself.'; } })();
 renderCap();
 </script>
 </body>

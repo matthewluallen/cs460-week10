@@ -16,7 +16,7 @@ hardware, no Netlify.
 
     ┌──────────┐  http (page) + ws:///ws   ┌──────────────┐  one client    ┌──────┐
     │ browser  │ ◀───── one origin ──────▶ │  twin-bridge  │ ──────────────▶│ twin │
-    └──────────┘       :8080               │   (the hub)   │ /tmp/plc-serial└──────┘
+    └──────────┘       :8088               │   (the hub)   │ /tmp/plc-serial└──────┘
     ┌──────────┐  raw TCP :8081 (local)    │  fans one     │
     │ console  │ ◀───────────────────────▶ │  console out  │
     └──────────┘                           └──────────────┘
@@ -31,11 +31,11 @@ is written to the twin. So the Studio and `./qemu/console.sh` work at the same t
 Dependency-free (Python 3 stdlib only), so it runs in a Codespace or a laptop with
 no `pip install`.
 
-    ./qemu/studio.sh                # starts the twin + this bridge; open :8080
+    ./qemu/studio.sh                # starts the twin + this bridge; open :8088
     ./qemu/console.sh               # attaches the text console (coexists with the Studio)
 
 Options (env or flags):
-    --port 8080                WebSocket + HTTP port (default 8080)
+    --port 8088                WebSocket + HTTP port (default 8088; the firmware's own HMI keeps 8080)
     --console-port 8081        raw TCP console port, localhost only (default 8081; 0 disables)
     --serial /tmp/plc-serial   twin console: a unix socket path, or host:port for TCP
     --dir <path>               static web root (default: ../web/public next to this script)
@@ -606,7 +606,7 @@ def _twin_identity(with_hash=False):
 FW_HTTP = os.environ.get("FW_HTTP", "")              # host:port; default derived from the twin
 FW_HMI_PORT = 8080                                   # WEB_HMI_PORT in sbom/firmware/src/config.h
 FW_PROXY_PATHS = ("/fw/api/log", "/fw/api/points")
-_BRIDGE_ADDR = {"bind": "127.0.0.1", "port": 8080}
+_BRIDGE_ADDR = {"bind": "127.0.0.1", "port": 8088}
 
 
 def _fw_target():
@@ -639,8 +639,8 @@ def _serve_fw_proxy(conn, path):
                      "holds, so the firmware page is not reachable from the host" % (FW_HMI_PORT, target),
             "fallback": "read the same audit log over the console: plc> log (Provenance Studio does this "
                         "automatically through the Studio's /ws console)",
-            "fix": "run the Studio on another port so the firmware keeps 8080: "
-                   "./qemu/twin-status.sh stop; BRIDGE_PORT=8088 ./qemu/studio.sh"}, 503)
+            "fix": "the Studio's default port is 8088 so the firmware keeps 8080; restart it without "
+                   "BRIDGE_PORT=8080: ./qemu/twin-status.sh stop; ./qemu/studio.sh"}, 503)
     host, port = target.rsplit(":", 1)
     try:
         s = socket.create_connection((host, int(port)), timeout=4)
@@ -1075,7 +1075,7 @@ def console_server(port, hub):
 def main(argv=None):
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description="Serve the Logic Studio and bridge it to the QEMU twin, on one port.")
-    ap.add_argument("--port", type=int, default=int(os.environ.get("BRIDGE_PORT", "8080")))
+    ap.add_argument("--port", type=int, default=int(os.environ.get("BRIDGE_PORT", "8088")))
     ap.add_argument("--console-port", type=int, default=int(os.environ.get("BRIDGE_CONSOLE_PORT", "8081")),
                     help="localhost raw TCP console port for ./qemu/console.sh (0 disables)")
     ap.add_argument("--serial", default=os.environ.get("SERIAL_SOCK", "/tmp/plc-serial"),

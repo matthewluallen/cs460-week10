@@ -41,15 +41,15 @@ Work the parts in order; each builds on the last. In Part 5 you run **your own t
 drive it from the **Logic Studio** in your browser — no teams, no shared bench, no hardware:
 
 ```bash
-./qemu/studio.sh          # starts your twin + serves the Studio on port 8080
+./qemu/studio.sh          # starts your twin + serves the Studio on port 8088
 ```
 
-Then open the forwarded port **8080** (Codespaces pops it up; locally it's
-`http://localhost:8080`) and click **Connect twin**. The one server both serves the page and
+Then open the forwarded port **8088** (Codespaces pops it up; locally it's
+`http://localhost:8088`) and click **Connect twin**. The one server both serves the page and
 bridges it to your twin, so the connection is same-origin — nothing to configure.
 
 > **Have a real M5StampLC?** The *same* Studio drives it over USB: open it on your own
-> machine (`http://localhost:8080` via a local Dev Container, or any HTTPS copy) in
+> machine (`http://localhost:8088` via a local Dev Container, or any HTTPS copy) in
 > **Chrome or Edge**, plug in the board, and click **Connect USB** instead of Connect twin.
 > (USB needs the device on the machine running the browser, so this path doesn't work from a
 > cloud Codespace — use the twin there. Every step is validated identically on real silicon.)
@@ -82,7 +82,7 @@ python formal-verify/verify_controls.py        # vuln (VIOLATED) → secure → 
 ## Browser tools (served from `web/public/`)
 
 Several parts use small browser apps that run straight from this repo — no build step, no
-lab network. `./qemu/studio.sh` already serves this folder on port 8080; for the no-device
+lab network. `./qemu/studio.sh` already serves this folder on port 8088; for the no-device
 tools alone you can instead run:
 
 ```bash
@@ -130,7 +130,7 @@ container fetches it for you (`qemu/fetch-qemu.sh`).
 started the twin for Parts 4–5 with one command:
 
 ```bash
-./qemu/studio.sh           # boots the twin, serves the Studio on :8080, AND muxes the console
+./qemu/studio.sh           # boots the twin, serves the Studio on :8088, AND muxes the console
 ```
 
 For the firmware/attack parts you want the text console too. Open a second terminal and run:

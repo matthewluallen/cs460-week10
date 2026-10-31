@@ -6,7 +6,7 @@
 #
 # Needs the twin + Studio server:  ./qemu/studio.sh   (same twin the Studio, console and Modbus use).
 # While it records, change an input — e.g. press IN1 (di0) at the chip:
-#   curl -s -X POST 'localhost:8080/field?bit=0&v=1'; sleep 1; curl -s -X POST 'localhost:8080/field?bit=0&v=0'
+#   curl -s -X POST 'localhost:8088/field?bit=0&v=1'; sleep 1; curl -s -X POST 'localhost:8088/field?bit=0&v=0'
 #
 # The Studio server switches QEMU's I²C controller trace on through QMP for N s, then off, and
 # converts it (tools/trace_to_sigrok.py). You get, in bus-analysis/out/:
@@ -18,7 +18,7 @@
 #   <id>.studio.json    loads into the Studio's Bus monitor (Open capture)
 set -euo pipefail
 SECS="${1:-6}"; BUS="${2:-i2c0}"
-PORT="${BRIDGE_PORT:-8080}"; URL="http://127.0.0.1:$PORT"
+PORT="${BRIDGE_PORT:-8088}"; URL="http://127.0.0.1:$PORT"
 if ! curl -s -o /dev/null --max-time 3 "$URL/logic_studio.html"; then
   echo "The Studio server is not answering on $URL — start the twin + server first:  ./qemu/studio.sh"
   exit 1

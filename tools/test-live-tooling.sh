@@ -12,7 +12,7 @@
 # Browser checks need Playwright:  npm i playwright && npx playwright install --with-deps chromium
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
-PORT="${BRIDGE_PORT:-8080}"; BASE="http://127.0.0.1:$PORT"; CON="${BRIDGE_CONSOLE_PORT:-8081}"
+PORT="${BRIDGE_PORT:-8088}"; BASE="http://127.0.0.1:$PORT"; CON="${BRIDGE_CONSOLE_PORT:-8081}"
 QMP_SOCK="${QMP_SOCK:-/tmp/plc-qmp}"; SERIAL_SOCK="${SERIAL_SOCK:-/tmp/plc-serial}"
 NPASS=0; NFAIL=0; NSKIP=0
 pass() { printf '  PASS  %s\n' "$*"; NPASS=$((NPASS+1)); }
@@ -223,7 +223,7 @@ for f in ("firmware.spdx.json", "firmware.cdx.json", "running-identity.json"):
     print(("PASS" if os.path.isfile(os.path.join(o, f)) else "FAIL") + " sbom/out/" + f)
 try:
     ident = json.load(open(os.path.join(o, "running-identity.json")))
-    live = json.load(urllib.request.urlopen("http://127.0.0.1:%s/twin/identity" % os.environ.get("BRIDGE_PORT", "8080")))
+    live = json.load(urllib.request.urlopen("http://127.0.0.1:%s/twin/identity" % os.environ.get("BRIDGE_PORT", "8088")))
     same = ident["app"]["elf_sha256"] == (live.get("app") or {}).get("elf_sha256")
     print(("PASS" if same else "FAIL") + " SBOM describes the image the twin booted (ELF %s)" % ident["app"]["elf_sha256"][:16])
     print("info build match: " + ident["build_match"]["how"])

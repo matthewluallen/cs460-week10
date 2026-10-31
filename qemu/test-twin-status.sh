@@ -16,10 +16,10 @@ check() { if eval "$1"; then ok "$2"; else bad "$2"; fi; }
 show() { sed 's/^/        | /' <<<"$1"; }
 twins()   { pgrep -f "[q]emu-system-xtensa.*unix:$SOCK,server" | wc -l | tr -d ' '; }
 twinpid() { pgrep -f "[q]emu-system-xtensa.*unix:$SOCK,server" | head -n1; }
-bridges() { pgrep -f "[t]win-bridge.py --port 8080 --serial $SOCK" | wc -l | tr -d ' '; }
+bridges() { pgrep -f "[t]win-bridge.py --port 8088 --serial $SOCK" | wc -l | tr -d ' '; }
 wait_running() { for _ in $(seq 1 200); do ./qemu/twin-status.sh >/dev/null 2>&1 && return 0; sleep 0.2; done; return 1; }
 wait_http()    { for _ in $(seq 1 100); do
-                   [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080/logic_studio.html")" = 200 ] && return 0
+                   [ "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8088/logic_studio.html")" = 200 ] && return 0
                    sleep 0.2; done; return 1; }
 console_says() {  # send one command through the Studio bridge's console port, print the reply
   python3 - "$1" <<'PY'
@@ -61,7 +61,7 @@ check '[ "$(twinpid)" = "$PID1" ]' "running twin untouched"
 
 echo "5. studio.sh with the twin already running"
 setsid nohup ./qemu/studio.sh >/tmp/tts-studio1.log 2>&1 < /dev/null &
-check 'wait_http' "Studio served on :8080"
+check 'wait_http' "Studio served on :8088"
 show "$(head -4 /tmp/tts-studio1.log)"
 check 'grep -q "reusing it" /tmp/tts-studio1.log' "studio.sh reused the twin"
 check '[ "$(twins)" = 1 ] && [ "$(twinpid)" = "$PID1" ]' "no second twin booted"
@@ -69,7 +69,7 @@ check '[ "$(bridges)" = 1 ]' "one Studio server"
 
 echo "6. studio.sh again"
 out=$(timeout 40 ./qemu/studio.sh 2>&1); rc=$?; show "$out"
-check '[ $rc -eq 0 ] && grep -q "already running on :8080" <<<"$out"' "second studio.sh starts nothing (exit 0)"
+check '[ $rc -eq 0 ] && grep -q "already running on :8088" <<<"$out"' "second studio.sh starts nothing (exit 0)"
 check '[ "$(bridges)" = 1 ] && [ "$(twins)" = 1 ]' "still one server, one twin"
 
 echo "7. studio.sh asking for a different build"

@@ -12,7 +12,7 @@ Week-4 wind-turbine lab, applied to the StampLC — and it stands alone (no wind
   │ SCADA :8800   │                     │ twin + bridge │  QEMU StampLC twin
   └───────────────┘                     │  :502 Modbus  │  (real firmware)
   ┌───────────────┐   read + WRITE      │  :80  HTTP    │
-  │ engineer      │ ─── (CWE-306) ────▶ │  :8080 Studio │
+  │ engineer      │ ─── (CWE-306) ────▶ │  :8088 Studio │
   │ Modbus master │                     └───────────────┘
   └───────────────┘            ▲
   ┌───────────────┐            │ passive span
@@ -22,7 +22,7 @@ Week-4 wind-turbine lab, applied to the StampLC — and it stands alone (no wind
 
 | Station | What it is | Ports |
 |---|---|---|
-| **plc** (10.20.30.10) | the controller — the QEMU twin + bridge; its own Modbus/TCP and HTTP are bound on the plant network | 8080 Studio, 502 Modbus, 80 HTTP |
+| **plc** (10.20.30.10) | the controller — the QEMU twin + bridge; its own Modbus/TCP and HTTP are bound on the plant network | 8088 Studio, 8080 web HMI, 502 Modbus, 80 HTTP |
 | **hmi** (10.20.30.20) | a SCADA HMI that **polls the controller over Modbus** and shows a live dashboard | 8800 |
 | **engineer** (plant, dynamic IP) | an engineering / attacker workstation — a **Modbus master** that reads and (on the vulnerable build) writes the controller with no auth | — |
 | **mqtt** (10.20.30.40) | the phone broker + sensor page: phones scan a QR code and publish their sensors; the controller subscribes | 8090 phone page, 1883 MQTT |
@@ -38,7 +38,7 @@ The devcontainer already includes Docker-in-Docker, so nothing to install.
 docker compose -f stations/docker-compose.yml up --build
 ```
 
-Open the forwarded **8800** (the HMI dashboard) and **8080** (the Studio) from the **Ports**
+Open the forwarded **8800** (the HMI dashboard) and **8088** (the Studio) from the **Ports**
 tab. The HMI tiles update every second — every value arrived as a real Modbus frame on the
 wire.
 
