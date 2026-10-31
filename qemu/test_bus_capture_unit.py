@@ -103,7 +103,7 @@ class BusCapture(unittest.TestCase):
             B._qmp([("qom-set", {"path": B._FIELD_PATH, "property": "di", "value": 0x05})])
             B._bus_note_field(0x05)
         threading.Thread(target=press).start()
-        res, code = B._bus_capture({"seconds": ["2"]})
+        res, code = B._bus_capture({"secs": ["2"]})          # the /bustap?secs=N spelling
         self.assertEqual(code, 200, res)
         self.assertTrue(res["ok"], res.get("error"))
         self.assertFalse(self.double.on, "tracing left ON")
@@ -121,8 +121,16 @@ class BusCapture(unittest.TestCase):
             self.assertTrue(res["sigrok"]["ok"], res["sigrok"])
             self.assertIn("write: 59", res["sigrok"]["addresses"])
             self.assertIn("0x03", [c["value"] for c in res["sigrok"]["relay_write_changes_0x59_reg02"]])
+            ch = [(c["op"], c["reg"], c["value"]) for c in res["sigrok"]["changes_0x59"]]
+            self.assertIn(("read", "0x00", "0x50"), ch)            # IN1 (bit 4) seen by the decoder
+            self.assertIn(("write", "0x02", "0x03"), ch)           # RELAY 1 + RELAY 2 written
+            self.assertIn("pvs", res["files"])
+            with open(os.path.join(B.BUS_OUT_DIR, res["files"]["pvs"])) as fh:
+                pvs = fh.read()
+            self.assertIn("decoder0\\id=i2c", pvs)
         # the Studio importer's rules (logic_studio.html parseQemuBusCapture)
-        b = json.load(open(os.path.join(B.BUS_OUT_DIR, res["files"]["studio"])))
+        with open(os.path.join(B.BUS_OUT_DIR, res["files"]["studio"])) as fh:
+            b = json.load(fh)
         rx = re.compile(r"^esp32_i2c_observe controller=(0x[0-9a-f]+) path=(/machine/[a-zA-Z0-9_./-]+) seq=(\d+) "
                         r"epoch=(\d+) virtual_ns=(\d+) event=(\w+) address=(-?\d+) direction=(-?\d+) data=(-?\d+) nack=(-?\d+)$")
         rows = [ln for ln in b["trace"].split("\n") if ln]

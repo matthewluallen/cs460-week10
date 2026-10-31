@@ -146,19 +146,29 @@ Each transaction decodes back to its device and value — e.g. address `0x48`
 on its device lane, stepped per ladder scan, with the input→logic→output
 correlation and a freeze/force control that mirrors the twin's QMP register injection.
 
-### Live sampling from the running twin (slow it down first)
+### Live tap of YOUR running twin → PulseView (the core path)
 
-`tools/twin_sampler.py` polls the firmware's `/api/points` over the emulated
-W5500 stack and reconstructs the per-scan I²C transactions into a growing VCD +
-JSON — a **live** capture while the logic runs. Run the twin **slowed** so the
-bus cadence is human-paced instead of thousands of transactions a second:
+With your twin running (`./qemu/studio.sh`), record its I²C bus while you act:
 
 ```bash
-./bus-analysis/live-sample.sh   # twin_sampler.py (live) -> live.vcd + live.json, then sigrok-cli decodes it
+./bus-analysis/tap.sh 10          # 10 s on i2c0 — press Start IN1 (di0) during it
+# or: the "● Record twin bus (6 s)" button in the Studio's Bus monitor
 ```
 
-Run the twin slowed first (see `tools/twin_tap.sh`, which launches it with
-`-icount shift=5,sleep=on`). Tunables: `SAMPLES`, `INTERVAL`, `OUT`.
+The Studio server switches QEMU's own I²C-controller trace (`esp32_i2c_observe`) on through
+QMP for those seconds, then off again, and converts it with `tools/trace_to_sigrok.py`. It is
+the **same twin** your Studio, console and Modbus talk to — nothing is replayed or generated.
+`tap.sh` prints the sigrok-cli decode for address `0x59` (each register value change, with its
+time) and saves in `bus-analysis/out/`: `<time>.sr` (+ `<time>.pvs`, which stacks the I²C
+decoder when PulseView opens the `.sr`), `.vcd`, `.decode.txt`, `.json`, `.manifest.json` and
+a `.studio.json` for the Studio's Bus monitor. Inputs you change through `/field` during the
+capture appear as channels `IN1`–`IN4`.
+
+What is observed vs drawn: **bytes and their order are observed** (the emulated controller,
+outside the firmware, so a malicious image cannot hide them); **edges are drawn** at 400 kHz
+on the twin's virtual-time axis; the master's ACK/NACK on read bytes is inferred. Not shown:
+analog detail, clock stretching, probes of absent addresses. For timing questions run the twin
+real-time-aligned: `RESTART=1 ICOUNT=shift=5,sleep=on ./qemu/studio.sh`.
 
 The teaching firmware also exposes this same bus traffic directly: `busstream on`
 on the serial console streams decoded `@BUS <ms> <R|W> 0x<addr> <decode>` lines —
@@ -184,9 +194,8 @@ digital capture → the same sigrok decode.
 `tools/trace_to_sigrok.py` is that virtual tap. It reads the QEMU I²C controller's
 own `esp32_i2c_observe` trace — the complete byte-level bus traffic
 (START / address / repeated-start / data / ACK-NACK / STOP, with `virtual_ns`
-timing) — and reconstructs the SDA/SCL into a VCD. You run it through `tools/twin_tap.sh` (the
-one-command virtual tap below), not by invoking QEMU and the reconstructor by
-hand.
+timing) — and reconstructs the SDA/SCL into a VCD. You run it through `./bus-analysis/tap.sh` (your running twin), not by invoking QEMU and the
+reconstructor by hand.
 
 Validated: it recovers register-pointer writes, data reads, repeated starts, and
 the firmware's board-probe **NACKs** — exactly what a bench analyzer sees. The
@@ -196,11 +205,14 @@ same bus; the capture format and the answers match. Analog-only effects (rise
 times, noise) live below the logic-analyzer abstraction and are the one thing a
 scope — not this — would add, bench-only.
 
-You don't drive QEMU or `trace_to_sigrok.py` by hand: the **one-command virtual
-tap** below (`tools/twin_tap.sh`) launches the traced twin and runs the
-reconstruction for you, writing `bus.vcd` + `bus.json`.
+You don't drive QEMU or `trace_to_sigrok.py` by hand: `./bus-analysis/tap.sh` asks the Studio
+server to trace your running twin and runs the reconstruction for you.
 
-### One-command virtual tap → analyzer / PulseView
+### CI check: a throwaway twin's idle bus (not the lab path)
+
+`tools/twin_tap.sh` boots a separate copy of the twin with no console, so nobody can press
+anything on it; CI (`qemu/smoke-test.py`) uses it to prove the released twin's bus decodes.
+For the lab use `./bus-analysis/tap.sh` above.
 
 ```bash
 ./qemu/fetch-qemu.sh                     # once

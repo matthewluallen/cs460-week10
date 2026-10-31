@@ -678,7 +678,7 @@ BUS_MAX_TRACE = 256 * 1024 * 1024
 STUDIO_MAX_EVENTS = 50000
 STUDIO_EVENTS = {"reset", "fsm_reset", "address", "write", "read", "stop", "rstart_command", "end_command",
                  "ack_mismatch_stop", "tx_wait", "rx_wait", "invalid_write_count", "invalid_opcode"}
-_FILE_RE = re.compile(r"^bus-\d{8}-\d{6}-i2c[01]\.(vcd|sr|json|studio\.json|decode\.txt|"
+_FILE_RE = re.compile(r"^bus-\d{8}-\d{6}-i2c[01]\.(vcd|sr|pvs|json|studio\.json|decode\.txt|"
                                     r"manifest\.json|trace\.log\.gz)$")
 _bus_lock = threading.Lock()
 _bus_tap = {"active": False, "writes": []}
@@ -715,29 +715,55 @@ def _sigrok_summary(src, out_txt):
                  "--protocol-decoder-samplenum"], capture_output=True, text=True, timeout=180)
     with open(out_txt, "w") as f:
         f.write(r.stdout)
-    addrs, changes, last = {}, [], None
-    state = []                                            # tokens of the current frame
+    addrs, changes, events = {}, [], []
+    last = {}
+    cur_addr, cur_dir, pointer, nbytes = None, None, None, 0
     for line in r.stdout.splitlines():
         m = _re.match(r"^(\d+)-(\d+) i2c-\d+: (.*)$", line)
         if not m:
             continue
         s0, ann = int(m.group(1)), m.group(3)
-        if ann in ("Start", "Start repeat"):
-            state = [s0]
-        elif ann.startswith("Address "):
+        if ann.startswith("Address "):
             k = ann.replace("Address ", "")
             addrs[k] = addrs.get(k, 0) + 1
-            state.append(k)
-        elif ann.startswith("Data write: ") and state:
-            state.append(ann[12:])
-            if len(state) >= 4 and state[1] == "write: 59" and state[2].upper() == "02" and len(state) == 4:
-                v = state[3].upper()
-                if v != last:
-                    changes.append({"t_s": round(state[0] / 4e6, 6), "value": "0x" + v.lower()})
-                    last = v
+            cur_dir, cur_addr = k.split(": ")[0], k.split(": ")[1].lower()
+            nbytes, t_frame = 0, s0
+        elif ann.startswith("Data ") and cur_addr == "59":
+            v = ann.split(": ")[1].lower()
+            if cur_dir == "write":
+                if nbytes == 0:
+                    pointer = v
+                else:
+                    reg = "%02x" % ((int(pointer, 16) + nbytes - 1) & 0xFF)
+                    if last.get(("W", reg)) != v:
+                        last[("W", reg)] = v
+                        events.append({"t_s": round(s0 / 4e6, 6), "op": "write", "reg": "0x" + reg, "value": "0x" + v})
+                        if reg == "02":
+                            changes.append({"t_s": round(s0 / 4e6, 6), "value": "0x" + v})
+            else:
+                reg = "%02x" % ((int(pointer or "0", 16) + nbytes) & 0xFF)
+                if last.get(("R", reg)) != v:
+                    last[("R", reg)] = v
+                    events.append({"t_s": round(s0 / 4e6, 6), "op": "read", "reg": "0x" + reg, "value": "0x" + v})
+            nbytes += 1
     return {"ok": r.returncode == 0, "decoder": "sigrok-cli i2c", "addresses": addrs,
-            "relay_write_changes_0x59_reg02": changes, "file": os.path.basename(out_txt),
+            "relay_write_changes_0x59_reg02": changes, "changes_0x59": events[:400],
+            "file": os.path.basename(out_txt),
             "time_base": "sample number / 4 MHz (drawn timeline)"}
+
+
+def _write_pvs(path, channels):
+    """PulseView session setup beside the .sr (same base name), stacking the I2C decoder on SCL/SDA.
+    PulseView restores <name>.pvs when it opens <name>.sr. Best effort: if a PulseView version
+    ignores it, Add decoder -> I2C (SCL=SCL, SDA=SDA) by hand."""
+    lines = ["[General]", "decode_signals=1",
+             "", "[decode_signal0]", "name=I2C (live tap)", "enabled=true", "decoders=1",
+             "decoder0\\id=i2c", "decoder0\\visible=true", "decoder0\\options=0",
+             "channels=2",
+             "channel0\\name=SCL", "channel0\\initial_pin_state=2", "channel0\\assigned_signal_name=SCL",
+             "channel1\\name=SDA", "channel1\\initial_pin_state=2", "channel1\\assigned_signal_name=SDA", ""]
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
 
 
 def _studio_bundle(obs_lines, identity, session, t_start, t_end):
@@ -773,7 +799,7 @@ def _studio_bundle(obs_lines, identity, session, t_start, t_end):
 def _bus_capture(qs):
     import gzip, uuid
     try:
-        secs = max(1, min(BUS_MAX_SECONDS, int(qs.get("seconds", ["6"])[0])))
+        secs = max(1, min(BUS_MAX_SECONDS, int((qs.get("seconds") or qs.get("secs") or ["6"])[0])))
     except ValueError:
         return {"ok": False, "error": "seconds must be an integer 1-%d" % BUS_MAX_SECONDS}, 400
     bus = qs.get("bus", ["i2c0"])[0]
@@ -856,6 +882,8 @@ def _bus_capture(qs):
                             capture_output=True, text=True, timeout=180)
                 if r.returncode == 0 and os.path.isfile(base + ".sr"):
                     files["sr"] = cid + ".sr"
+                    _write_pvs(base + ".pvs", summ.get("channels", ["SCL", "SDA"]))
+                    files["pvs"] = cid + ".pvs"
                 sig = _sigrok_summary(base + (".sr" if "sr" in files else ".vcd"), base + ".decode.txt")
                 files["decode"] = cid + ".decode.txt"
             elif not txns:
@@ -962,7 +990,7 @@ def handle(conn, hub, root):
             else:
                 _serve_modbus(conn, path)
             conn.close()
-        elif path.split("?", 1)[0] == "/bus/capture":
+        elif path.split("?", 1)[0] in ("/bus/capture", "/bustap"):          # /bustap?secs=N = alias
             if method != "POST":
                 _deny(conn, 405, "use POST /bus/capture?seconds=6 (e.g. curl -X POST); results: GET /bus/captures")
             elif not origin_ok(headers):

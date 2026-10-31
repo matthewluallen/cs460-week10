@@ -388,11 +388,14 @@ def main():
                     help="packed: back-to-back (CI parity); virtual: place transactions at virtual_ns")
     ap.add_argument("--field", help="JSON {di_start, writes:[{t, di}]} from the Studio server -> IN1..IN4 channels")
     ap.add_argument("--max-gap-ms", type=float, default=None, help="shorten idle gaps longer than this")
-    ap.add_argument("--format", choices=("auto", "observe", "generic"), default="auto")
+    ap.add_argument("--format", choices=("auto", "observe", "generic", "qemu-core"), default="auto",
+                    help="observe = esp32_i2c_observe (released twin); generic/qemu-core = i2c_event/send/recv")
     ap.add_argument("--max", type=int, default=0, help="limit transactions (frames)")
     ap.add_argument("--addr", type=lambda x: int(x, 0), default=None, help="keep only frames touching this address")
     ap.add_argument("--summary", action="store_true", help="print the JSON summary")
     a = ap.parse_args()
+    if a.format == "qemu-core":
+        a.format = "generic"
     with open(a.trace, errors="replace") as f:
         lines = f.readlines()
     if a.addr is not None or a.max:

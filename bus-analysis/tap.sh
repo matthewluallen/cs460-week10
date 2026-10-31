@@ -10,7 +10,7 @@
 #
 # The Studio server switches QEMU's I²C controller trace on through QMP for N s, then off, and
 # converts it (tools/trace_to_sigrok.py). You get, in bus-analysis/out/:
-#   <id>.sr          open in PulseView (Add decoder: I²C, SCL=SCL, SDA=SDA)
+#   <id>.sr          open in PulseView; <id>.pvs beside it stacks the I²C decoder (SCL, SDA)
 #   <id>.vcd         the same waveform as text (any VCD viewer)
 #   <id>.decode.txt  sigrok-cli's I²C decode, with sample numbers (÷ 4 MHz = seconds)
 #   <id>.json        one row per transaction (address, R/W, bytes, virtual time)
@@ -47,9 +47,16 @@ f = j["field"]
 print("/field writes during the capture: %d   relays latch %s -> %s" % (len(f["writes"]), f["relays_start"], f["relays_end"]))
 sg = j.get("sigrok") or {}
 if sg.get("ok"):
-    print("sigrok-cli decode: %s" % ", ".join("%s×%d" % kv for kv in sg["addresses"].items()))
-    for c in sg.get("relay_write_changes_0x59_reg02", []):
-        print("   sigrok: write 0x59 [0x02, %s] at %.6f s" % (c["value"], c["t_s"]))
+    print("sigrok-cli I2C decode: %s" % ", ".join("%s×%d" % kv for kv in sg["addresses"].items()))
+    print("sigrok-cli decode for address 0x59, each time a register value changes (time = sample / 4 MHz):")
+    for c in sg.get("changes_0x59", [])[:60]:
+        what = "write" if c["op"] == "write" else "read "
+        hint = ""
+        if c["reg"] == "0x02" and c["op"] == "write":
+            hint = "  output port 0: RELAY 1-4 = bits 0-3"
+        elif c["reg"] == "0x00" and c["op"] == "read":
+            hint = "  input port 0: IN1-IN4 = bits 4-7"
+        print("   %10.6f s  %s 0x59 reg %s = %s%s" % (c["t_s"], what, c["reg"], c["value"], hint))
 else:
     print("sigrok-cli decode: not run (%s)" % sg.get("error"))
 for w in s.get("warnings", []):
@@ -57,5 +64,7 @@ for w in s.get("warnings", []):
 print("files (%s/):" % j["repo_path"])
 for k, v in j["files"].items():
     print("   %-9s %s     (%s%s)" % (k, v, url, j["download"][k]))
+if "pvs" in j["files"]:
+    print("PulseView: open %s (it should restore the I2C decoder from %s; if not: Add decoder -> I2C, SCL=SCL, SDA=SDA)" % (j["files"]["sr"], j["files"]["pvs"]))
 print(s["fidelity"])
 PY
