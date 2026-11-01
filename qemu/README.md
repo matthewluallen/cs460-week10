@@ -6,7 +6,7 @@ The quick start below runs the committed classroom image. Both `m5stamplc` and
 
 ## Historical classroom quick start
 
-Runs the *real*, de‑branded StampLC firmware — the same `plc>` console and the same
+Runs the *real*, de‑branded TBD firmware — the same `plc>` console and the same
 vulnerable Modbus / HMI / OTA services you'd meet on the bench — entirely in software.
 **Parts 6 and 7 use this.** (It's also fair game as enrichment for the earlier parts.)
 
@@ -52,11 +52,11 @@ model owns the IO expansion's CH1/CH2 (a tank level on CH1, a 4–20 mA flow loo
 own sensor instead, restart with `RESTART=1 FIELD_ANALOG=1 ./qemu/studio.sh`: the process model is
 switched off and the Circuit tab's *Light on RP1* buttons (or `POST /field?ch1_mv=<mV>`) put the
 divider voltage on CH1, which the firmware reads over I²C @0x20 exactly as on the board. The twin's
-IO expansion reports module revision 1, the same as the bench StampLC's pack.
+IO expansion reports module revision 1, the same as the bench TBD's pack.
 
 > **On an Apple-Silicon Mac?** There's no native-macOS twin — the patched QEMU is built
 > for Linux only (the release ships `qemu-twin-linux-x86_64` and `-linux-arm64`; stock
-> Homebrew `qemu-system-xtensa` can't model the StampLC's I²C / LCD / W5500, so it stalls
+> Homebrew `qemu-system-xtensa` can't model the TBD's I²C / LCD / W5500, so it stalls
 > at boot). Run the twin in a **Codespace**, or open this repo in a **local VS Code Dev
 > Container** (*Dev Containers: Reopen in Container*) — that's Linux arm64, so
 > `fetch-qemu.sh` pulls the matching `qemu-twin-linux-arm64` build and everything below
@@ -114,7 +114,7 @@ least-privilege example for the course: the narrowest grant that makes the thing
 ## Under the hood
 
 The prebuilt binary is a **patched** Espressif QEMU (a stock `qemu-system-xtensa`
-can't model the StampLC's I²C sensors, LCD, or W5500, so the firmware stalls at
+can't model the TBD's I²C sensors, LCD, or W5500, so the firmware stalls at
 startup). Prebuilt bundles + the firmware images are hosted on the repo's
 `qemu-twin-*` release. The referenced custom patch source is not in the inspected
 release or repository branches, so a reproducible model build remains a provenance

@@ -1,7 +1,7 @@
-# Running the StampLC firmware in QEMU (no hardware)
+# Running the TBD firmware in QEMU (no hardware)
 
 **Audience:** instructors, and students who want to exercise the *real* firmware
-without a physical StampLC. **Not required for the graded Week‑10 parts** (bus
+without a physical TBD controller. **Not required for the graded Week‑10 parts** (bus
 analysis, SBOM, HBOM, ladder, and the remote live device are all reachable
 without QEMU). This is the high‑fidelity "run the actual vulnerable firmware on
 your own machine" path — useful for the firmware‑analysis and live‑service
@@ -23,13 +23,13 @@ evidence.*
 
 | Approach | Dates seen | State | Verdict |
 |---|---|---|---|
-| **Patched‑QEMU twin** — Espressif `qemu` fork + StampLC device‑model patches; real 8 MB image boots to a live OpenPLC scan; `plc>` console + Modbus/TCP + I/O injection | patch set **2026‑09‑30**; live emulator evidence **2026‑10‑02 → 10‑04** (23 cases green on 10‑04) | **CURRENT / VERIFIED** | **Use this.** The only route proven to boot the unmodified firmware to live services. |
+| **Patched‑QEMU twin** — Espressif `qemu` fork + TBD device‑model patches; real 8 MB image boots to a live OpenPLC scan; `plc>` console + Modbus/TCP + I/O injection | patch set **2026‑09‑30**; live emulator evidence **2026‑10‑02 → 10‑04** (23 cases green on 10‑04) | **CURRENT / VERIFIED** | **Use this.** The only route proven to boot the unmodified firmware to live services. |
 | Stock‑QEMU + `open_eth` + firmware HAL‑sim (early "license‑clean" idea) | **2026‑09‑03 → 09‑09** | Superseded | The committed `merged-eth.bin` is a *hardware* build and **hangs at `M5StamPLC.begin()`** under stock QEMU (confirmed 2026‑10‑23). The `[env:sim]` in that repo is a *native‑host* logic sim, not an ESP32 image. Do not rely on its `twin/qemu/README.md`. |
 | "No W5500 → reach Modbus via USB‑CDC `gateway`" handoff note | **2026‑09‑30** | Stale | Pre‑dates the W5500 emulation ("Wall 8"). The current patched twin answers Modbus/TCP directly; the `gateway` command still exists but is no longer the only way in. |
 
 **Bottom line:** the binary that runs our firmware is a **patched** build of
 Espressif's `qemu-system-xtensa`, *not* a stock download. A stock
-`qemu-system-xtensa` boots the ESP32‑S3 core but does **not** model the StampLC's
+`qemu-system-xtensa` boots the ESP32‑S3 core but does **not** model the TBD's
 I²C chips (AW9523B, INA226, LM75B, RX8130, PI4IOE), the ST7789 LCD, or the W5500,
 so the real firmware stalls during board bring‑up. (Empirically: a stock Espressif
 `qemu-system-xtensa 9.2.2` loads ROM → 2nd‑stage bootloader → app entry, then goes
@@ -65,9 +65,9 @@ the twin works.
 
 ## What you need
 
-1. **A patched `qemu-system-xtensa`** (the TBD StampLC twin build). Built from
+1. **A patched `qemu-system-xtensa`** (the TBD twin build). Built from
    Espressif's QEMU fork (`github.com/espressif/qemu`, branch `esp-develop`) with
-   the StampLC device‑model patches applied (see **Building the patched QEMU**).
+   the TBD device‑model patches applied (see **Building the patched QEMU**).
    The stock Espressif binary is the *base*; it is necessary but **not
    sufficient** on its own.
 2. **An 8 MB merged flash image** of the firmware (see **Building the image**).
@@ -189,7 +189,7 @@ Optional environment variables:
 
 ## Building the patched QEMU
 
-The device‑model patches live in the TBD StampLC twin patch set
+The device‑model patches live in the TBD twin patch set
 (`qemu-esp32s3-fixes/`). To produce the binary:
 
 1. Check out Espressif's QEMU fork: `github.com/espressif/qemu`, branch
@@ -197,11 +197,11 @@ The device‑model patches live in the TBD StampLC twin patch set
 2. Drop each patched source over its matching path in the QEMU tree
    (`hw/xtensa/esp32s3.c`, `hw/i2c/esp32_i2c.c`, `hw/gpio/esp32_gpio.c`,
    `hw/misc/esp32c3_jtag.c`, plus headers).
-3. Add the two StampLC I²C sources (`hw/i2c/*_i2c.c`) to `hw/i2c/meson.build`,
+3. Add the two TBD I²C sources (`hw/i2c/*_i2c.c`) to `hw/i2c/meson.build`,
    guarded by `CONFIG_XTENSA_ESP32S3`.
 4. Configure for `xtensa-softmmu` and build (`./configure --target-list=xtensa-softmmu && ninja -C build`).
 
-The patch set models the StampLC base (AW9523B relays/DI @0x59, PI4IOE @0x43,
+The patch set models the TBD base (AW9523B relays/DI @0x59, PI4IOE @0x43,
 INA226 @0x40, LM75B @0x48, RX8130 @0x32, ST7789 LCD, buttons, buzzer, USB‑CDC
 console, RS‑485, CAN), the **IO‑expansion pack** (@0x20), the **W5500 PoE pack**,
 and a 100 ms process‑physics loop that ties relay outputs back to the sensors —
@@ -225,7 +225,7 @@ emulator, so the firmware "never knows it's a twin."
   image boots the ROM + 2nd‑stage bootloader, then aborts in a loop with
   `Detected size(2048k) smaller than the size in the binary image header(8192k).
   Probe failed.` Pad to exactly 8 MB. QEMU also only accepts 2/4/8/16 MB images.
-- **Stock QEMU is not enough.** Stock `qemu-system-xtensa` has no StampLC
+- **Stock QEMU is not enough.** Stock `qemu-system-xtensa` has no TBD
   peripheral models; the firmware stalls at `begin()` (board bring‑up) after the
   bootloader hands off. You need the patched build.
 - **SLIRP "open" ≠ service up.** If you forward guest ports with

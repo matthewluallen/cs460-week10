@@ -389,7 +389,7 @@ function substation(){
  <rect x="964" y="119" width="60" height="34" rx="5" class="card"/>${text(975,140,'LOAD','tiny')}${text(875,66,'Feeder / load')}${text(875,84,model?number(model.grid.demand_kw/1000,2)+' MW demand':'Synthetic distribution feeder','small')}
  <circle class="secondary" cx="703" cy="136" r="13"/>${text(684,112,'CT','tiny')}<path class="secondary" d="M487 136 V174"/><circle class="secondary" cx="487" cy="166" r="8"/>${text(502,175,'VT','tiny')}
  ${rect(28,207,230,65)}${text(44,231,'Control center · DNP3 master')}${text(44,252,mode==='live'?'CORE host · read-only Class 0':'Recorded master / outstation traffic','small')}
- ${rect(367,207,303,65)}${text(383,231,'Station RTU · educational surrogate')}${text(383,252,mode==='live'?'M5StamPLC firmware in QEMU':'RTU role · no vendor identity inferred','small')}
+ ${rect(367,207,303,65)}${text(383,231,'Station RTU · educational surrogate')}${text(383,252,mode==='live'?'TBD firmware in QEMU':'RTU role · no vendor identity inferred','small')}
  ${rect(775,207,277,65)}${text(791,231,'51 · Feeder protection IED')}${text(791,252,trip?'TRIP LATCHED · separate model':'65 A / 500 ms · separate model','small')}
  <path class="comm" d="M258 239 H367"/><circle class="wire-dot" cx="310" cy="239" r="4"/>
  <path class="secondary" d="M487 181 V200 M602 155 V196 M703 151 V185 H869 V207 M775 223 H700 V185 H613 V155"/>

@@ -65,7 +65,7 @@
 <body>
 <div class="wrap">
   <h1>Threat Map — connecting the lab to the MITRE taxonomies</h1>
-  <p class="sub">Every weakness you exercise on the StampLC maps onto the same public frameworks a real OT security team uses.
+  <p class="sub">Every weakness you exercise on the TBD controller maps onto the same public frameworks a real OT security team uses.
   This page ties each lab attack across seven taxonomies — the embedded threat (<b>EMB3D</b>), the code weakness (<b>CWE</b>),
   the attack pattern (<b>CAPEC</b>), the ICS technique (<b>ATT&amp;CK for ICS</b>), how a red team emulates it (<b>CALDERA</b>),
   the defensive countermeasure (<b>D3FEND</b>), and — where an AI/ML surface exists — <b>ATLAS</b>.</p>
@@ -139,7 +139,7 @@ const FW = {
 const ATTACKS = [
   {
     key:'default-creds', name:'Default / hardcoded web credentials', phase:'Part 5 · firmware',
-    intro:`The StampLC web console ships with a built-in login <code>admin:openplc</code>. You recover it without touching the device — just by reading the firmware image: <code>strings stamplc-factory-8MB.bin | grep -iE 'admin|passw|login'</code>. A credential baked into the binary is identical on every unit and can't be rotated per-device.`,
+    intro:`The TBD web console ships with a built-in login <code>admin:openplc</code>. You recover it without touching the device — just by reading the firmware image: <code>strings stamplc-factory-8MB.bin | grep -iE 'admin|passw|login'</code>. A credential baked into the binary is identical on every unit and can't be rotated per-device.`,
     evidence:`$ strings sbom/firmware/prebuilt/stamplc-factory-8MB.bin | grep -iE 'admin|openplc'\nadmin\nopenplc        # default console login, identical on every unit`,
     fix:`Secure build: no built-in account; first boot provisions a unique credential, stored hashed. CWE-798/1392 closed.`,
     fw:{

@@ -1,6 +1,6 @@
-# StampLC OpenPLC Controller — User Manual
+# TBD OpenPLC Controller — User Manual
 
-**Model:** M5Stack StampLC (ESP32‑S3) · OpenPLC teaching firmware v1.0
+**Model:** TBD (ESP32‑S3) · OpenPLC teaching firmware v1.0
 **Audience:** instructors and students configuring and operating the device.
 
 > **Please read first — intended use.** This is a **teaching and lab** controller. Its
@@ -13,7 +13,7 @@
 
 ## 1. Overview
 
-The StampLC is a compact programmable logic controller (PLC) built on an ESP32‑S3. It
+The TBD controller is a compact programmable logic controller (PLC) built on an ESP32‑S3. It
 provides 4 relay outputs, 8 opto‑isolated digital inputs, on‑board power and temperature
 sensing, a real‑time clock, a 1.14" display, RS‑485, and an optional W5500 PoE Ethernet
 port. It runs an OpenPLC‑style runtime: a small program scans inputs, evaluates logic, and
@@ -56,7 +56,7 @@ You can confirm this map on any unit with the `i2cscan` console command (§7).
 
 All initial configuration happens over the USB‑C console.
 
-1. Connect the StampLC to your computer with a USB‑C cable.
+1. Connect the TBD controller to your computer with a USB‑C cable.
 2. Open a serial terminal at **115200 baud, 8‑N‑1**. Any of these work:
    - macOS / Linux: `screen /dev/tty.usbmodem* 115200` (or `pio device monitor`)
    - Windows: PuTTY or Tera Term on the device's COM port
@@ -101,7 +101,7 @@ reboots. The menu idles out after 30 s and boots with the current configuration.
 
 ## 5. Network setup
 
-The StampLC has **two independent network interfaces**, each with its own address:
+The TBD controller has **two independent network interfaces**, each with its own address:
 
 - **WiFi** — always present (built into the ESP32-S3). Three modes: **Off** (contained), **STA** (join a network), **AP** (host a setup network).
 - **W5500 Ethernet** — the optional PoE module; configured only when it is fitted.

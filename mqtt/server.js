@@ -1,6 +1,6 @@
 // CS460 phone-sensor MQTT bridge — one Node process, one container.
 //
-//   * MQTT over TCP   :1883   — the M5StampLC twin subscribes here
+//   * MQTT over TCP   :1883   — the TBD twin subscribes here
 //   * MQTT over WS    :8090   — phone browsers publish here (same origin as the page)
 //   * HTTP            :8090   — serves the sensor page + a QR of this server's PUBLIC url
 //
@@ -29,7 +29,7 @@ try { fs.writeFileSync('/tmp/bridge.key', KEY); } catch (e) {}
 
 // ---- MQTT over TCP (the twin connects here) ----
 net.createServer(aedes.handle).listen(TCP_PORT, () =>
-  console.log(`[bridge] MQTT/TCP   :${TCP_PORT}  (M5StampLC twin subscribes here)`));
+  console.log(`[bridge] MQTT/TCP   :${TCP_PORT}  (TBD twin subscribes here)`));
 
 // ---- HTTP: the sensor page + the dynamic QR ----
 function publicUrl(req) {

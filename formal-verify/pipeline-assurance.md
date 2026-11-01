@@ -39,7 +39,7 @@ the modeled property.
 
 ## Where formal proof stops: system-of-systems integration
 
-A proof is only as wide as the boundary you own. The StampLC does not run alone — it sits in a
+A proof is only as wide as the boundary you own. The TBD controller does not run alone — it sits in a
 system of systems: an upstream sensor it did not manufacture, a vendor PLC on the same bus, a
 historian or cloud service, an operator's workstation. **You cannot formally verify code and
 interfaces you neither build nor control.** At each such boundary the honest move is a

@@ -1,9 +1,9 @@
-# Stations — the StampLC as a real OT network
+# Stations — the TBD controller as a real OT network
 
 Everywhere else in this lab you drive **one** controller (the twin, or a real board). This
 folder runs it the way a plant really looks: **separate stations on a network**, each a
 container, speaking **real protocols you can capture**. It's the multi-node model from the
-Week-4 wind-turbine lab, applied to the StampLC — and it stands alone (no wind farm).
+Week-4 wind-turbine lab, applied to the TBD controller — and it stands alone (no wind farm).
 
 ```
             plant network  10.20.30.0/24

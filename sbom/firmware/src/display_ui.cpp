@@ -221,7 +221,7 @@ static void renderBoot(){
 // ---- renders ----
 static void renderHome(){
   D.fillScreen(BG);
-  tL("M5 StamPLC",6,4,1,MUTED);
+  tL("TBD",6,4,1,MUTED);
   { String ips=eth_ok()?eth_ip():String("no-net"); D.setTextSize(1); int w=D.textWidth(ips.c_str()); tL(ips.c_str(),234-w,4,1,MUTED); }
   int m=plc_mode();
   D.drawRoundRect(4,20,104,52,5,LINE);

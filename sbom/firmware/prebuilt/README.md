@@ -1,6 +1,6 @@
-# Prebuilt StampLC firmware — flash without compiling
+# Prebuilt TBD firmware — flash without compiling
 
-These are **ready-to-flash images** of the StampLC teaching firmware, built from
+These are **ready-to-flash images** of the TBD teaching firmware, built from
 `sbom/firmware/` in this repo (verified clean compile). Use these if you just want the
 firmware on a device — **no toolchain, no build**. (To modify + rebuild instead, see
 [`../BUILD.md`](../BUILD.md).)

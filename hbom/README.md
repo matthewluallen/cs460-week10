@@ -7,7 +7,7 @@ which an SBOM can't see.
 
 ## The worksheet
 
-Open [`stamplc-hbom.csv`](stamplc-hbom.csv). It's pre-filled with the StampLC's components
+Open [`stamplc-hbom.csv`](stamplc-hbom.csv). It's pre-filled with the TBD's components
 as identified from the vendor's own driver library, but several cells say `FILL IN`.
 Complete them:
 
@@ -23,7 +23,7 @@ Complete them:
 
 Two cross-checks that are the real skill here:
 
-1. **Firmware's assumed BOM vs. the real board.** The StampLC's I/O is driven by an
+1. **Firmware's assumed BOM vs. the real board.** The TBD's I/O is driven by an
    **AW9523B** expander and a **PI4IOE5V** input expander. The teaching firmware on
    this branch already uses the real **AW9523B** — so the "firmware assumes a generic
    **MCP23017/PCA9555** at `0x20`/`0x21` instead" counterfeit angle is **hypothetical**

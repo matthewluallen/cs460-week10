@@ -1,4 +1,4 @@
-# Building the two StampLC runtime profiles
+# Building the two TBD runtime profiles
 
 The lab ships two firmware profiles built from the same source tree in this folder. They differ
 only by a build switch.
@@ -97,7 +97,7 @@ image used for an individual test run.
 
 ## Local board upload
 
-With a real M5StampLC connected over USB (not from a cloud Codespace — USB needs the board on the
+With a real TBD controller connected over USB (not from a cloud Codespace — USB needs the board on the
 machine running the tool):
 
 ```bash

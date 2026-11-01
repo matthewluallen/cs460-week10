@@ -83,7 +83,7 @@ handled wrongly." Say why the pipeline needs both.)
 
 ### 6 — Where proof stops: a compensating control
 
-The StampLC lives in a **system of systems** — an upstream sensor, a vendor PLC on the bus, a
+The TBD controller lives in a **system of systems** — an upstream sensor, a vendor PLC on the bus, a
 cloud historian, an operator workstation — none of which you built or can formally verify. Pick
 **one** such boundary from the table in `pipeline-assurance.md`. State: the property you
 *cannot* prove, **why** (the boundary you don't own), the **compensating control** you'd place

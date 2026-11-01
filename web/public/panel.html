@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<title>StamPLC Panel</title>
+<title>TBD Panel</title>
 <meta name="description" content="Interactive emulation of the TBD teaching-PLC front panel — boot ceremony, 3-button navigation, modular I/O, and the live Modbus contested-register lesson.">
 <style>
   :root{
@@ -38,7 +38,7 @@
   .stage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
   @media(max-width:880px){.stage{grid-template-columns:1fr}}
 
-  /* ===== faithful StamPLC enclosure ===== */
+  /* ===== faithful TBD enclosure ===== */
   .device{position:relative;background:linear-gradient(180deg,#fbfbfc,#e7e9ec);
     border:1px solid #c4c8ce;border-radius:16px;padding:0;overflow:hidden;
     box-shadow:0 24px 60px rgba(0,0,0,.45), inset 0 1px 0 #fff}
@@ -154,7 +154,7 @@
 
 <div class="wrap">
   <header class="top">
-    <span class="brand">TBD <span class="b2">·</span> StamPLC Panel</span>
+    <span class="brand">TBD <span class="b2">·</span> Panel</span>
     <span class="kick">TBD · on-device operator interface</span>
   </header>
   <p class="lede">The teaching PLC's front panel, running. Three buttons, a 240×135 screen — an operator
@@ -186,14 +186,14 @@
 
         <div class="enc-pad">
           <div class="rail">
-            <span class="tag" id="idtag">SN StamPLC-A17 · MAC …3F:2A</span>
+            <span class="tag" id="idtag">SN TBD-A17 · MAC …3F:2A</span>
             <span class="led"><span class="lamp" id="lamp"></span><span id="ledtxt">LED</span></span>
           </div>
           <div class="face">
             <div class="lcol">
               <div class="screen-shell">
                 <canvas id="lcd" width="960" height="540" role="img"
-                        aria-label="StamPLC LCD — live state is announced in text below"></canvas>
+                        aria-label="TBD LCD — live state is announced in text below"></canvas>
               </div>
               <!-- text mirror of the glass for screen readers; updated only when state changes -->
               <div id="lcdtext" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -303,7 +303,7 @@ function setLed(color,label,glow){lamp.style.background=color;
 let seq=1;
 function el(o){return Object.assign({value:0,forced:false,forceSrc:null,lastSrc:'SCAN',lastIp:null,
   lastTick:0,unit:'',writable:false,forceable:false},o);}
-function baseBoard(){return{type:'BASE',name:'StamPLC',addr:null,els:[
+function baseBoard(){return{type:'BASE',name:'TBD',addr:null,els:[
   el({id:'DI0',kind:'DI',value:1}),el({id:'DI1',kind:'DI',value:0}),el({id:'DI2',kind:'DI',value:1}),
   el({id:'DI3',kind:'DI',value:0}),el({id:'DI4',kind:'DI',value:0}),el({id:'DI5',kind:'DI',value:0}),
   el({id:'DI6',kind:'DI',value:1}),el({id:'DI7',kind:'DI',value:0}),
@@ -510,7 +510,7 @@ function drawHome(){
   const auth=dev.authority; const acol=auth==='LOCAL'?C.ok:auth==='REMOTE'?C.warn:C.fault;
   g.fillStyle=acol;g.globalAlpha=.16;rr(4,4,44,13,3);g.fill();g.globalAlpha=1;
   txt('['+auth+']',7,6.5,F.micro,acol);
-  txt('StamPLC-A17',W-4,6.5,F.micro,C.dim,'right');
+  txt('TBD-A17',W-4,6.5,F.micro,C.dim,'right');
   // hero MODE word
   const mc=dev.mode===0?C.ok:dev.mode===2?C.warn:C.fault;
   const sel0=ui.cursor===0;
@@ -656,7 +656,7 @@ function drawComms(){
   g.fillStyle=C.bg;g.fillRect(0,0,W,H-15);
   txt('COMMS · IDENTITY',6,6,F.title,C.primary);
   const rows=[['IP','192.168.0.9 / 24'],['GW','192.168.0.1'],['MAC','02:53:F7:39:42:FF'],
-    ['SN','StamPLC-A17'],['Modbus','TCP :502'],['TASK', dev.task+'  (grading nonce)']];
+    ['SN','TBD-A17'],['Modbus','TCP :502'],['TASK', dev.task+'  (grading nonce)']];
   let y=26; rows.forEach(r=>{ txt(r[0],8,y,F.body,C.muted); txt(r[1],70,y,F.body,r[0]==='TASK'?C.accent:C.primary); y+=13; });
   txt('last write: '+(dev.log[0]?dev.log[0].src+' '+(dev.log[0].reg):'—'),8,y+2,F.micro,C.dim);
   chin('·','·','↩');

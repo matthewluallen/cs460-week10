@@ -1,4 +1,4 @@
-# Remote StampLC console (Netlify)
+# Remote TBD console (Netlify)
 
 > **Optional path.** The canonical Part 1 path is each student driving **their own twin**
 > (`./qemu/run.sh` + the `plc>` console or Logic Studio — see [`wiring/`](../wiring/) and the
@@ -8,7 +8,7 @@
 A tiny team-gated front end for Part 1. Students enter a team code, apply a program,
 toggle the input, and watch the output. The browser never touches a device directly —
 it calls a Netlify Function that checks the code and (when configured) forwards to that
-team's StampLC through the gateway.
+team's TBD controller through the gateway.
 
 ## Portable projects in Logic Studio
 

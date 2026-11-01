@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <title>TBD Logic Studio</title>
-<meta name="description" content="TBD StamPLC logic authoring and read-only controller monitoring: ladder, statement list, register values and USB program download.">
+<meta name="description" content="TBD logic authoring and read-only controller monitoring: ladder, statement list, register values and USB program download.">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root{
@@ -621,7 +621,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
 
 <div class="app">
   <header>
-    <div class="brand"><span class="mark">S3</span><div>TBD Logic Studio <small>TBD · StamPLC</small></div></div>
+    <div class="brand"><span class="mark">S3</span><div>TBD Logic Studio <small>TBD</small></div></div>
     <span class="seg" id="appViewSeg" title="Logic authoring · the end-to-end signal Flow · the network (Modbus) view"><button type="button" data-appview="logic" class="on">Logic</button><button type="button" data-appview="flow">Flow ⚡</button><button type="button" data-appview="protocol">Protocol ⇄</button><button type="button" data-appview="circuit">Circuit ⚙</button></span>
     <span class="seg" id="modeSeg" title="Author edits the project; Monitor observes controller replies without changing outputs">
       <button data-mode="edit" class="on">✎ Author</button><button data-mode="online">◉ Monitor</button>
@@ -683,12 +683,12 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
     <div class="hcard">
       <div class="hc-h"><span class="tk"></span>Controller &middot; panel<span class="hsrc" id="heroPanelSrc">emulated</span></div>
       <div class="hc-b hcc">
-        <div class="stamplc-svg" id="heroDevice" role="group" aria-label="StampLC controller: screen, IN1–IN8 inputs, RELAY 1–4"></div>
+        <div class="stamplc-svg" id="heroDevice" role="group" aria-label="TBD controller: screen, IN1–IN8 inputs, RELAY 1–4"></div>
         <div hidden><div class="rgb" id="heroRgb"></div><canvas id="heroLcd" width="960" height="540"></canvas>
           <button class="key" id="hkA">A</button><button class="key" id="hkB">B</button><button class="key" id="hkC">C</button></div>
         <div class="hmeta">
           <div class="hname" id="heroName">No project</div>
-          <div class="hsub">M5 StamPLC &middot; ESP32-S3</div>
+          <div class="hsub">TBD &middot; ESP32-S3</div>
           <div class="hmode" id="heroModeBadge"><span class="d"></span><span id="heroMode">Unknown</span></div>
           <div class="hconn" id="heroConn">USB disconnected</div>
           <div class="hhint">A&middot;B&middot;C drive the on-device LCD. On the twin this is its real screen; on a board, a mirror of it.</div>
@@ -863,7 +863,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
 
   <section id="viewCircuit" aria-label="Circuit Studio — wire and run predesigned circuits">
     <div class="proto-head">
-      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">Part 1 · wire &amp; run · snap-kit parts on the StampLC</span></div>
+      <div class="flow-title">Circuit Studio ⚙ <span class="flow-sub">Part 1 · wire &amp; run · snap-kit parts on the TBD controller</span></div>
       <span class="seg" id="cwSub" role="tablist" aria-label="Circuit Studio views"><button type="button" role="tab" data-sub="wire" class="on">Wire &amp; run</button><button type="button" role="tab" data-sub="paths">Input paths</button><button type="button" role="tab" data-sub="parts">Parts</button></span>
       <span class="spacer" style="flex:1"></span>
       <span class="flow-hint" id="circuitHint"></span>
@@ -909,7 +909,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
         <span><span class="hs-k">conn</span> <span id="hsConn">—</span></span>
         <span><span class="hs-k">scan</span> <span id="hsScan">—</span></span>
         <span><span class="hs-k">bus/s</span> <span id="hsBus">—</span></span>
-        <span class="hs-live" id="hsEnlarge" title="Open the StampLC screen large enough to read and interact with">⤢ screen</span>
+        <span class="hs-live" id="hsEnlarge" title="Open the TBD screen large enough to read and interact with">⤢ screen</span>
         <span class="hs-live" id="hsLive" title="Stream real @BUS transactions to the overview scope">go live ▸</span>
       </div>
       <span class="hs-sep" style="margin:0 2px"></span>
@@ -953,7 +953,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
  const circ=(x,y,r,c)=>{ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=c;ctx.fill();};
  const clr=()=>{ctx.fillStyle=C.BG;ctx.fillRect(0,0,240,135);};
  function chin(a,b,c){const m=mInt();ctx.fillStyle=C.SURF;ctx.fillRect(0,121,240,14);circ(7,128,3,mC(m));T(mS(m),13,124,1,C.WHITE);T(H.volts.toFixed(1)+'V',52,124,1,C.MUTED);if(H.forces>0)T(H.forces+'F',92,124,1,C.VIO);const h='A:'+a+' B:'+b+' C:'+c;T(h,236-TW(h,1),124,1,C.ACC);}
- function home(){const m=mInt();clr();T('M5 StamPLC',6,4,1,C.MUTED);{const ip=H.ip||'no-net';T(ip,234-TW(ip,1),4,1,C.MUTED);}dRR(4,20,104,52,5,C.LINE);T(mS(m),12,28,4,mC(m));T('mode',14,60,1,C.MUTED);T('SCAN DI',120,20,1,C.MUTED);for(let i=0;i<8;i++)fRR(120+i*15,32,11,11,2,H.DI[i]?C.OK:C.SURF);T('DRV CMD',120,50,1,C.MUTED);for(let i=0;i<4;i++)fRR(120+i*15,62,11,11,2,H.RLY[i]?C.OK:C.SURF);T('+IO-EXP @0x20',120,80,1,C.ACC);if(H.forces>0)T(H.forces+' FORCED',8,80,1,C.VIO);ctx.fillStyle=C.BG;ctx.fillRect(4,88,232,9);T('DI scan #'+H.scanN+' '+H.age,6,88,1,C.MUTED);const items=['MODE','I/O','GROVE','FORCE','INFO'];let x=6;for(let i=0;i<5;i++){const on=i===H.menu,w=TW(items[i],1)+10;if(on)fRR(x,98,w,16,4,C.ACC);T(items[i],x+5,101,1,on?C.BG:C.MUTED);x+=w+6;}chin('next','open','-');}
+ function home(){const m=mInt();clr();T('TBD',6,4,1,C.MUTED);{const ip=H.ip||'no-net';T(ip,234-TW(ip,1),4,1,C.MUTED);}dRR(4,20,104,52,5,C.LINE);T(mS(m),12,28,4,mC(m));T('mode',14,60,1,C.MUTED);T('SCAN DI',120,20,1,C.MUTED);for(let i=0;i<8;i++)fRR(120+i*15,32,11,11,2,H.DI[i]?C.OK:C.SURF);T('DRV CMD',120,50,1,C.MUTED);for(let i=0;i<4;i++)fRR(120+i*15,62,11,11,2,H.RLY[i]?C.OK:C.SURF);T('+IO-EXP @0x20',120,80,1,C.ACC);if(H.forces>0)T(H.forces+' FORCED',8,80,1,C.VIO);ctx.fillStyle=C.BG;ctx.fillRect(4,88,232,9);T('DI scan #'+H.scanN+' '+H.age,6,88,1,C.MUTED);const items=['MODE','I/O','GROVE','FORCE','INFO'];let x=6;for(let i=0;i<5;i++){const on=i===H.menu,w=TW(items[i],1)+10;if(on)fRR(x,98,w,16,4,C.ACC);T(items[i],x+5,101,1,on?C.BG:C.MUTED);x+=w+6;}chin('next','open','-');}
  function modeScr(){const m=mInt();clr();T('PROCESSOR MODE',6,6,2,C.WHITE);for(let i=0;i<3;i++){const y=36+i*24,sel=i===H.target;if(sel)dRR(4,y-3,150,22,4,C.ACC);T((i===m?'•':' ')+' '+mL(i),12,y,2,sel?mC(i):C.MUTED);}if(H.target===2)T('network gets authority',6,108,1,C.WARN);chin('next','APPLY','back');}
  function ioScr(){clr();T('I/O: scan DI; output requests',6,6,1,C.MUTED);let top=H.iocur-3;if(top<0)top=0;if(top>ELEMS.length-6)top=ELEMS.length-6;if(top<0)top=0;for(let r=0;r<6&&top+r<ELEMS.length;r++){const i=top+r,e=ELEMS[i],y=22+r*15,sel=i===H.iocur;if(sel)fRR(2,y-1,236,15,3,C.SURF);T(e.b+' '+e.id,8,y,1,sel?C.WHITE:C.MUTED);if(e.k==='AIN')T('-- mV',150,y,1,C.MUTED);else{const on=e.k==='DI'?H.DI[e.i]:e.k==='RLY'?H.RLY[e.i]:0;T(on?'ON':'off',150,y,1,on?C.OK:C.MUTED);}if(sel)T('▶',226,y,1,C.ACC);}ctx.fillStyle=C.BG;ctx.fillRect(4,111,232,9);T('DI scan #'+H.scanN+' '+H.age,6,111,1,C.MUTED);chin('next','act','back');}
  function groveScr(){clr();T('GROVE SENSORS',6,6,2,C.WHITE);T('PORT.A bus  (mirror: readings come from',6,26,1,C.MUTED);T('the console: devices samples)',6,38,1,C.MUTED);chin('-','-','back');}
@@ -986,7 +986,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
  function hook(){if(H.hooked)return;try{if(typeof lineListeners!=='undefined'){lineListeners.push(heroLine);H.hooked=true;}}catch(e){}}
  function drawLcd(){hook();if(realFresh()){ctx.imageSmoothingEnabled=false;ctx.drawImage(H.real,0,0,240,135);return;}
    if(H.scr==='HOME')home();else if(H.scr==='MODE')modeScr();else if(H.scr==='IO')ioScr();else if(H.scr==='GROVE')groveScr();else if(H.scr==='FORCE')forceScr();else if(H.scr==='LOG')logScr();else infoScr();}
- // ---- the controller drawing: the same snap-kit StampLC as the Circuit tab, with this screen in it.
+ // ---- the controller drawing: the same snap-kit controller as the Circuit tab, with this screen in it.
  // Inputs/relays: on the twin from GET /field (the expander's own registers, no console traffic); on a
  // board from the io readback when one has arrived. The ids get their own prefix so this hidden-or-shown
  // drawing never captures the Circuit tab's gradient/filter references.
@@ -1007,7 +1007,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
    if(!devUrl)refreshDeviceLcd(true);
    let svg=SK.defs(T)+SK.stamplc({x:8,y:12,used:{RELAY1:1,RELAY2:1,RELAY3:1,RELAY4:1},lcd:{href:devUrl,label:src.short}},vm,T);
    svg=svg.replace(/id="sk/g,'id="hdsk').replace(/#sk/g,'#hdsk');
-   el.innerHTML='<svg viewBox="0 0 500 392" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="StampLC controller">'+svg+'</svg>';}
+   el.innerHTML='<svg viewBox="0 0 500 392" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="TBD controller">'+svg+'</svg>';}
  function refreshDeviceLcd(force){const now=performance.now();if(!force&&(now-devLcdAt<500||!devShown()))return;devLcdAt=now;
    try{if(!devScratch){devScratch=document.createElement('canvas');devScratch.width=480;devScratch.height=270;}
      const g=devScratch.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(cv,0,0,480,270);devUrl=devScratch.toDataURL('image/png');
@@ -1069,7 +1069,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
    const pn=(typeof PROJECT!=='undefined'&&PROJECT)?(PROJECT.name||'Project'):'No project'; const hn=document.getElementById('heroName'); if(hn)hn.textContent=pn;
    document.getElementById('heroPanelSrc').textContent=window.heroLcdSource().short;
    {const ss=document.getElementById('heroSigSrc'); const L=window.__liveBus||{wanted:false,active:false};
-    const src=(typeof wsSock!=='undefined'&&wsSock)?'twin':'StampLC';
+    const src=(typeof wsSock!=='undefined'&&wsSock)?'twin':'TBD';
     if(H.busFocus!=null){ ss.textContent='focus 0x'+H.busFocus.toString(16)+(H.busFocusName?' '+H.busFocusName:'')+' ✕'; ss.title='click to clear bus focus'; }
     else if(L.wanted){ ss.textContent='● live @BUS'+(connNow?' · '+src:' (offline)'); ss.title='streaming real bus transactions — click to stop'; }
     else { ss.textContent='go live ▸'; ss.title='click to stream real @BUS transactions from the device'; }
@@ -1144,7 +1144,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
 (function(){
   function enlargeLcd(){
     if(typeof showModal!=='function')return;
-    showModal(`<h3>StampLC screen</h3><div class="body">
+    showModal(`<h3>TBD screen</h3><div class="body">
       <p style="font-size:12.5px;color:var(--ink2);margin:0 0 6px">A readable view of the controller’s screen. <b>A · B · C</b> drive the device buttons — step through its menus just like on the bench.</p>
       <p id="lcdBigSrc" role="status" style="font-size:12.5px;color:var(--ink2);margin:0 0 10px"></p>
       <div style="background:#0b0e13;border:1px solid #000;border-radius:10px;padding:14px;max-width:660px;margin:0 auto">
@@ -1504,7 +1504,7 @@ window.mbFetch = async function(q){
       +`<div class="sens-sub">sensor-bus temperature · on-board rail ${vin!=null?(vin/1000).toFixed(1)+' V':'—'} / ${cur!=null?cur+' mA':'—'}</div>`;
     // CPU
     const cpu=el('circCpu'); const mode=['PROGRAM','RUN','REMOTE'][st.reg[20]]||'—', scan=st.reg[21]!=null?(st.reg[21]/1000).toFixed(1)+' ms':'—';
-    cpu.innerHTML='<div class="cpuname">M5 StamPLC</div><div class="cpusub">ESP32-S3 · point map</div>'
+    cpu.innerHTML='<div class="cpuname">TBD</div><div class="cpusub">ESP32-S3 · point map</div>'
       +`<div class="cpumode">${mode} · scan ${scan}</div>`
       +'<div class="circ-cdesc" style="margin-top:12px;text-align:left">Every input lands in the <b>point map</b> as %IX (digital) or %IW (analog/sensor); the scan runs your ladder; results go out as %QX to the relays. The map is the single meeting point of the three input paths and the two protocols (bus & network).</div>';
     // Outputs
@@ -2266,7 +2266,7 @@ function validateProcessBindings(config){
   if(d==='bme680'||d==='bme688')need(input.bus===0&&input.address===119&&input.part===97&&input.revision===(d==='bme688'?1:0),'BME identity does not match its supported profile.');
   if(d==='sgp30')need(input.bus===0&&input.address===88&&input.part<4096&&(input.part&255)>=32&&input.revision===0,'SGP30 identity does not match its supported profile.');
   if(d==='max30100')need(input.bus===0&&input.address===87&&input.part===17&&input.revision<=255,'MAX30100 identity required; address 0x57 also occurs on other devices.');
-  if(d==='stamplc-io-candidate')need(input.bus===1&&input.mux===0&&input.address>=32&&input.address<=47&&input.part===input.address&&input.revision<255,'StamPLC IO expansion identity does not match its supported profile.');
+  if(d==='stamplc-io-candidate')need(input.bus===1&&input.mux===0&&input.address>=32&&input.address<=47&&input.part===input.address&&input.revision<255,'TBD IO expansion identity does not match its supported profile.');
   if(d==='mlx90614-candidate')need(input.bus===0&&input.address===90&&input.part===0&&input.revision===0,'NCIR identity required; address 0x5A alone is not identity.');
   if(d==='vl53l1x-candidate')need(input.bus===0&&input.mux!==0&&input.address===41&&input.part===60108&&input.revision===0,'ToF requires its qualified hub route and part identity.');
   if(d==='sgp30'||d==='mlx90614-candidate')need(typeof input.serial==='string'&&(d==='sgp30'?/^[0-9a-f]{12}$/:/^[0-9a-f]{16}$/).test(input.serial),'This module requires its exact reported serial.');
@@ -2606,7 +2606,7 @@ const LD={IX:OP.LD_IX,QX:OP.LD_QX,MX:OP.LD_MX};
 const ST={QX:OP.ST_QX,MX:OP.ST_MX};
 const CMP={GT:OP.GT,LT:OP.LT,GE:OP.GE,LE:OP.LE,EQ:OP.EQ};
 const CMPSYM={GT:'>',LT:'<',GE:'≥',LE:'≤',EQ:'='};
-/* ===== StamPLC I/O catalog ===== */
+/* ===== TBD I/O catalog ===== */
 const IO={
   IX:{n:8,label:i=>`%IX${i}`,sub:i=>`Digital input ${i}`,force:true},
   QX:{n:4,label:i=>`%QX${i}`,sub:i=>`Base relay ${i}`,force:true},
@@ -3709,7 +3709,7 @@ root.StudioDeviceScreen={collector,crc32,isComplete:frame=>completedFrames.has(f
 /* Shared observed assembly state for Studio and future world renderers. No control writes. */
 (function(root){
 // K141 manufacturer reference, reviewed2026-10-03. This is not a detected revision.
-const board={id:'m5stamplc',name:'M5StamPLC',reference:'https://docs.m5stack.com/en/core/StamPLC',ports:[
+const board={id:'m5stamplc',name:'TBD',reference:'https://docs.m5stack.com/en/core/StamPLC',ports:[
  {id:'display',label:'Screen',detail:'1.14-inch display. Supported firmware provides read-only pixel snapshots; a register value is not a screen pixel and a snapshot is not live video.',task:'Compare a controller reading with the physical display before asserting that both agree.'},
  {id:'inputs',label:'IN0–7',detail:'Eight isolated digital inputs mapped by this firmware to IX0–7. COM and field wiring are not discovered by reading the input bits.',task:'Trace one input through its register and authored logic. An electrical input level does not authenticate its source.'},
  {id:'outputs',label:'RLY0–3',detail:'Four relay outputs mapped to QX0–3. Register readback is not independent confirmation of contact position or connected load.',task:'Identify the safe state and independent feedback needed if a contact sticks.'},
@@ -3776,11 +3776,11 @@ function openTerminalMap(){
   const mx=Array.from({length:8},(_,i)=>chip('mem','—',`%MX${i}`,'internal bit','MX',i)).join('');
   const groveTdev=`<div class="tdev"><div class="th">Grove ports</div><p>Use <b>Grove devices</b> for controller-reported routes, supported readings and freshness. The connector or an address response alone does not identify a device or establish its supported functions. Port C uses an explicitly selected profile; it is not automatically treated as a load cell.</p><p>Sensor readings require an explicit validated process-input binding before ladder/ST can use them.</p></div>`;
   showModal(`<h3>Terminal map — physical ↔ logical</h3><div class="body"><section class="tdev" style="margin-bottom:14px;padding:12px"><h4 style="margin:0 0 8px">Controller connection explorer</h4><p>Reference layout, not to scale. Select a component to inspect its role; selection never operates hardware.</p><div id="boardPortChoices" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px"></div><div id="boardPortDetails" role="status" aria-live="polite" style="margin-top:12px;overflow-wrap:anywhere"></div></section><div class="tmap">
-    <div class="tdev"><div class="th">M5StamPLC (base) <span class="badge">ESP32-S3 · opto-in ×8 · relay ×4</span></div>
+    <div class="tdev"><div class="th">TBD (base) <span class="badge">ESP32-S3 · opto-in ×8 · relay ×4</span></div>
       <div class="tgrp"><div class="gl">Digital inputs — opto-isolated, share the input COM</div><div class="tchips">${di}</div></div>
       <div class="tgrp"><div class="gl">Relay outputs — dry contacts (NO / COM), AC or DC</div><div class="tchips">${rly}</div></div>
       <div class="tgrp"><div class="gl">On-board analog (no terminal — internal sensors)</div><div class="tchips">${ana}</div></div>
-      <div class="tnote">Comms: <code>PWR-485</code> = RS-485 <b>A/B</b> · <code>PWR-CAN</code> = CAN <b>H/L</b>. Base power: DC <b>6–36 V</b>; verify the installed expansion’s supply requirements. Numbering follows M5Stack channels: inputs 0–7, relays 0–3.</div>
+      <div class="tnote">Comms: <code>PWR-485</code> = RS-485 <b>A/B</b> · <code>PWR-CAN</code> = CAN <b>H/L</b>. Base power: DC <b>6–36 V</b>; verify the installed expansion’s supply requirements. Numbering follows TBD channels: inputs 0–7, relays 0–3.</div>
     </div>
     <div class="tdev"><div class="th">Connected assembly</div><p>Controller-reported routes; cable layout and board revision are not verified. </p><button class="btn" id="assemblyRead">Read connected devices</button><div id="assemblyDevices"></div><section style="margin-top:12px"><details id="deviceWorldPanel"><summary>3D device view</summary><p>Schematic layout. Controller envelope: 72 × 80 × 33.4 mm from the manufacturer. Screen placement and module boxes are illustrative; cable positions and module shapes are not verified. Uses the same observed state as the list and screen below.</p><button class="btn" id="deviceWorldFront">Front view</button> <button class="btn" id="deviceWorldAngle">Angled view</button><canvas id="deviceWorldCanvas" aria-label="Schematic controller and reported modules" style="width:100%;height:300px;display:block;margin-top:10px"></canvas><p id="deviceWorldStatus" role="status"></p><label for="deviceWorldSelect">Inspect a component</label><select id="deviceWorldSelect" style="max-width:100%"></select><p id="deviceWorldDetails" style="white-space:pre-wrap;overflow-wrap:anywhere"></p><div id="deviceWorldRegisterLinks"></div></details><h4>Controller screen</h4><p id="deviceScreenStatus" role="status" aria-live="polite"></p><button class="btn" id="readDeviceScreen">Capture screen</button> <button class="btn" id="cancelDeviceScreen" hidden>Cancel capture</button><canvas id="deviceScreen" width="240" height="135" hidden aria-label="Captured controller software display" style="display:none;max-width:100%;width:480px;height:auto;margin-top:12px;image-rendering:pixelated"></canvas><p>Read-only snapshot of pixels submitted by the firmware. It does not operate the controller or independently verify the physical LCD.</p></section></div>
     ${groveTdev}
@@ -3924,7 +3924,7 @@ function renderSensors(){
 /* ===== Test bench → the Circuit tab ("Wire & run") =====
  * The old ⚡ Test bench modal (flat SVG, 0-based labels, no N.C screw, no LED resistor) is replaced by
  * the full-width predesigned circuits in the Circuit tab (circuits/catalog.js + circuits/workspace.js):
- * faithful StampLC terminals labelled "IN1 (di0)" / "RELAY 1 (relay0)", snap-kit parts, bench and
+ * faithful TBD terminals labelled "IN1 (di0)" / "RELAY 1 (relay0)", snap-kit parts, bench and
  * schematic views, and chip-level input driving on the twin (POST /field) instead of force. */
 function openTestBench(id){
   id=(typeof id==='string')?id:null;   // the toolbar passes a click event
@@ -4018,7 +4018,7 @@ function openBusMap(){
   const spi=rail([dev('master','ESP32-S3','SPI master','SCK7 MISO9 MOSI8'),dev('','LCD','ST7789 display','CS-disp'),dev('','W5500','Ethernet + PoE','CS11')]);
   showModal(`<h3>Bus reference — verify the installed board and firmware</h3><div class="body">
     <div class="bus"><div class="bh"><span class="bn">Internal I²C</span><span class="bt">base controller 0 · m5::In_I2C</span></div>
-      <div class="bmaster">Reference devices from the StamPLC driver. This diagram is not a live inventory or a complete transaction trace. Software annotations cover selected calls only.</div>${i2cInt}</div>
+      <div class="bmaster">Reference devices from the TBD driver. This diagram is not a live inventory or a complete transaction trace. Software annotations cover selected calls only.</div>${i2cInt}</div>
     <div class="bus"><div class="bh"><span class="bn">Expansion I²C (chained)</span><span class="bt">0x20 → 0x2F</span></div>
       <div class="bmaster">Module addresses can be configured in this range. The current firmware discovers one expansion at boot; the diagram does not establish that multiple modules are supported or present.</div>
       ${rail([dev('master','ESP32-S3','I²C master',''),dev('','0x20','Module 1',''),dev('','0x21','Module 2',''),dev('','…','+14 more','')])}</div>
@@ -4036,7 +4036,7 @@ function openBusMap(){
 let busBusy=false,busWaiter=null,busTraceState='unknown',busCapture=null,busRecorded=false;
 /* ===== live bus: stream the device's own @BUS transactions to the hero scope =====
    This is the ONLY source of the Live-signal scope — real decoded I²C traffic from
-   the twin (over the bridge) or a real StampLC (over USB). It is never synthesized.
+   the twin (over the bridge) or a real TBD controller (over USB). It is never synthesized.
    `busstream` is paused automatically during any clean readback (see busCommand) so
    its lines can never split the chunked project-identity JSON. */
 window.__liveBus={wanted:false,active:false};
@@ -4680,7 +4680,7 @@ async function connect(){
   if(!hasSerial){log('Web Serial not available. Use Chrome/Edge, or Compile ▸ Copy frame into the console.','er');return;}
   let candidate=null;connecting=true;const button=document.getElementById('bConnect');button.disabled=true;button.textContent='Choose USB device…';
   log('Choose the intended controller in the browser device chooser, or cancel. No connection is confirmed yet.','rx');
-  try{candidate=await navigator.serial.requestPort({filters:[{usbVendorId:0x303a}]});await candidate.open({baudRate:115200});port=candidate;writer=port.writable.getWriter();rxBuf='';setConn(true);readLoop();log('USB port opened @115200. Controller identity and mode require replies.','ok');await send('status');try{await readProjectIdentity();}catch(e){log('Application identity unavailable: '+e.message,'er');}setTimeout(function(){ if(conn && port===candidate){ if(controllerModeAt===null){ log('\u26a0 This USB device is not responding as a StampLC controller. Disconnect and pick the StampLC in the port chooser (it shows as \u201cUSB JTAG serial\u201d).','er'); } else { log('\u2713 StampLC controller confirmed on this port.','ok'); } } },2600);}
+  try{candidate=await navigator.serial.requestPort({filters:[{usbVendorId:0x303a}]});await candidate.open({baudRate:115200});port=candidate;writer=port.writable.getWriter();rxBuf='';setConn(true);readLoop();log('USB port opened @115200. Controller identity and mode require replies.','ok');await send('status');try{await readProjectIdentity();}catch(e){log('Application identity unavailable: '+e.message,'er');}setTimeout(function(){ if(conn && port===candidate){ if(controllerModeAt===null){ log('\u26a0 This USB device is not responding as a TBD controller. Disconnect and pick the TBD controller in the port chooser (it shows as \u201cUSB JTAG serial\u201d).','er'); } else { log('\u2713 TBD controller confirmed on this port.','ok'); } } },2600);}
   catch(e){if(candidate&&candidate===port)await disconnect();if(/permissions policy|disallowed|SecurityError/i.test(e.message||'')){log('USB blocked by this browser context. Open the standalone page in Chrome/Edge.','er');}else if(e.name==='NotFoundError')log('USB selection cancelled; no controller connected.','rx');else log('Connection unavailable: '+e.message,'er');}
   finally{connecting=false;button.disabled=false;button.textContent=port?'Disconnect USB':'Connect USB';}
 }
@@ -4978,7 +4978,7 @@ function openNetConfig(){
   g('ncReload').onclick=load;
   g('ncAskAI').onclick=()=>{
     const vals={eth:{mode:g('ncEthMode').value,ip:g('ncEthIp').value,gw:g('ncEthGw').value,mask:g('ncEthMask').value,present:ethPresent},wifi:{mode:g('ncWMode').value,ssid:g('ncSsid').value,addr:g('ncWAddr').value,ip:g('ncWIp').value,gw:g('ncWGw').value,mask:g('ncWMask').value}};
-    const prompt='I am configuring an M5StampLC soft-PLC (ESP32-S3) network settings in the Logic Studio. Here is the current form state as JSON:\n'+JSON.stringify(vals,null,2)+'\n\nPlease explain, for someone new to networking and firmware: what each setting does, whether this configuration is sensible and safe, and any security implications (e.g. DHCP vs static, default AP credentials). Reference the per-interface model (W5500 Ethernet + WiFi, each static or DHCP; WiFi OFF/STA/setup-AP).';
+    const prompt='I am configuring a TBD soft-PLC (ESP32-S3) network settings in the Logic Studio. Here is the current form state as JSON:\n'+JSON.stringify(vals,null,2)+'\n\nPlease explain, for someone new to networking and firmware: what each setting does, whether this configuration is sensible and safe, and any security implications (e.g. DHCP vs static, default AP credentials). Reference the per-interface model (W5500 Ethernet + WiFi, each static or DHCP; WiFi OFF/STA/setup-AP).';
     (navigator.clipboard?navigator.clipboard.writeText(prompt):Promise.reject()).then(()=>{g('ncMsg').textContent='Ask-AI prompt copied — paste it into any AI assistant.';},()=>{g('ncMsg').textContent='Copy failed; prompt logged to the console.';console.log(prompt);});
   };
   g('ncApply').onclick=async()=>{
@@ -4992,7 +4992,7 @@ function openNetConfig(){
     cmds.push('netcfg save');
     g('ncMsg').textContent='Applying…';
     for(const c of cmds){ if(!rawSend(c)){g('ncMsg').textContent='Send failed — connection lost.';return;} await new Promise(r=>setTimeout(r,200)); }
-    g('ncMsg').textContent='Saved to device ('+cmds.length+' commands). Reboot the StampLC to apply addressing changes.';
+    g('ncMsg').textContent='Saved to device ('+cmds.length+' commands). Reboot the TBD controller to apply addressing changes.';
     log('Network config written to device; reboot to apply.','ok');
   };
   wireInfo(); paintTeach(); load();

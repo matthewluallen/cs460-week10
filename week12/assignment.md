@@ -51,7 +51,7 @@ Submit the diff and the `verify_controls.py` output before and after.
    in CIE terms — **safety**, **security**, **resiliency**, or the **customer experience** that
    rides on them — and the MITRE mitigation/technique it embodies. Say explicitly why the
    **formal-verify** stage is not redundant with the **test** stage.
-2. **Compensate where you can't prove.** The StampLC is one node in a system of systems. Choose
+2. **Compensate where you can't prove.** The TBD controller is one node in a system of systems. Choose
    **two** boundaries you do not own (an upstream sensor, a vendor PLC, a cloud historian, the
    operator workstation, an unauthenticated time source). For each, give: the property you
    cannot prove, **why** (the boundary), the **compensating control**, its **MITRE** technique
