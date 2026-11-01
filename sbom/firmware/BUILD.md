@@ -106,7 +106,7 @@ pio run -e m5stamplc -t upload          # or -e m5stamplc_secure
 pio device monitor -b 115200
 ```
 
-The board target is ESP32-S3 / M5Stamp S3, 8 MB flash, DIO at 80 MHz. Before replacing firmware,
+The board target is ESP32-S3 / TBD, 8 MB flash, DIO at 80 MHz. Before replacing firmware,
 record the board's current firmware and keep a recoverable backup; the read-only
 [bench capture](../../tools/bench/README.md) observes the existing console state without changing
 it.

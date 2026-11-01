@@ -13,7 +13,7 @@ firmware on a device — **no toolchain, no build**. (To modify + rebuild instea
 | `SHA256SUMS.txt` | Integrity — `sha256sum -c SHA256SUMS.txt` |
 | `manifest.json` | ESP Web Tools descriptor (for a WebSerial flash button) |
 
-Target: **ESP32-S3 (M5Stamp S3)**, 8 MB flash, DIO @ 80 MHz, custom OTA partition.
+Target: **ESP32-S3 (TBD)**, 8 MB flash, DIO @ 80 MHz, custom OTA partition.
 
 ## Flash it
 

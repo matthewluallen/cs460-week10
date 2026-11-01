@@ -33,7 +33,7 @@ console) and, once networked, over **Wi‑Fi or Ethernet** (a web interface, Mod
 
 | Function | Part | Bus / address | Notes |
 |---|---|---|---|
-| Controller | M5StampS3 (ESP32‑S3) | — | Wi‑Fi + BLE, 8 MB flash |
+| Controller | TBD (ESP32‑S3) | — | Wi‑Fi + BLE, 8 MB flash |
 | Relay/SSR outputs ×4 + opto inputs ×8 | AW9523B expander | I²C `0x59` | `relay0`–`relay3` (plus `ssr*`); the 8 opto DIs `di0`–`di7` are read on this chip too |
 | Panel buttons ×3 | PI4IOE5V expander | I²C `0x43` | front buttons (A/B/C) + INT line |
 | Power monitor | TI INA226 | I²C `0x40` | bus voltage / current |
