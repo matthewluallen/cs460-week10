@@ -41,6 +41,7 @@
   .col-capec{border-top:3px solid var(--f-capec)} .col-attack{border-top:3px solid var(--f-attack)}
   .col-d3fend{border-top:3px solid var(--f-d3fend)} .col-caldera{border-top:3px solid var(--f-caldera)}
   .col-atlas{border-top:3px solid var(--f-atlas)}
+  .col-controls{border-top:3px solid #3fb0ac}
   .pickrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
   select{background:#0c1220;color:var(--ink);border:1px solid var(--edge);border-radius:10px;padding:10px 12px;font-size:14px;min-width:300px}
   .chip{font-size:11px;padding:3px 9px;border-radius:999px;background:#222c42;color:var(--dim)}
@@ -95,6 +96,7 @@
           <th class="col-caldera">CALDERA</th>
           <th class="col-d3fend">D3FEND</th>
           <th class="col-atlas">ATLAS</th>
+          <th class="col-controls">Controls &middot; 62443/NIST</th>
         </tr></thead>
         <tbody id="matrix-body"></tbody>
       </table>
@@ -113,7 +115,7 @@
 
   <p class="foot">IDs link to the official framework entry. Frameworks: EMB3D (emb3d.mitre.org), CWE (cwe.mitre.org),
   CAPEC (capec.mitre.org), ATT&amp;CK for ICS (attack.mitre.org), D3FEND (d3fend.mitre.org), CALDERA / caldera-ot (github.com/mitre),
-  ATLAS (atlas.mitre.org). <b>ATLAS is N/A for all eight</b> — none involve a machine-learning model today; if the course adds an ML
+  ATLAS (atlas.mitre.org). <b>ATLAS is N/A for all eleven</b> — none involve a machine-learning model today; if the course adds an ML
   anomaly detector on the sensor stream, the phone-sensor false-data attack would then map to ATLAS <code>AML.T0043</code> (Craft Adversarial Data).
   <b>CALDERA reality check:</b> caldera-ot ships six protocol plugins (modbus, bacnet, dnp3, profinet, iec61850, gems) — only the two Modbus
   attacks have a real public plugin; MQTT, credential, overflow and RE attacks need a custom ability. Mappings are teaching approximations
@@ -130,6 +132,7 @@ const FW = {
   d3fend: {name:'D3FEND',  color:'var(--f-d3fend)', url:id=>'https://d3fend.mitre.org/'},
   caldera:{name:'CALDERA', color:'var(--f-caldera)',url:id=>'https://github.com/mitre/caldera-ot'},
   atlas:  {name:'ATLAS',   color:'var(--f-atlas)',  url:id=>`https://atlas.mitre.org/techniques/${id}`},
+  controls:{name:'Controls \u00b7 62443/NIST', color:'#3fb0ac', url:id=>/^(FR|SL)/.test(id)?'https://www.isa.org/standards-and-publications/isa-standards/isa-iec-62443-series-of-standards':'https://csrc.nist.gov/projects/cprt/catalog'},
 };
 
 // framework cell = {id,title,url?} | [cells] | null. url overrides the builder (D3FEND/CALDERA).
@@ -146,7 +149,8 @@ const ATTACKS = [
       attack:{id:'T1694.001',title:'Insecure Credentials: Default Credentials (formerly T0812) · Lateral Movement'},
       caldera:null,
       d3fend:{id:'D3-MFA',title:'Multi-factor Authentication',url:D3('Multi-factorAuthentication')},
-      atlas:null
+      atlas:null,
+      controls:[{id:'FR1 IAC',title:'Identification & Authentication Control'},{id:'IA-5',title:'Authenticator Management'}]
     }
   },
   {
@@ -161,7 +165,8 @@ const ATTACKS = [
       attack:null,
       caldera:null,
       d3fend:{id:'D3-DENCR',title:'Flash / Disk Encryption',url:D3('DiskEncryption')},
-      atlas:null
+      atlas:null,
+      controls:[{id:'FR3 SI',title:'System Integrity'},{id:'SC-12',title:'Cryptographic Key Establishment & Management'}]
     }
   },
   {
@@ -176,7 +181,8 @@ const ATTACKS = [
       attack:[{id:'T1692.001',title:'Unauthorized Message: Command Message (formerly T0855 Unauthorized Command Message)'},{id:'T0835',title:'Manipulate I/O Image'}],
       caldera:{id:'modbus',title:'caldera-ot · modbus plugin'},
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
-      atlas:null
+      atlas:null,
+      controls:[{id:'FR5 RDF',title:'Restricted Data Flow (zones & conduits)'},{id:'FR1 IAC',title:'Identification & Authentication'},{id:'SC-7',title:'Boundary Protection'}]
     }
   },
   {
@@ -191,7 +197,8 @@ const ATTACKS = [
       attack:{id:'T1692.002',title:'Unauthorized Message: Reporting Message (formerly T0856 Spoof Reporting Message)'},
       caldera:{id:'modbus',title:'caldera-ot · modbus plugin'},
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
-      atlas:null
+      atlas:null,
+      controls:[{id:'FR3 SI',title:'System Integrity'},{id:'SC-8',title:'Transmission Confidentiality & Integrity'}]
     }
   },
   {
@@ -206,7 +213,8 @@ const ATTACKS = [
       attack:{id:'T1692.001',title:'Unauthorized Message: Command Message'},
       caldera:null,
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
-      atlas:null
+      atlas:null,
+      controls:[{id:'FR1 IAC',title:'Identification & Authentication'},{id:'FR5 RDF',title:'Restricted Data Flow'},{id:'AC-3',title:'Access Enforcement'}]
     }
   },
   {
@@ -216,12 +224,13 @@ const ATTACKS = [
     fix:`Secure build (ENABLE_CWE_DEMOS off): bounded copy; overflow fixed at compile time. CWE-787/788/306 closed.`,
     fw:{
       emb3d:{id:'TID-327',title:'Out of Bounds Memory Access'},
-      cwe:[{id:'CWE-787',title:'Out-of-bounds Write'},{id:'CWE-788',title:'Access of Memory Location After End of Buffer'}],
+      cwe:[{id:'CWE-787',title:'Out-of-bounds Write'},{id:'CWE-788',title:'Access of Memory Location After End of Buffer'},{id:'CWE-778',title:'Insufficient Logging (the forced write bypasses the audited path)'}],
       capec:{id:'CAPEC-100',title:'Overflow Buffers'},
-      attack:{id:'T0866',title:'Exploitation of Remote Services'},
+      attack:[{id:'T0835',title:'Manipulate I/O Image (the effect)'},{id:'T0866',title:'Exploitation of Remote Services (the reach)'}],
       caldera:null,
-      d3fend:{id:'D3-SFCV',title:'Stack Frame Canary Validation',url:D3('StackFrameCanaryValidation')},
-      atlas:null
+      d3fend:{id:'bounds-check',title:'Source-level bounded copy (CWE-787 fix). The buffer is a static/.bss variable, so this is NOT stack-canary D3-SFCV; D3FEND has no precise bounds-checking technique.',url:'https://cwe.mitre.org/data/definitions/787.html'},
+      atlas:null,
+      controls:[{id:'FR3 SI',title:'System Integrity'},{id:'SI-10',title:'Information Input Validation'},{id:'AU-2',title:'Audit Events (the forced write leaves no row)'}]
     }
   },
   {
@@ -236,7 +245,8 @@ const ATTACKS = [
       attack:{id:'T0845',title:'Program Upload'},
       caldera:null,
       d3fend:{id:'D3-DENCR',title:'Flash / Disk Encryption',url:D3('DiskEncryption')},
-      atlas:null
+      atlas:null,
+      controls:[{id:'FR4 DC',title:'Data Confidentiality'},{id:'SC-28',title:'Protection of Information at Rest'}]
     }
   },
   {
@@ -251,7 +261,56 @@ const ATTACKS = [
       attack:[{id:'T1692.001',title:'Unauthorized Message: Command Message'},{id:'T0835',title:'Manipulate I/O Image'}],
       caldera:null,
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
-      atlas:null
+      atlas:null,
+      controls:[{id:'FR3 SI',title:'System Integrity'},{id:'FR1 IAC',title:'Identification & Authentication'},{id:'SI-10',title:'Information Input Validation'}]
+    }
+  },
+  {
+    key:'unsigned-ota', name:'Unsigned firmware update accepted', phase:'Part 6 · OTA',
+    intro:`The update endpoint on <code>:80 /api/upload</code> takes bytes over cleartext HTTP with no login and <b>stores</b> them — it reports <code>verified=NO</code> but nothing authenticates the image. A malformed blob never boots (the boot-loader checks format), so the fingerprint is unchanged; a <i>well-formed</i> malicious image is Part 7.`,
+    evidence:`$ ./firmware-ota/push-unsigned.sh\nendpoint accepted 22 bytes  →  verified=NO   (stored, not rejected)\n$ plc> diag json   →  elf_sha256 unchanged (the junk never ran)`,
+    fix:`Secure build requires auth + an HMAC-checked image (Part 9); Week 12 replaces the shared HMAC with public-key signatures + a build record.`,
+    fw:{
+      emb3d:null,
+      cwe:[{id:'CWE-347',title:'Improper Verification of Cryptographic Signature'},{id:'CWE-345',title:'Insufficient Verification of Data Authenticity'},{id:'CWE-319',title:'Cleartext Transmission of Sensitive Information'}],
+      capec:{id:'CAPEC-186',title:'Malicious Software Update'},
+      attack:{id:'T1693.001',title:'Modify Firmware: System Firmware (formerly T0857)'},
+      caldera:null,
+      d3fend:{id:'D3-MAN',title:'Message Authentication (sign/verify the update)',url:D3('MessageAuthentication')},
+      atlas:null,
+      controls:[{id:'FR3 SI',title:'System Integrity (update integrity)'},{id:'SA-10',title:'Developer Configuration Management / code signing'}]
+    }
+  },
+  {
+    key:'supply-chain', name:'Supply-chain dormant payload', phase:'Part 7 · twin',
+    intro:`A trojaned image (one compile flag on the same source) boots and beacons to an attacker C2; on “armed” it moves a relay with <b>no field input and no audited row</b>. The ~624-byte payload relays out the whole app partition, so millions of bytes differ — a byte-diff cannot isolate it. Only a reproducible/signed build can establish provenance.`,
+    evidence:`$ ./supply-chain/diff-images.sh\nclean 8,388,608 B  vs  trojaned 8,388,608 B  (same size)\nbytes differing: 1,670,982   (payload ~624 B — NOT recoverable from the diff)`,
+    fix:`Reproducible build + SLSA / in-toto attestation; signed firmware; egress filtering to catch the C2 beacon.`,
+    fw:{
+      emb3d:null,
+      cwe:[{id:'CWE-506',title:'Embedded Malicious Code'},{id:'CWE-494',title:'Download of Code Without Integrity Check'}],
+      capec:{id:'CAPEC-439',title:'Manipulation During Distribution'},
+      attack:{id:'T0862',title:'Supply Chain Compromise'},
+      caldera:null,
+      d3fend:null,
+      atlas:null,
+      controls:[{id:'FR3 SI',title:'System Integrity'},{id:'SR-4',title:'Provenance'},{id:'SR-11',title:'Component Authenticity'}]
+    }
+  },
+  {
+    key:'ntp-y2038', name:'Rogue network time → Y2038 wrap', phase:'Part 8 · time',
+    intro:`The controller trusts an unauthenticated time source. A 2038 date arrives intact on the wire and is mis-stored as 1902 by a 64→32-bit truncation. The audit log stays monotonic (<code>millis()</code>) while the wall clock wraps — which is exactly why the fix decouples the evidence trail from wall-clock time.`,
+    evidence:`$ plc> clk\n1902-04-27 17:31:44 UTC   ← WRAPPED   (the wire carried 2038-06-03, 64-bit, intact)\n$ plc> log   →  timestamps still in order (millis since boot)`,
+    fix:`Authenticated time (NTS) + a plausibility bound on time jumps; 64-bit epoch storage (secure build); monotonic clock for the audit trail.`,
+    fw:{
+      emb3d:null,
+      cwe:[{id:'CWE-197',title:'Numeric Truncation Error'},{id:'CWE-190',title:'Integer Overflow or Wraparound'},{id:'CWE-191',title:'Integer Underflow'}],
+      capec:{id:'CAPEC-94',title:'Adversary in the Middle (AiTM)'},
+      attack:[{id:'T0830',title:'Adversary-in-the-Middle'},{id:'T0815',title:'Denial of View'}],
+      caldera:null,
+      d3fend:{id:'D3-MAN',title:'Message Authentication (authenticated time)',url:D3('MessageAuthentication')},
+      atlas:null,
+      controls:[{id:'FR6 TRE',title:'Timely Response to Events'},{id:'SC-45',title:'System Time Synchronization'}]
     }
   },
 ];
@@ -264,6 +323,7 @@ const STEP_ORDER = [
   {fw:'caldera',cls:'emulate',  label:'Emulate it',        lead:'How a red team would automate/emulate this (CALDERA / caldera-ot).'},
   {fw:'d3fend', cls:'defense',  label:'Countermeasure',    lead:'The defensive technique that neutralizes it (D3FEND).'},
   {fw:'atlas',  cls:'offense',  label:'AI/ML angle',       lead:'Where an ML component would change the picture (ATLAS).'},
+  {fw:'controls',cls:'defense', label:'Control standard',   lead:'The required control + security level (IEC 62443 FR/SL, NIST 800-53).'},
 ];
 
 function links(key, c){
@@ -282,6 +342,7 @@ function buildMatrix(){
       <td class="col-caldera">${links('caldera',a.fw.caldera)}</td>
       <td class="col-d3fend">${links('d3fend',a.fw.d3fend)}</td>
       <td class="col-atlas">${links('atlas',a.fw.atlas)}</td>
+      <td class="col-controls">${links('controls',a.fw.controls)}</td>
     </tr>`).join('');
 }
 function buildStepperOptions(){
