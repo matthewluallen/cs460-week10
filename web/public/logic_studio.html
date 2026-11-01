@@ -639,7 +639,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
       <button class="btn" id="bConnectTwin" title="Drive the QEMU twin over the twin-bridge WebSocket (no USB)">Connect twin</button>
       <button class="btn pri" id="bDownload" disabled>Load application ▸</button>
       <button class="btn" id="bMonitor" disabled>Start monitoring</button>
-      <span class="pill off" id="connPill"><span class="dot"></span>USB disconnected</span>
+      <span class="pill off" id="connPill"><span class="dot"></span>Disconnected</span>
       <span class="tbar-div"></span>
       <details class="menu" id="toolsMenu">
         <summary class="btn" title="More tools, tables and views">⋯ Tools ▾</summary>
@@ -4800,10 +4800,13 @@ function setConn(on){
   if(!on&&monTimer!==null){clearInterval(monTimer);monTimer=null;}
   if(on){if(hbTimer===null)hbTimer=setInterval(()=>{if(conn&&!busBusy&&monTimer===null)send('status');},1500);}else if(hbTimer!==null){clearInterval(hbTimer);hbTimer=null;}
   if(on){var _br=document.querySelector('.brand');if(_br){_br.classList.add('poweron');setTimeout(function(){_br.classList.remove('poweron');},1300);}}
-  const p=document.getElementById('connPill');p.className='pill '+(on?'on':'off');p.innerHTML='<span class="dot"></span>'+(on?'USB port open':'USB disconnected');
+  // Reflect which transport is live: the twin WebSocket (wsSock) or a USB serial port.
+  // Both connect paths set their global (wsSock / port) before calling setConn(true).
+  const twin=!!wsSock;
+  const p=document.getElementById('connPill');p.className='pill '+(on?'on':'off');p.innerHTML='<span class="dot"></span>'+(on?(twin?'Twin connected':'USB port open'):'Disconnected');
   document.getElementById('bMonitor').disabled=!on;document.getElementById('bMonitor').textContent='Start monitoring';
   document.getElementById('bReadStatus').disabled=!on;
-  document.getElementById('bConnect').textContent=on?'Disconnect USB':'Connect USB';
+  document.getElementById('bConnect').textContent=on?(twin?'Disconnect twin':'Disconnect USB'):'Connect USB';
   renderControllerStatus();renderRegs();renderLadder(null);drawTrend();
 }
 function toggleMonitor(){

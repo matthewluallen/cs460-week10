@@ -38,5 +38,9 @@ elif [ -S "$SOCK" ]; then
 else
   echo "No twin is running yet. Start it first:"
   echo "    ./qemu/studio.sh        # twin + Studio + console, one command"
+  echo
+  echo "  Running the stations plant (stations/docker-compose.yml)? The twin runs INSIDE the"
+  echo "  plc container, not on this host — attach to its console there instead:"
+  echo "    docker compose -f stations/docker-compose.yml exec plc ./qemu/console.sh"
   exit 1
 fi
