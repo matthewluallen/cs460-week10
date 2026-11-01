@@ -53,6 +53,26 @@ def relay(txt, n):
     m = re.search(rf"relay{n}\s+cmd=\d+\s+act=(\d)", txt)
     return m.group(1) if m else "?"
 
+def poll_relay(sock, want, timeout=20):
+    """Poll `io` until every wanted relay matches, or timeout. The QEMU twin settles a
+    scan or two behind each force, so a single read right after a force can miss the
+    transition — poll for it (mirrors assessment/verify-lab.py)."""
+    end = time.time() + timeout; last = ""
+    while time.time() < end:
+        last = cmd(sock, "io", 1.2)
+        if all(relay(last, n) == v for n, v in want.items()):
+            return True, last
+    return False, last
+
+def steady(sock, want, dur=2.5):
+    """Every `io` sample over `dur` seconds matches `want` (proves a state HOLDS)."""
+    end = time.time() + dur; last = ""; seen = 0
+    while time.time() < end:
+        last = cmd(sock, "io", 0.8); seen += 1
+        if not all(relay(last, n) == v for n, v in want.items()):
+            return False, last
+    return seen > 0, last
+
 def http(url, timeout=5):
     try:
         with urllib.request.urlopen(url, timeout=timeout) as r:
@@ -134,24 +154,32 @@ def main():
         cmd(sock, f"force {t} 0", 0.4)
     cmd(sock, "mode run", 1.5)
     cmd(sock, "force reset_pb 1", 0.8); cmd(sock, "force reset_pb 0", 0.8)
-    cmd(sock, "force start_pb 1", 1.5); cmd(sock, "force start_pb 0", 1.0)
-    ran = relay(cmd(sock, "io", 1.2), 0) == "1"
-    cmd(sock, "force stop_pb 1", 1.5)
-    stopped = relay(cmd(sock, "io", 1.2), 0) == "0"
+    cmd(sock, "force stop_pb 1", 0.8); cmd(sock, "force stop_pb 0", 0.4)   # begin from idle
+    cmd(sock, "force start_pb 1", 0.8); cmd(sock, "force start_pb 0", 0.4)
+    ran, _ = poll_relay(sock, {0: "1"}, 20)                                # seal-in may lag a scan
+    cmd(sock, "force stop_pb 1", 0.8); cmd(sock, "force stop_pb 0", 0.4)
+    stopped, _ = poll_relay(sock, {0: "0"}, 20)
     for t in ("start_pb", "stop_pb", "estop_ok", "reset_pb"):
         cmd(sock, f"unforce {t}", 0.4)
-    check("control.motor_program_runs", "unknown tag" not in tag and ran and stopped,
-          "positive control: start_pb seals relay0 in and stop_pb drops it on the secure build "
-          "(no estop_ok tag = the factory motor program is not installed: rebuild with ./qemu/build-twin.sh secure)")
+    ok_motor = "unknown tag" not in tag and ran and stopped
+    check("control.motor_program_runs", ok_motor,
+          "positive control: start_pb seals relay0 in and stop_pb drops it on the secure build"
+          + ("" if ok_motor else " — FAILED: " + (
+              "no estop_ok tag (factory motor program not installed; rebuild with "
+              "./qemu/build-twin.sh secure)" if "unknown tag" in tag else
+              f"relay0 reached start={ran} stop={stopped} within 20s — is the Logic Studio "
+              "twin-bridge attached to this console? stop it (it holds the serial) and re-run")))
 
     # --- Part 9: CWE-787 /api/tag overflow into the force image ---
     # Secure build clamps the copy into a separate 32-byte buffer: relay0 stays OFF.
     OVF = "00"*32 + "0200000000000000" + "0200000000000000"
+    cmd(sock, "force estop_ok 1", 0.6)          # healthy E-stop so mode run admits RUN cleanly
     cmd(sock, "mode run", 1.5)
-    base_off = relay(cmd(sock, "io", 1.2), 0) == "0"
+    base_off, _ = poll_relay(sock, {0: "0"}, 10)
     http(f"http://{HMI}/api/tag?data=" + OVF)
     time.sleep(2.0)
-    still_off = relay(cmd(sock, "io", 1.2), 0) == "0"
+    still_off, _ = steady(sock, {0: "0"}, 2.5)   # relay0 STAYS off through the overflow
+    cmd(sock, "unforce estop_ok", 0.4)
     check("part9.overflow_no_relay", base_off and still_off,
           "overlong /api/tag does NOT energize relay0 (bounds-checked copy)")
 
