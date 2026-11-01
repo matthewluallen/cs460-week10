@@ -1137,7 +1137,7 @@ body.hero-collapsed section.controller-status[aria-label="Project workspace"]{di
 })();
 </script>
 <script>
-// ===== Enlarge the StampLC screen: a big, crisp, live view of the on-device LCD =====
+// ===== Enlarge the TBD screen: a big, crisp, live view of the on-device LCD =====
 // The hero LCD canvas is 960x540 but shown ~176px wide, so its text is unreadable. This pops
 // it to a readable size (live, copied from the hero canvas each frame) with working A/B/C keys,
 // and stays reachable from the compact strip when the overview is collapsed.
@@ -3709,7 +3709,7 @@ root.StudioDeviceScreen={collector,crc32,isComplete:frame=>completedFrames.has(f
 /* Shared observed assembly state for Studio and future world renderers. No control writes. */
 (function(root){
 // K141 manufacturer reference, reviewed2026-10-03. This is not a detected revision.
-const board={id:'m5stamplc',name:'TBD',reference:'https://docs.m5stack.com/en/core/StamPLC',ports:[
+const board={id:'m5stamplc',name:'TBD',reference:'',ports:[
  {id:'display',label:'Screen',detail:'1.14-inch display. Supported firmware provides read-only pixel snapshots; a register value is not a screen pixel and a snapshot is not live video.',task:'Compare a controller reading with the physical display before asserting that both agree.'},
  {id:'inputs',label:'IN0–7',detail:'Eight isolated digital inputs mapped by this firmware to IX0–7. COM and field wiring are not discovered by reading the input bits.',task:'Trace one input through its register and authored logic. An electrical input level does not authenticate its source.'},
  {id:'outputs',label:'RLY0–3',detail:'Four relay outputs mapped to QX0–3. Register readback is not independent confirmation of contact position or connected load.',task:'Identify the safe state and independent feedback needed if a contact sticks.'},
