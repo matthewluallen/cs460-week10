@@ -22,9 +22,9 @@
  * The firmware engineer is redesigning this (per-sensor freshness, declared slots, quality word): update
  * this table only — the phone block, the readout, the network-link label and the signal path read it. */
 const PHONE_MAP=[
-  {id:'motion', name:'Motion',          scalar:'|a|',     unit:'m/s²', point:'%IW2', reg:51, scale:100, scaleNote:'|a| × 100', topic:'accel',  key:'mag',  ios:true,  spoof:true,  thr:{set:1300,clear:1100,op:'>',text:'|a|×100 > 1300 sets · < 1100 clears'}},
-  {id:'orient', name:'Orientation',     scalar:'tilt β',  unit:'°',    point:'%IW3', reg:52, scale:1,   scaleNote:'β in degrees', topic:'orient', key:'beta', ios:true,  spoof:true,  thr:{set:30,clear:25,op:'>',text:'β > 30° sets · < 25° clears'}},
-  {id:'light',  name:'Ambient light',   scalar:'lux',     unit:'lux',  point:'%IW1', reg:50, scale:1,   scaleNote:'lux',      topic:'light',  key:'lux',  ios:false, spoof:true,  note:'Android Chrome only', thr:{set:20,clear:40,op:'<',text:'lux < 20 sets · > 40 clears (dark alarm)'}},
+  {id:'motion', name:'Motion',          scalar:'|a|',     unit:'m/s²', point:'%IW2', reg:141, scale:100, scaleNote:'|a| × 100', topic:'accel',  key:'mag',  ios:true,  spoof:true,  thr:{set:1300,clear:1100,op:'>',text:'|a|×100 > 1300 sets · < 1100 clears'}},
+  {id:'orient', name:'Orientation',     scalar:'tilt β',  unit:'°',    point:'%IW3', reg:146, scale:1,   scaleNote:'β in degrees', topic:'orient', key:'beta', ios:true,  spoof:true,  thr:{set:30,clear:25,op:'>',text:'β > 30° sets · < 25° clears'}},
+  {id:'light',  name:'Ambient light',   scalar:'lux',     unit:'lux',  point:'%IW1', reg:140, scale:1,   scaleNote:'lux',      topic:'light',  key:'lux',  ios:false, spoof:true,  note:'Android Chrome only', thr:{set:20,clear:40,op:'<',text:'lux < 20 sets · > 40 clears (dark alarm)'}},
   {id:'sound',  name:'Microphone level',scalar:'level',   unit:'0–100',point:null,   reg:null,scale:1,  topic:'sound',  key:'level',ios:true,  spoof:true,  note:'firmware does not subscribe to phone/+/sound yet'},
   {id:'geo',    name:'Geolocation',     scalar:'lat / lon',unit:'',    point:null,   reg:null,          topic:'geo',    key:null,   ios:true,  spoof:false, note:'no scalar defined yet; no spoof control'},
   {id:'battery',name:'Battery',         scalar:'%',       unit:'%',    point:null,   reg:null,          topic:'battery',key:'level',ios:false, spoof:false, note:'no Battery API on iOS Safari; not ingested'},

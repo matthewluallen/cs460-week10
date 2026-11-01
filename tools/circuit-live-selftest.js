@@ -33,7 +33,7 @@ const srv=http.createServer((q,r)=>{const u=new URL(q.url,'http://x');
     firmware();r.writeHead(200,{'content-type':'application/json'});return r.end(JSON.stringify({ok:true,di:field.di,relays:field.relays,analog:{ch1_mv:field.ch1,ch2_mv:0,ch1_ua:0,ch2_ua:0,ch1_source:'field',ch2_source:'field',writable:true}}));}
   if(u.pathname==='/lcd'){log.push('GET /lcd');r.writeHead(200,{'content-type':'image/png','x-frame-age-ms':'120'});return r.end(LCD_PNG);}
   if(u.pathname==='/modbus'){const fc=+u.searchParams.get('fc'),addr=+u.searchParams.get('addr'),n=+u.searchParams.get('count');let values=Array(n).fill(0);
-    if(fc===1&&addr===100)values=values.map((_,i)=>(field.di>>i)&1);if(fc===3&&addr===50)values=[0,981,12];r.writeHead(200,{'content-type':'application/json'});return r.end(JSON.stringify({ok:true,values}));}
+    if(fc===1&&addr===100)values=values.map((_,i)=>(field.di>>i)&1);if(fc===3&&addr===140)values=[0,981,0,0,0,0,12,0];r.writeHead(200,{'content-type':'application/json'});return r.end(JSON.stringify({ok:true,values}));}
   let p=u.pathname==='/'?'/logic_studio.html':u.pathname;try{const b=fs.readFileSync(path.join(ROOT,p));r.writeHead(200,{'content-type':p.endsWith('.js')?'application/javascript':p.endsWith('.csco')||p.endsWith('.json')?'application/json':'text/html'});r.end(b);}catch(e){r.writeHead(404);r.end('nf');}});
 srv.on('upgrade',(q,sock)=>{const k=q.headers['sec-websocket-key'];const acc=crypto.createHash('sha1').update(k+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: '+acc+'\r\n\r\n');sockets.push(sock);let rest=Buffer.alloc(0);
@@ -75,7 +75,7 @@ const dom=(pg,fn,arg)=>pg.waitForFunction(fn,arg,{timeout:6000}).then(()=>true,(
   await pg.evaluate(()=>CircuitWorkspace.setView('schematic'));
   ok(await dom(pg,()=>!!document.querySelector('#cwStage svg [data-hop-target="sch-in3"]')),'schematic renders from the netlist');
   await pg.evaluate(()=>{CircuitWorkspace.setView('bench');CircuitWorkspace.select('e');CircuitWorkspace.phone('motion');});
-  ok(await dom(pg,()=>/%IW2 = 981/.test(document.getElementById('cwStage').textContent)),'phone block: %IW2 read from Modbus reg 51');
+  ok(await dom(pg,()=>/%IW2 = 981/.test(document.getElementById('cwStage').textContent)),'phone block: %IW2 read from Modbus reg 141 (firmware phone-point window 140-165)');
   const ptags=await pg.evaluate(()=>[...document.querySelectorAll('#cwPath .cw-hop-tag')].map(e=>e.textContent));
   ok(ptags[3]==='BYPASSED','phone path: opto · 0x59 in · I²C read BYPASSED');
   // the controller's screen: on the twin the drawing shows the real frame (GET /lcd), enlarges, and A/B/C press the panel
