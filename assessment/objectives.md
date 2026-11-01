@@ -12,8 +12,16 @@ hardware at the bench tomorrow and get the same PASS.
 **Parity legend** — where an objective can be demonstrated:
 `[both]` physical PLC and twin · `[twin]` twin only · `[offline]` no device (repo tools only).
 
-**Mapping key** — each objective ties to the course's throughline:
-MITRE **ATT&CK for ICS** technique (T0xxx) · **CWE** weakness class · **CIE** = cyber-informed-engineering principle.
+**Mapping key** — each objective ties to the course's throughline across the taxonomy spine:
+MITRE **ATT&CK for ICS** technique (T0xxx/T16xx) · **CWE** weakness class · **CAPEC** attack pattern ·
+MITRE **EMB3D** device threat · **D3FEND** countermeasure · **control standard** (**IEC 62443** FR/SL ·
+**NIST SP 800-53/800-82**) · **CIE** = cyber-informed-engineering principle.
+
+> **Authoritative cross-walk:** the full per-attack mapping across all of these lives in
+> `web/public/threat-map.html` (and is reviewed in `REVIEW/`). This file, the Threat Map, and the lab
+> "Sources:" lines are the three sources of truth and must agree — if they drift, the Threat Map +
+> `REVIEW/02-coverage-matrix.md` win. (Example reconciled 2026-11: the overflow force is **T0835**
+> Manipulate I/O Image for the effect, **T0866** only for the remote reach.)
 
 Objectives use measurable verbs (decode, generate, reconcile, force, demonstrate, trace,
 prove, refute, remediate, verify). "Reasoning" criteria are assessed against the four-part
