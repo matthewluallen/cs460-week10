@@ -49,6 +49,14 @@ device-exposure × consequence, SSVC-style); we re-rank in Stage 7. **Src:** LR 
 | CC2a | read-back gate is single-layer on firmware trust; no signed-project / change-audit compensating control | G4 | P2 | S4 | open |
 | CC6a | the **deliberate absence** of an un-rewritable protection (the TRITON/CIE capstone) should be stated as a design stance, tied to 62443 SIS — not read as an unfilled gap | G7 | P2 | S4 | open |
 | CC6b | the capstone asks students to **name** a bounding layer with no reference model (hardwired drop / independent SIS) | G1 | P3 | S4 | open |
+| | **— Stage 6 assessment-alignment findings —** | | | | |
+| A1 | chain/cross-layer reasoning isn't a scored dimension (only implicit in per-node "does not establish" + optional E2) | G6 | P1 | S6 | open |
+| A2 | compensating-control depth + 62443/NIST mapping not required in the main Part 9 (only primary fix + residual) | G6 | P1 | S6 | open |
+| A3 | the multi-taxonomy Threat-Map walk isn't a scored rubric element | G6 | P2 | S6 | open |
+| A4 | three anchor holes: E3 gate (CS1), P7 no-input move (B11), P9 positive control (B07) | G5 | P1 | S6 | open |
+| A5 | the summative **video** rubric is Canvas-only (not version-controlled); only the per-part finding rubric is in-repo | G6/G7 | P2 | S6 | open |
+| A6 | Lateral Movement / IT side neither taught nor assessed (ties B17/CK1) | G8 | P3 | S6 | open |
+| | *Note: the 2026-10-30 board's "assessment is Canvas-only/fakeable" (C3) is largely CLOSED — rubric.md + week12/rubric.md are in-repo and reasoning-weighted. A5 is the residual.* | | | | |
 
 ## Notes
 - Several 2026-10-30 board items are now **closed** by prior work (CI exists; phone-bridge consent fixed;
