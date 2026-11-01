@@ -16,6 +16,16 @@ Two programs are provided:
   input image — anyone who can force or write it can make a tripped E-stop look healthy (we
   come back to this as a security point, and it's the thing to name in your finding).
 
+> **Making the motor a momentary "jog" is not a one-cut change.** The motor rung (net N3) holds
+> the output with *two* elements: the **seal-in** branch (`motor`/`%QX0` feeding back) **and** a
+> one-scan **new-press** contact (`start_released`/`MX1`) in series with Start. Deleting only the
+> seal-in branch does **not** give you a jog — it leaves the motor energised for a single scan on
+> the press and then dead for the whole hold. To get a true jog (motor on only while Start is
+> held) you must remove **both** the seal-in branch **and** the `MX1` new-press contact, leaving
+> Start in series with the permissives. The cleaner change, and the one to prefer, is to **add a
+> permissive**: put `IN5` (`%IX4`, di4) in series with Start so the motor runs only while that
+> extra enable is also on — the seal-in and E-stop interlock stay intact.
+
 **Output syntax.** `latch_with_estop.st` uses IEC located variables (`%IX0.n` = IN n+1,
 `%QX0.n` = RELAY n+1), exactly like the Studio's ST export. `passthrough.st` writes its
 output as **`COIL[n]`** (the Modbus coil image) — e.g. `COIL[0] := lamp;`. `COIL[0]` is the coil that energizes **physical relay0**,

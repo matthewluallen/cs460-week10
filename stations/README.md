@@ -33,6 +33,17 @@ Week-4 wind-turbine lab, applied to the StampLC — and it stands alone (no wind
 ### In a GitHub Codespace (recommended)
 The devcontainer already includes Docker-in-Docker, so nothing to install.
 
+**First, stop your own single-twin setup from the earlier parts.** This stack publishes host
+ports **8088** (plc Studio), **8090** + **1883** (mqtt phone broker) and **8800** (hmi). If your
+own Part 1 twin/Studio (`./qemu/studio.sh`) still holds **8088**, or the phone bridge
+(`mqtt/share.sh`) still holds **8090/1883**, `docker compose up` fails with a port-in-use (bind)
+error. Stop them first:
+
+```bash
+./qemu/twin-status.sh stop                        # stop your own twin + Studio (frees :8088)
+pkill -f "node server.js" 2>/dev/null || true     # stop the phone bridge if you ran mqtt/share.sh (frees :8090/:1883)
+```
+
 ```bash
 ./qemu/fetch-qemu.sh                              # once: fetch the twin (mounted into the plc station)
 docker compose -f stations/docker-compose.yml up --build

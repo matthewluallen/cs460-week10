@@ -56,6 +56,15 @@ and checks, for each attack, that the *effect* is gone: unauthenticated OTA uplo
 → lockout; the Part-8 NTP step → `clk` does **not** wrap; the Part-9 `/api/tag` overflow →
 relay0 stays OFF.
 
+> **Before the `/api/tag` overflow can move a relay, the controller must be running a program
+> that drives that relay.** The overflow only shows an effect when **circuit 3 (Motor
+> start/stop + E-stop)** is loaded and the controller is in **RUN** — on a fresh twin booted in
+> PROGRAM mode (or with no project installed) the overlong write changes nothing and the demo
+> looks like a no-op. `verify-secure.sh` handles this for you: it enters RUN and uses the
+> seeded motor program as a positive control (it fails with a clear message if that program is
+> not installed — rebuild with `./qemu/build-twin.sh secure`, which seeds it into NVS). If you
+> reproduce the overflow by hand on the vulnerable build, load circuit 3 and enter RUN first.
+
 ### Active learning
 
 - **Predict:** before you boot the secure image, list each attack from Parts 6-8 (plus the

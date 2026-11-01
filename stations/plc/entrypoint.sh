@@ -13,11 +13,18 @@ export BRIDGE_BIND=0.0.0.0      # the Studio server must accept the host's port 
 export BRIDGE_PORT=8088         # Studio port; the firmware's own web HMI keeps :8080 on the plant network
 export SERIAL_SOCK=/tmp/plc-serial
 echo "[plc] booting the twin (${PROFILE:-vuln}) + bridge; Modbus :502, HTTP :80, web HMI :8080, Studio :8088 on $(hostname -i)"
-# Once the console answers, point the controller at the phone broker (mqtt station) so phone
-# sensors arrive as NETWORK points. Firmware without the `mqtt` command just prints "? type 'help'".
+# Once the firmware finishes booting, point the controller at the phone broker (mqtt station)
+# so phone sensors arrive as NETWORK points. Firmware without the `mqtt` command just prints
+# "? type 'help'".
 MQTT_BROKER="${MQTT_BROKER:-10.20.30.40}"
-( for _ in $(seq 1 90); do
-    (printf 'status\n'; sleep 2) | timeout 4 nc 127.0.0.1 8081 2>/dev/null | grep -q 'MODE=' && break
+( # Wait for the twin to finish booting BEFORE sending it anything. Right after boot the
+  # firmware holds a ~5 s "Press ENTER" Wi-Fi-config window; a stray newline (e.g. the old
+  # `status` probe) sent into that window opens the config menu instead of reaching plc>. So
+  # read the console passively — sending nothing — until the boot banner's "Startup complete"
+  # scrolls past (mirrors how assessment/verify-lab.py waits for "Startup complete" before it
+  # drives the board). `nc -d` never reads stdin, so nothing is injected during the window.
+  for _ in $(seq 1 90); do
+    [ -n "$(timeout 120 nc -d 127.0.0.1 8081 2>/dev/null | grep -m1 'Startup complete')" ] && break
     sleep 2
   done
   echo "[plc] mqtt connect $MQTT_BROKER"
