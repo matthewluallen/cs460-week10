@@ -44,6 +44,11 @@ device-exposure × consequence, SSVC-style); we re-rank in Stage 7. **Src:** LR 
 | CO2 | the **audit gap** itself is unmapped — add **CWE-778 Insufficient Logging** | G8 | P2 | S3 | open |
 | CK1 | **Lateral Movement absent** — the engineering-station→PLC pivot isn't shown (ties B17) | G8 | P2 | S3 | open |
 | CK2 | **Discovery** (i2cscan/SBOM recon) not framed as the ATT&CK Discovery stage | G8 | P3 | S3 | open |
+| | **— Stage 4 control-review findings (compensating controls) —** | | | | |
+| CC1a | plausibility gate taught for the **sensor** path only; not for the physical di / analog CH1 inputs | G4 | P2 | S4 | open |
+| CC2a | read-back gate is single-layer on firmware trust; no signed-project / change-audit compensating control | G4 | P2 | S4 | open |
+| CC6a | the **deliberate absence** of an un-rewritable protection (the TRITON/CIE capstone) should be stated as a design stance, tied to 62443 SIS — not read as an unfilled gap | G7 | P2 | S4 | open |
+| CC6b | the capstone asks students to **name** a bounding layer with no reference model (hardwired drop / independent SIS) | G1 | P3 | S4 | open |
 
 ## Notes
 - Several 2026-10-30 board items are now **closed** by prior work (CI exists; phone-bridge consent fixed;
