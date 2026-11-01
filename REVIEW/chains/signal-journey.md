@@ -23,6 +23,20 @@ Each hop: the observation, the lens/instrument, what it **establishes** about th
 | 6 | output image → RELAY 1 closes; motor (own supply via the contact) turns | Physical · Circuit tab / the board | the physical **actuation** (load energizes) if wired | that it is **safe** — the E-stop is only an *input to the logic* (TRITON: altered logic can ignore it) | T0831 Manipulation of Control · T0836 | — | yes (board) · twin models the latch |
 | 7 | relay → the wire: HMI Modbus poll carries the coil; phone values arrive as MQTT | Wire · tshark/Wireshark, Node-RED | what the **supervisory layer** sees + what external clients can read/write | **who** sent a frame (Modbus/MQTT carry no identity); the HMI lamp **lags** the relay (the view ≠ the state) | T1692.001/.002 · T0832 · T0815 | CWE-306/345 | yes |
 
+## Outside-input branches (decided 2026-11: own branch into the logic)
+The inputs an attacker poisons do **not** enter at the wire (link 7) — they enter where the controller
+*trusts* them, which is the **logic/code** layer. Shown as explicit branches merging into the journey:
+
+| Branch | Merges at | What it poisons | Own chain card |
+|---|---|---|---|
+| Firmware update (OTA / supply-chain image) | link 4 (code) | the code that runs the scan | `trust-firmware.md` |
+| Network time (NTP) | link 3 (logic) | a time-dependent decision | `trust-time.md` |
+| Phone / sensor claim (MQTT) | link 3 (logic) | a word-input the rung reads | `trust-sensor.md` |
+| Network write (Modbus FC5 / MQTT DCMD) | link 5 (output image) | the coil directly, bypassing links 1-4 | `trust-network-write.md` |
+| Memory overflow → force mask | link 4→5 (code→output) | the output with no audited row | `trust-memory-overflow.md` |
+
+Each branch is its own Stage-3 chain card; the Signal Journey is the clean happy-path they merge into.
+
 ## Attack-tree / bowtie view
 **Top event (bowtie center):** *RELAY 1 commands the motor against intent/safety.*
 
@@ -54,9 +68,8 @@ Each hop: the observation, the lens/instrument, what it **establishes** about th
   authenticated-time/plausibility, un-rewritable protection layer) — Stage 4.
 
 ## Review notes / open questions for the team
-- Is the 7-lens framing complete, or should **side-channel inputs** (time, phone) be their own lens rather
-  than folded into link 7? They enter the logic at link 3, not the wire at link 7 — arguably a separate
-  input branch. *Proposed: add an "Inputs from outside" branch feeding link 3 (firmware updates at link 4;
-  time + sensor claims at link 3).*
+- **Resolved (2026-11):** outside inputs get their own branch into the logic/code layer (see
+  "Outside-input branches" above), each a separate trust-chain card. The Signal Journey stays the clean
+  happy-path they merge into.
 - Confirm the firmware source anchors for each link (link 2 DI read, link 5 `relay_write_mask`) so the
   Provenance lens cites the same lines this card does.
