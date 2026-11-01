@@ -32,7 +32,7 @@ template<class Build> void send_checked(WebServer& server, const char* path, Bui
 // http://192.168.4.1:8080/setup). Educational: each field's ⓘ pulls teaching from the
 // device's own /api/explain (the same table the console 'explain' command uses).
 const char SETUP_PAGE[] = R"HTML(<!doctype html><html><head><meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1"><title>StampLC Setup</title><style>
+<meta name=viewport content="width=device-width,initial-scale=1"><title>TBD Setup</title><style>
 body{font:15px system-ui,sans-serif;margin:0;background:#0f1419;color:#e6edf3}.wrap{max-width:600px;margin:0 auto;padding:16px}
 h1{font-size:19px}fieldset{border:1px solid #2a3340;border-radius:10px;margin:14px 0;padding:12px}legend{color:#7ee787;padding:0 6px}
 .lbl{display:flex;align-items:center;gap:6px;margin:10px 0 2px;color:#9da7b3}
@@ -44,7 +44,7 @@ button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:8px;backgr
 .learn{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#9da7b3;margin-left:12px}.muted{color:#6b7684;font-size:13px}.ok{color:#7ee787}
 .note{margin:8px 0;padding:8px 10px;border-radius:6px;background:#161b22;border:1px solid #2a3340;font-size:12.5px;color:#9da7b3;display:none}
 </style></head><body><div class=wrap>
-<h1>StampLC network setup <label class=learn><input type=checkbox id=learn> Learn mode</label></h1>
+<h1>TBD network setup <label class=learn><input type=checkbox id=learn> Learn mode</label></h1>
 <p class=muted>Configure each interface, Save, then reboot. Tap the i on any setting to learn what it is and what the firmware does.</p>
 <div id=note class=note></div>
 <fieldset><legend>WiFi (always present)</legend>
@@ -219,7 +219,7 @@ void WebHMI::handle_config() {
     if (!allowed) { send_json(server, PLC_ACL_ERROR); return; }
     server.sendHeader("Access-Control-Allow-Origin", "*");
     if (!server.authenticate(g_cfg.cfg_user, g_cfg.cfg_pass)) {
-        return server.requestAuthentication(BASIC_AUTH, "StamPLC Config",
+        return server.requestAuthentication(BASIC_AUTH, "TBD Config",
             "default admin:openplc (CWE-798/1392) - change it with 'netcfg auth'");
     }
     if (server.method() == HTTP_POST) {
@@ -258,7 +258,7 @@ String web_api_html() {
     // kept below on purpose.
     return R"CWEHTML(<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>StamPLC HMI</title><style>
+<title>TBD HMI</title><style>
 :root{--bg:#0e1116;--pan:#171c24;--ln:#2a323d;--tx:#e6edf3;--mut:#8b98a8;--on:#39d353;--off:#3a4351;--amb:#e3b341;--red:#f85149;--blu:#388bfd}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,Segoe UI,Arial}
 header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;background:var(--pan);border-bottom:1px solid var(--ln)}
@@ -279,7 +279,7 @@ button:hover{border-color:var(--blu)}input{background:#0e1116;color:var(--tx);bo
 .warn{grid-column:1/-1;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);color:#ffb3ae;border-radius:8px;padding:10px 14px;font-size:12px}
 a{color:var(--blu)}
 </style></head><body>
-<header><h1>StamPLC &middot; PLC HMI</h1>
+<header><h1>TBD &middot; PLC HMI</h1>
 <span id="mode" class="badge prog">...</span>
 <button onclick="mode('run')">RUN</button><button onclick="mode('prog')">PROGRAM</button>
 <span id="netsvc" class="badge" title="W5500 socket budget: max 4 concurrent network services">net &ndash;/4</span>

@@ -1,7 +1,7 @@
 # Assessment
 
 This folder makes the Week-10/11 lab **gradeable from the repo**, on either target — the
-physical M5Stack StampLC or its QEMU digital twin — with the same checks.
+physical TBD controller or its QEMU digital twin — with the same checks.
 
 - **`objectives.md`** — measurable learning objectives (one set per part + the extensions),
   each tagged where it can be demonstrated (`[both]` / `[twin]` / `[offline]`) and mapped to a
@@ -31,7 +31,7 @@ One self-contained command (boots the twin, verifies, tears it down):
 python assessment/verify-lab.py --boot-twin P1 P3 P4 P6 P8
 ```
 
-**Physical StampLC** over USB (and Ethernet for the HTTP legs):
+**Physical TBD controller** over USB (and Ethernet for the HTTP legs):
 ```bash
 SERIAL_PORT=/dev/ttyACM0 \
 OTA_HOST=<plc-ip>:80 HMI_HOST=<plc-ip>:8080 NTP_HOST=<your-host-ip> \

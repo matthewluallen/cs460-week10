@@ -1,4 +1,4 @@
-// display_ui.h - on-device LCD panel (TBD StamPLC): boot logo + live home
+// display_ui.h - on-device LCD panel (TBD): boot logo + live home
 // screen (mode hero + I/O) + 3-button navigation (RUN/PROG/REM mode change).
 // First increment of firmware/LCD_UX_SPEC.md; renders on M5StamPLC.Display.
 #pragma once

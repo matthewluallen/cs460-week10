@@ -2,7 +2,7 @@
 
 By default the lab's rogue servers run on `127.0.0.1` — simple, but the "attacker"
 then shares the device's own loopback. For a more realistic picture, run them in a
-**separate container at a distinct IP** (`172.30.0.10`), so the StamPLC twin sees the
+**separate container at a distinct IP** (`172.30.0.10`), so the TBD twin sees the
 attacker as its own host on the network.
 
 This needs Docker. In a **Codespace** it's already enabled (the dev container ships

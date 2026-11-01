@@ -2,7 +2,7 @@
 
 The emulated bus and a physical tap must decode to the **same answers** (see the
 "Parity" section in `README.md`). This is the on‑bench side: what to clip onto a
-real StampLC so an in‑person student runs the *same* sigrok flow and gets the *same*
+real TBD controller so an in‑person student runs the *same* sigrok flow and gets the *same*
 transactions a remote student gets from the QEMU virtual tap.
 
 ## What a student runs is identical either way
@@ -33,7 +33,7 @@ sources.
 
 ## Where to probe
 
-The StampLC runs **two** I²C buses (confirmed from the twin's trace):
+The TBD controller runs **two** I²C buses (confirmed from the twin's trace):
 
 - **`i2c0` — the base bus:** AW9523 relays + opto DI `0x59`, PI4IOE buttons `0x43`, INA226 `0x40`,
   LM75 `0x48`, RX8130 RTC `0x32`. This is the lab's bus (inputs → logic → relays).
@@ -44,7 +44,7 @@ header** (the connector the IO‑expansion module mates with) — SDA, SCL, and 
 The Grove port exposes the `i2c1` bus directly.
 
 > **Instructor pre‑wire.** Confirm the exact SDA/SCL/GND pins on the expansion
-> header against the StampLC schematic and bring them to a 3‑pin breakout before
+> header against the TBD schematic and bring them to a 3‑pin breakout before
 > class (consistent with the rest of the pre‑wired bench). Students clip the two
 > signals + ground and capture; they don't open the unit. On 3.3 V logic the FX2
 > thresholds are fine; add series 100 Ω if cable length causes ringing.

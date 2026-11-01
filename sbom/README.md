@@ -13,7 +13,7 @@ for CVEs).
 ## Exercise 1 — the device's real dependencies
 
 Open [`firmware/platformio.ini`](firmware/platformio.ini). That's the actual build
-manifest for the StampLC firmware — and you can **compile it yourself** in Codespaces
+manifest for the TBD firmware — and you can **compile it yourself** in Codespaces
 or local VS Code (see [`firmware/BUILD.md`](firmware/BUILD.md)). Its `lib_deps` are the
 real components compiled into the device:
 
@@ -82,7 +82,7 @@ small sample manifest in `sbom/vuln-sample/`.
   top CVE as firmware-resident or build-host-only, and note what the scan could
   not have told you (reachability).
 - **Pair check** — tell a partner, for one CVE, whether it would survive onto the
-  StampLC and why.
+  TBD controller and why.
 
 ---
 

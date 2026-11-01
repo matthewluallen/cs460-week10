@@ -51,7 +51,7 @@ lamp := push_button AND enable_sw;  (* output only when BOTH are on *)
 ## How it gets onto the device
 
 You don't flash over USB. In **Part 1** you open the class **front end**, pick your
-program, and **Apply** — it loads onto your team's StampLC over the network. Then you
+program, and **Apply** — it loads onto your team's TBD controller over the network. Then you
 toggle the input and watch the output. The editor shows the same program as ladder and
 as ST, so you can see the rung you changed either way.
 
@@ -68,7 +68,7 @@ tools and open the forwarded port:
 
 Logic Studio now opens on a **command-center** layout with two live panels across the top:
 
-- **Controller · panel** — a StampLC replica with the on-device **LCD** and the **A / B / C**
+- **Controller · panel** — a TBD replica with the on-device **LCD** and the **A / B / C**
   keys. The keys drive that LCD (sending `btn a|b|c` when a real device is connected over
   USB, emulated otherwise) — the same screen and buttons you'd press on the bench.
 - **Live signal** — a bus scope fed by the firmware's `busstream` (`@BUS …` lines; Studio

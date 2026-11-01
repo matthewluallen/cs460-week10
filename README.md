@@ -1,14 +1,14 @@
-# CS460 Weeks 10–12 — Inside the Stack: StampLC SBOM/HBOM, Bus & Firmware Analysis, and Formally Verified Updates
+# CS460 Weeks 10–12 — Inside the Stack: TBD SBOM/HBOM, Bus & Firmware Analysis, and Formally Verified Updates
 
-A hands-on lab on the **M5Stack StampLC**, a small real PLC (ESP32-S3; 4 relays,
+A hands-on lab on the **TBD controller**, a small real PLC (ESP32-S3; 4 relays,
 8 opto-isolated inputs, RS-485, Modbus). You will read what a device is *made of*
 (software and hardware bills of materials), follow a real **bus exchange** down into
 the controller, and drive one **input → ladder logic → output** on a live device — all
 from this repo.
 
 The whole lab runs **in your browser and the QEMU firmware twin — no hardware required.**
-The twin boots the *real, unmodified* StampLC firmware, so you run it, drive it, and attack
-it exactly as you would a device over USB. A physical StampLC on the bench validated every
+The twin boots the *real, unmodified* TBD firmware, so you run it, drive it, and attack
+it exactly as you would a device over USB. A physical TBD controller on the bench validated every
 step on real silicon; it appears here only as reference ("this is what it looks like on
 hardware"), never as something you need to own or connect to.
 
@@ -27,10 +27,10 @@ QEMU firmware twin for Parts 6–7 — built for x86-64 (Codespaces) or arm64 (l
 
 | Section | # | Part | Folder | Device? |
 |---|---|------|--------|---------|
-| A · Build | 1 | **Wire & run** — one input → your logic → one output, driven from the **Logic Studio** against **your own twin** (every step validated on a real StampLC too) | [`wiring/`](wiring/) | Twin |
+| A · Build | 1 | **Wire & run** — one input → your logic → one output, driven from the **Logic Studio** against **your own twin** (every step validated on a real TBD controller too) | [`wiring/`](wiring/) | Twin |
 | A · Build | 2 | **Ladder logic** — start from a prebuilt program; enable one rung (or add one function) | [`ladder/`](ladder/) | No (apply on your twin, running since Part 1) |
 | B · Analyze | 3 | **Bus analysis** — decode a real recorded Modbus RTU exchange and reason about what it does (and doesn't) establish | [`bus-analysis/`](bus-analysis/) | No |
-| B · Analyze | 4 | **HBOM** — map the StampLC's hardware components and reconcile them with what the bus actually shows | [`hbom/`](hbom/) | No |
+| B · Analyze | 4 | **HBOM** — map the TBD's hardware components and reconcile them with what the bus actually shows | [`hbom/`](hbom/) | No |
 | B · Analyze | 5 | **SBOM** — generate and compare software bills of materials (SPDX vs CycloneDX), then scan for CVEs | [`sbom/`](sbom/) | No |
 | C · Break | 6 | **Firmware & the unsigned update** — boot the *real* firmware in the twin; find and prove an unsigned-OTA weakness | [`firmware-ota/`](firmware-ota/) | No (twin) |
 | C · Break | 7 | **Supply-chain kill switch** — detonate a dormant OTA payload through a compromised update source; trace it to a relay | [`supply-chain/`](supply-chain/) | No (twin) |
@@ -48,7 +48,7 @@ Then open the forwarded port **8088** (Codespaces pops it up; locally it's
 `http://localhost:8088`) and click **Connect twin**. The one server both serves the page and
 bridges it to your twin, so the connection is same-origin — nothing to configure.
 
-> **Have a real M5StampLC?** The *same* Studio drives it over USB: open it on your own
+> **Have a real TBD controller?** The *same* Studio drives it over USB: open it on your own
 > machine (`http://localhost:8088` via a local Dev Container, or any HTTPS copy) in
 > **Chrome or Edge**, plug in the board, and click **Connect USB** instead of Connect twin.
 > (USB needs the device on the machine running the browser, so this path doesn't work from a
@@ -93,7 +93,7 @@ tools alone you can instead run:
 |------|------|---------------|
 | **TBD Logic Studio** — ladder / Structured Text authoring; drives **your twin** (Connect twin) or a **real board over USB** (Connect USB); embedded **Bus monitor** | `web/public/logic_studio.html` | Parts 1 & 2 |
 | **Protocol Studio** — follow one captured or live frame field-by-field, from the wire up | `web/public/protocol_studio.html` | Parts 3 & 6 |
-| **Operator panel** — the StampLC HMI / operator view | `web/public/panel.html` | Parts 6–7 |
+| **Operator panel** — the TBD HMI / operator view | `web/public/panel.html` | Parts 6–7 |
 
 Logic Studio's **Bus monitor** and Part 3's I²C analyzer (`bus-analysis/i2c-analyzer.html`)
 share one lane-timeline engine, so the same capture decodes identically in either — the
@@ -148,7 +148,7 @@ shows what is running; `./qemu/twin-status.sh stop` stops it). To switch builds,
 *different* profile — `secure` or `malicious` — directly, as shown below.) The console is the
 real USB console:
 `mode run`, `io`, `force`, `status`, `busstream on`, `btn a|b|c`, `cwe`, `proto`,
-`login`, `passwd`, `clk`, `ntpsync` all behave exactly as on a physical StampLC.
+`login`, `passwd`, `clk`, `ntpsync` all behave exactly as on a physical TBD controller.
 
 **Compare the two builds.** Part 9 hardens the firmware; build and boot the secure image
 next to the vulnerable one and re-run the attacks:
@@ -162,7 +162,7 @@ RESTART=1 ./qemu/run.sh secure # swap your running twin for it; ./qemu/console.s
 `./qemu/run.sh malicious` boots the Part-7 supply-chain image the same way.
 
 Under the hood it's a **patched** build of Espressif's QEMU (a stock `qemu-system-xtensa`
-boots the chip but can't model the StampLC's I²C sensors, LCD, or W5500). The
+boots the chip but can't model the TBD's I²C sensors, LCD, or W5500). The
 prebuilt model avoids a local emulator build.
 **[docs/QEMU-Twin.md](docs/QEMU-Twin.md)** records its observed interfaces, the
 separate new-artifact physics gate, and the missing custom patch-source provenance.
@@ -173,7 +173,7 @@ Codespaces or local VS Code. See [`sbom/firmware/BUILD.md`](sbom/firmware/BUILD.
 
 ## Configuring the device (instructors)
 
-The StampLC's full setup and operation — USB‑C serial console, the boot config menu,
+The TBD's full setup and operation — USB‑C serial console, the boot config menu,
 joining Wi‑Fi, run modes, the command reference, network interfaces, and the security
 notice — is documented in **[docs/StampLC-User-Manual.md](docs/StampLC-User-Manual.md)**.
 Students don't need it for the lab (the device is pre‑provisioned and reached remotely); it's

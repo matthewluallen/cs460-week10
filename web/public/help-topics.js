@@ -156,7 +156,7 @@ window.TBD_TOPICS = [
   "id": "rtu",
   "title": "RTU · remote terminal unit; PLC · programmable logic controller",
   "plain": "A remote terminal unit (RTU) gathers field readings for a control center. A programmable logic controller (PLC) runs control logic. QEMU emulates a computer/controller platform.",
-  "engineering": "The actual M5StamPLC firmware serves as this educational RTU in QEMU. The protection IED and electrical plant are separate models. This is not Siemens or Rockwell device firmware.",
+  "engineering": "The actual TBD firmware serves as this educational RTU in QEMU. The protection IED and electrical plant are separate models. This is not Siemens or Rockwell device firmware.",
   "cyber": "Firmware, protocol settings, network namespace and point map identify the target. A familiar device label is insufficient evidence of implementation fidelity.",
   "check": "Inspect the admitted firmware/program identity and register map. Separate controller execution from the modeled environment feeding it.",
   "sources": [
@@ -1008,7 +1008,7 @@ window.TBD_TOPICS = [
   "check": "Compare both values and their age/quality. Trace the selected field through its binding and register scaling into ladder/ST. For a qualified fault exercise, check that a bad checksum or sensor-error flag removes validity instead of producing a healthy zero. NCIR emulated fault exercises are not yet qualified. Keep physical measurements distinct from simulated consequences.",
   "sources": [
    {
-    "title": "M5Stack · NCIR U028",
+    "title": "TBD · NCIR U028",
     "url": "https://docs.m5stack.com/en/unit/Unit_NCIR"
    },
    {

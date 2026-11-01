@@ -91,7 +91,7 @@ device reports it **actually** on (`act=1`). Prefer that readback over "the ligh
 can also drive it visually in **Logic Studio** (`./qemu/studio.sh`). The machine-checkable anchor
 is `python assessment/verify-lab.py P1`, which runs exactly this sequence (seal-in, stop, trip,
 no restart, reset, start again) and asserts the relays — the **same check passes on a physical
-StampLC**.
+TBD controller**.
 
 > **Safety beat.** `force estop_ok 1` *defeats* the E-stop: the PLC believes the loop is
 > healthy whatever the switch says. Real safety controllers refuse forces on safety I/O, and a
@@ -138,7 +138,7 @@ own twin.
 
 ### In-room wiring (what the bench looks like)
 
-- **Output:** StampLC **RELAY 1 (relay0)** N.O. terminal → snap-kit LED (through its
+- **Output:** TBD **RELAY 1 (relay0)** N.O. terminal → snap-kit LED (through its
   resistor/lamp block). When your logic sets relay0, the LED lights.
 - **Input (in-person):** a snap-kit **switch** wired into the **IN1 (DI 0)** loop. Flip it →
   DI 0 asserts.

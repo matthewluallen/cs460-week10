@@ -3,11 +3,11 @@
 You built a rung in Part 2. Now **drive it** on the running firmware with a simple
 virtual circuit — a pushbutton and an LED — and watch your logic move a real output.
 No hardware required: everything here runs against the **QEMU twin**, and every step
-below was validated on a physical M5StampLC as well (the bench is the reference, not
+below was validated on a physical TBD controller as well (the bench is the reference, not
 something you need to own).
 
 > Every readback and result in this section was captured live from the firmware
-> console on both the twin and a real StampLC. If your result differs, that's a finding
+> console on both the twin and a real TBD controller. If your result differs, that's a finding
 > — write down what you observed and what you'd check next.
 
 ![The pushbutton → green LED circuit in the Studio Test bench](../docs/img/bench-01-circuit-pushbutton.png)
@@ -28,7 +28,7 @@ Start your twin and the Studio with one command, then open port **8088** and cli
 ```
 
 The server serves the page and bridges it to your twin on the same origin, so there is
-nothing to configure. (Have a real M5StampLC? Open the same Studio on your own machine in
+nothing to configure. (Have a real TBD controller? Open the same Studio on your own machine in
 Chrome/Edge, plug in the board, and click **Connect USB** instead — the rest of this section
 is identical.)
 

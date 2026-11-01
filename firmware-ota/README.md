@@ -1,7 +1,7 @@
 # Part 6 — Firmware & the Unsigned Update
 
 Parts 1–5 read what a device is *made of* and watched one bus exchange. Now you run the
-**real firmware** — the same image that boots on the physical StampLC — on an emulator,
+**real firmware** — the same image that boots on the physical TBD controller — on an emulator,
 and you find a vulnerability that no SBOM or bus capture from the earlier parts could
 have shown you on its own: an **unsigned over-the-air (OTA) update** path.
 

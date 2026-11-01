@@ -1,6 +1,6 @@
 # CS460 Weeks 10–11 — Learning Objectives (measurable)
 
-This lab runs on two interchangeable targets: a **physical M5Stack StampLC** and its
+This lab runs on two interchangeable targets: a **physical TBD controller** and its
 **QEMU digital twin** (which boots the *real, unmodified* firmware). Every objective below
 is written so it can be demonstrated and **assessed identically on either target** — the
 console commands, the protocol on the wire, and the observable effect are the same; only the
@@ -92,7 +92,7 @@ and **state** what the exchange does and does not establish about the device's s
 - **Mapping:** ATT&CK **T0861** (Point & Tag Identification), **T0801** (Monitor Process State) · CIE: a read is not a write.
 
 ### Part 4 — HBOM `[both]`
-**SWBAT** enumerate the StampLC's I²C devices and **reconcile** the live bus scan against the
+**SWBAT** enumerate the TBD's I²C devices and **reconcile** the live bus scan against the
 hardware bill of materials.
 - **Observable:** `i2cscan` reports the six internal devices (0x20, 0x32, 0x40, 0x43, 0x48,
   0x59) plus the PORT.A device at 0x77, and each is matched to an HBOM line.
@@ -177,7 +177,7 @@ legitimate reading still passes.
 ## Twin ↔ physical parity contract
 
 An objective tagged `[both]` must produce the **same verifier verdict** on the twin and on a
-physical StampLC. This holds because:
+physical TBD controller. This holds because:
 
 - The firmware is identical — the twin boots the same image that flashes to the board.
 - The console protocol is identical — `mode`, `force`, `io`, `clk`, `log`, `i2cscan`,

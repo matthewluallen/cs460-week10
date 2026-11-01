@@ -1,6 +1,6 @@
-# Cardputer I2C Bus Viewer — a handheld analyzer for the StamPLC bus
+# Cardputer I2C Bus Viewer — a handheld analyzer for the TBD bus
 
-A complementary, self-contained signal analyzer for the Week-10 bus lab: an M5Stack
+A complementary, self-contained signal analyzer for the Week-10 bus lab: a TBD
 Cardputer that passively sniffs I2C and shows the decoded transactions on its own LCD.
 It's the FX2 + laptop tap collapsed into one handheld — the third tier alongside the
 virtual `i2c-analyzer.html` (the QEMU twin) and the bench FX2 + PulseView, all sharing
@@ -20,14 +20,14 @@ The Cardputer always sniffs its **Grove port: SDA = GPIO2, SCL = GPIO1** (passiv
 only — it cannot disturb the bus). Where you connect those two lines picks the view:
 
 - **SENSOR view (zero wiring — the default on boot):** plug the Cardputer straight into the
-  StamPLC **PORT.A** Grove jack. You see the sensor I2C bus (BME688 `0x77`). Good first demo.
+  TBD **PORT.A** Grove jack. You see the sensor I2C bus (BME688 `0x77`). Good first demo.
 - **CONTROL view (the lab's relay/DI bus):** that bus is *not* on any Grove port — it is the
   internal `In_I2C` on the bottom **expansion header** (SDA = **GPIO13**, SCL = **GPIO15**, GND).
   Use **Grove→pin (Dupont) leads — no breadboard**: push the male pins straight into the header —
   Cardputer SDA (G2) → header GPIO13, SCL (G1) → header GPIO15, and a **common GND**. Send
   `mode control` over USB to switch the view. You then see `0x59` (relays / opto-DI), `0x43`
   (buttons), `0x40 / 0x48 / 0x32`. Power the Cardputer from its own USB/battery; don't tie the
-  Grove 5 V line. (Confirm the exact header pads on the StamPLC schematic first.)
+  Grove 5 V line. (Confirm the exact header pads on the TBD schematic first.)
 
 ## Control it over USB (115200) — the keyboard is not used
 All control is over the USB-serial console; the Cardputer's own keys do nothing (the key
@@ -60,7 +60,7 @@ hold up next to the virtual view. The hosted analyzer is at
 **https://cs460-cardputer-analyzer.netlify.app** (connects to the Cardputer over WebSerial).
 
 ## Honest limits
-Passive software sniffer tuned for the StamPLC's **bursty 400 kHz** bus; a continuously
+Passive software sniffer tuned for the TBD's **bursty 400 kHz** bus; a continuously
 saturated bus can drop events (shown as `drop:` on screen). 3.3 V logic only. The on-device
 decode is a teaching view, not a bench Saleae. **Bench-validate on real hardware** — the
 firmware is compile-verified here; timing and the LCD render are confirmed on the device.
