@@ -18,10 +18,10 @@ device-exposure × consequence, SSVC-style); we re-rank in Stage 7. **Src:** LR 
 | B10 | Studio toolbar says "USB" when connected to the twin | G7 | P3 | LR | **PR #14** (setConn keys off transport; studio-regression green) |
 | B11 | Part 7 has no automated proof of the no-input relay move (verify-lab P7 = manual SKIP) | G5 | P2 | LR | open (PR #14 left as-is — needs a twin to develop a safe assertion) |
 | B12 | stations plc entrypoint probes during the firmware's ENTER window (opens Wi-Fi menu) | G1 | P3 | LR | **PR #14** (passive read until "Startup complete"; needs stack run to confirm) |
-| B13 | Threat-Map: 3 headline attacks uncovered (unsigned OTA T1693.001, supply-chain T0862, NTP/Y2038 T0830) | G8 | P1 | TM | open |
-| B14 | Overflow-force mapped T0866; effect is I/O-image manipulation → T0835 | G2 | P2 | TM/RB | open |
-| B15 | Three sources of truth diverge (lab Sources vs Threat-Map vs objectives); no sync check | G7 | P1 | TM | open |
-| B16 | No control-standard lens (IEC 62443 FR/SL, NIST 800-82/800-53) anywhere | G8 | P1 | TM | open |
+| B13 | Threat-Map: 3 headline attacks uncovered (unsigned OTA T1693.001, supply-chain T0862, NTP/Y2038 T0830) | G8 | P1 | TM | **PR #15** (3 rows added) |
+| B14 | Overflow-force mapped T0866; effect is I/O-image manipulation → T0835 | G2 | P2 | TM/RB | **PR #15** (T0866→T0835) |
+| B15 | Three sources of truth diverge (lab Sources vs Threat-Map vs objectives); no sync check | G7 | P1 | TM | **PR #15** (sources-of-truth note added; CI check still TODO) |
+| B16 | No control-standard lens (IEC 62443 FR/SL, NIST 800-82/800-53) anywhere | G8 | P1 | TM | **PR #15** (Controls · 62443/NIST column added) |
 | B17 | No ATT&CK **Enterprise** mapping for the IT side (HMI container, engineering station) | G8 | P2 | TM | open |
 | B18 | CWE-78 command injection is pattern-only (no shell) — keep out of "observable" columns | G9 | P2 | TM/RB | open |
 | B19 | `panel.html` unusable non-visually (canvas-only, A/S/D keys, no text mirror) | — (a11y) | P2 | RB | open |
@@ -33,15 +33,15 @@ device-exposure × consequence, SSVC-style); we re-rank in Stage 7. **Src:** LR 
 | C3c | `act=1` ≠ contact-moved caveat only in Part 1; needs to travel everywhere relay state is shown | G9 | P3 | S3 | open |
 | CN1 | network-write risk has **no 62443/segmentation** compensating control named (message-auth only; single barrier) | G4 | P2 | S3 | open |
 | CN2 | MQTT **DCMD→coil** write may not be demonstrated end-to-end (only phone→point) | G9 | P2 | S3 | open |
-| CF1 | unsigned-OTA CWE should be **CWE-347** (sig verification) + 345, not "accepts bytes" | G2 | P2 | S3 | open |
+| CF1 | unsigned-OTA CWE should be **CWE-347** (sig verification) + 345, not "accepts bytes" | G2 | P2 | S3 | **PR #15** (CWE-347 added on the OTA row) |
 | CF2 | SLSA/in-toto + secure-boot are **prose-only**; no provenance artifact | G9 | P2 | S3 | open |
 | CF3 | **egress filtering** (the C2 beacon) not named as a compensating control | G4 | P2 | S3 | open |
 | CT1 | NTP chain merges at logic but **no time-gated control decision** is shown being flipped | G3 | P2 | S3 | open |
-| CT2 | Y2038: add **CWE-190/191** alongside CWE-197 | G2 | P3 | S3 | open |
+| CT2 | Y2038: add **CWE-190/191** alongside CWE-197 | G2 | P3 | S3 | **PR #15** (CWE-190/191 in map + objectives) |
 | CS1 | E3 plausibility gate is **graded prose**, no machine anchor | G5/G6 | P1 | S3 | open |
 | CS3 | strongest sensor control (**out-of-band cross-check**) is conceptual only | G4 | P2 | S3 | open |
-| CO1 | overflow D3FEND = **D3-SFCV (stack canary)** but target is a **.bss static** → should be bounds-check/input-validation | G2 | P1 | S3 | open |
-| CO2 | the **audit gap** itself is unmapped — add **CWE-778 Insufficient Logging** | G8 | P2 | S3 | open |
+| CO1 | overflow D3FEND = **D3-SFCV (stack canary)** but target is a **.bss static** → should be bounds-check/input-validation | G2 | P1 | S3 | **PR #15** (D3FEND stack-canary→bounds-check) |
+| CO2 | the **audit gap** itself is unmapped — add **CWE-778 Insufficient Logging** | G8 | P2 | S3 | **PR #15** (CWE-778 added) |
 | CK1 | **Lateral Movement absent** — the engineering-station→PLC pivot isn't shown (ties B17) | G8 | P2 | S3 | open |
 | CK2 | **Discovery** (i2cscan/SBOM recon) not framed as the ATT&CK Discovery stage | G8 | P3 | S3 | open |
 | | **— Stage 4 control-review findings (compensating controls) —** | | | | |
