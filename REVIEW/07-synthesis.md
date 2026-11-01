@@ -16,8 +16,9 @@ project's own strongest ideas are **under-connected and under-assessed**:
    the defense-in-depth story (62443 zones/conduits, SLSA/in-toto, egress filtering, out-of-band
    cross-checks) lives in prose, and the main-lab rubric asks for the primary fix + residual but not the
    depth Week 12 already models (A2, CN1, CF2/CF3).
-3. **A few real bugs/holes** block or weaken specific proofs: the secure build's positive control can't run
-   (B07), Part 7 has no automated proof (B11), the E3 gate has no anchor (CS1).
+3. **A few real bugs/holes** block or weaken specific proofs: Part 7 has no automated proof (B11), the E3 gate
+   has no anchor (CS1). (B07 — the secure positive control "can't run" — turned out to be a verify-secure
+   robustness artifact, now **fixed**: the project boots ready and runs; the verifier just read the relay too eagerly.)
 4. **The terminal barrier is deliberately absent** (an un-rewritable protection) — the TRITON/CIE capstone.
    Correct pedagogy; it should be *stated as a design stance*, not left to read as a gap (CC6a).
 
@@ -32,7 +33,7 @@ project's own strongest ideas are **under-connected and under-assessed**:
 ### P0 — correctness, before the next class
 | Item | What | Why now | Effort |
 |---|---|---|---|
-| **B07** | secure build boots without activating the seeded motor program → Part 9 positive control fails | Part 9's "prove the fix" can't fully run | structural (firmware boot-load or verify-secure load) |
+| **B07** | ~~secure build boots without activating the seeded motor program~~ → **FIXED (twin-verified 7/7)**. Not a firmware bug: the secure twin boots the project ready and it runs; verify-secure read `io` once and missed the slow-twin relay settle (false FAIL). Fixed by polling (`poll_relay`/`steady`). | positive control now passes | **done** (verifier robustness) |
 | **B03/B09 (Canvas)** | the jog-text correction + the 8090-public note are in the repo copy but **the Canvas page still needs them** | student-facing, wrong-answer risk | quick (Canvas edit) |
 
 ### P1 — high value
@@ -40,7 +41,7 @@ project's own strongest ideas are **under-connected and under-assessed**:
 |---|---|---|
 | **A1** | make the Signal-Journey chain finding a **required, scored** deliverable (score cross-layer reasoning) | structural (rubric + lab) |
 | **A2** | port Week 12's residual-risk rule + a **compensating-control / 62443** ask into the main Part 9 rubric | quick (rubric) |
-| **A4 / CS1 / B11** | close the three anchor holes: a verifier for the E3 gate, a scripted P7 assertion, the B07 fix | structural |
+| **A4 / CS1 / B11** | close the remaining anchor holes: a verifier for the E3 gate, a scripted P7 assertion (B07 is now closed) | structural |
 | **CN1** | name/demonstrate **62443 zones/conduits (FR5)** as the network compensating control (not msg-auth only) | medium (a segmented-plant variant) |
 | **C3a / G3-b / G3-c** | the chain **joins** (logic-solve is inferred; forge-points + unaudited write not on the journey) | quick-medium (label + 2 journey branches) |
 
@@ -57,9 +58,10 @@ C3c (`act`≠contact caveat everywhere) · CK2 (frame recon as Discovery) · CT2
 ## Quick wins vs. structural
 - **Quick wins (text/rubric/label, no firmware):** A2, A3, A5, CN1-doc, C3a labels, CC6a, the Canvas edits,
   the board a11y prune. A single "rubric + lab-text" PR could land most of P1's cheap half.
-- **Structural (firmware / design / new artifacts):** B07 (boot activation), A1 (scored chain deliverable +
+- **Structural (firmware / design / new artifacts):** A1 (scored chain deliverable +
   its anchor), A4 anchors (E3 verifier, P7 assertion), CN1 segmented-plant variant, the "demonstrate the
-  compensating control" items (CF2/CF3/CS3), CT1 time-gated decision.
+  compensating control" items (CF2/CF3/CS3), CT1 time-gated decision. (B07 is closed — it was a verifier
+  robustness fix, not firmware work.)
 
 ## The living cadence (how this stays true)
 1. **One authoritative mapping:** `web/public/threat-map.html` is the cross-walk of record; `REVIEW/` is the
