@@ -1,0 +1,127 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body{margin:0;background:#fff;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{width:1280px}
+  text{fill:#182030}
+  .t-title{font-size:23px;font-weight:700}
+  .t-sub{font-size:14px;fill:#5c6b86}
+  .t-node{font-size:15px;font-weight:700}
+  .t-ip{font-size:12px;fill:#5c6b86;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .t-desc{font-size:12px;fill:#37435a}
+  .t-step{font-size:12.5px;font-weight:700}
+  .t-tech{font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace;fill:#37435a}
+  .t-net{font-size:12px;font-weight:700;fill:#5c6b86;letter-spacing:.5px}
+  .num{font-size:13px;font-weight:700;fill:#fff}
+</style></head><body><div class="wrap">
+<svg viewBox="0 0 1280 820" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="aRed" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#d62f45"/></marker>
+    <marker id="aBlue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2f6bd6"/></marker>
+    <marker id="aGrey" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#8894a8"/></marker>
+    <marker id="aGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#1a9150"/></marker>
+  </defs>
+
+  <text class="t-title" x="40" y="40">E5 — CALDERA phone-sensor attack, in action</text>
+  <text class="t-sub" x="40" y="63">The adversary sits in the middle of the sensor → controller trust: a forged reading on the unauthenticated broker is indistinguishable from the real phone's.</text>
+
+  <!-- plant network container -->
+  <rect x="300" y="92" width="940" height="600" rx="12" fill="#f4f7fc" stroke="#c9d4e6" stroke-dasharray="6 5"/>
+  <text class="t-net" x="320" y="114">PLANT NETWORK · 10.20.30.0/24</text>
+
+  <!-- initial access source (outside the plant) -->
+  <rect x="40" y="150" width="210" height="96" rx="10" fill="#fff4f5" stroke="#e7a9b1"/>
+  <text class="t-node" x="60" y="178">USB / phishing</text>
+  <text class="t-desc" x="60" y="200">dropped stick or an email</text>
+  <text class="t-desc" x="60" y="217">attachment a human opens</text>
+  <text class="t-tech" x="60" y="236">T0847 · T0865 · CAPEC-452/163</text>
+
+  <!-- CALDERA C2 -->
+  <rect x="320" y="150" width="230" height="110" rx="10" fill="#fdecef" stroke="#d62f45"/>
+  <text class="t-node" x="340" y="178">CALDERA C2</text>
+  <text class="t-ip" x="340" y="197">10.20.30.50 · :8888</text>
+  <text class="t-desc" x="340" y="219">adversary profile +</text>
+  <text class="t-desc" x="340" y="236">custom MQTT abilities</text>
+  <text class="t-desc" x="340" y="253">reads the event log</text>
+
+  <!-- engineer station + agent -->
+  <rect x="320" y="470" width="230" height="120" rx="10" fill="#fff" stroke="#8894a8"/>
+  <text class="t-node" x="340" y="498">Engineer station</text>
+  <text class="t-ip" x="340" y="517">10.20.30.30</text>
+  <rect x="340" y="532" width="190" height="42" rx="7" fill="#fdecef" stroke="#d62f45"/>
+  <text class="t-node" x="352" y="551" style="font-size:13px">Sandcat agent</text>
+  <text class="t-tech" x="352" y="568">beacons &amp; runs tasking</text>
+
+  <!-- real phone (legit sensor) -->
+  <rect x="610" y="140" width="190" height="86" rx="10" fill="#f1faf4" stroke="#1a9150"/>
+  <text class="t-node" x="630" y="167">Real phone</text>
+  <text class="t-desc" x="630" y="188">the legitimate sensor</text>
+  <text class="t-desc" x="630" y="205">publishing honest</text>
+  <text class="t-desc" x="630" y="221">phone/&lt;id&gt;/… readings</text>
+
+  <!-- broker -->
+  <rect x="610" y="300" width="210" height="130" rx="10" fill="#fff8ec" stroke="#d99a16"/>
+  <text class="t-node" x="630" y="328">MQTT broker</text>
+  <text class="t-ip" x="630" y="347">10.20.30.40 · :1883</text>
+  <text class="t-desc" x="630" y="372">no authentication —</text>
+  <text class="t-desc" x="630" y="389">accepts any publisher;</text>
+  <text class="t-desc" x="630" y="406">an id is a claim,</text>
+  <text class="t-desc" x="630" y="423">not a login</text>
+
+  <!-- E4 detector -->
+  <rect x="610" y="500" width="210" height="92" rx="10" fill="#eef4fe" stroke="#2f6bd6"/>
+  <text class="t-node" x="630" y="527">E4 detector <tspan style="font-size:11px;fill:#2f6bd6">(blue)</tspan></text>
+  <text class="t-desc" x="630" y="549">watches the stream,</text>
+  <text class="t-desc" x="630" y="566">raises ai/&lt;id&gt;/verdict —</text>
+  <text class="t-desc" x="630" y="583">alarm only, never actuates</text>
+
+  <!-- PLC twin -->
+  <rect x="1000" y="300" width="210" height="150" rx="10" fill="#eef1f7" stroke="#5c6b86"/>
+  <text class="t-node" x="1020" y="328">StampLC controller</text>
+  <text class="t-ip" x="1020" y="347">10.20.30.10 (twin)</text>
+  <text class="t-desc" x="1020" y="372">subscribes; keeps each</text>
+  <text class="t-desc" x="1020" y="389">value as a network point</text>
+  <text class="t-desc" x="1020" y="406">(Modbus 140–165) the</text>
+  <text class="t-desc" x="1020" y="423">ladder acts on → RELAY</text>
+  <circle cx="1180" cy="333" r="9" fill="#d62f45"/>
+
+  <!-- ===== flows ===== -->
+  <!-- 0 initial access: dropper -> agent -->
+  <path d="M150,246 C150,430 300,470 338,520" fill="none" stroke="#8894a8" stroke-width="2.4" marker-end="url(#aGrey)"/>
+  <circle cx="190" cy="392" r="12" fill="#8894a8"/><text class="num" x="186" y="396">0</text>
+  <text class="t-step" x="205" y="388" fill="#5c6b86">initial access</text>
+  <text class="t-tech" x="205" y="405">fetch + run the agent</text>
+  <text class="t-tech" x="205" y="420">T0863 · T1105</text>
+
+  <!-- 1 agent <-> C2 -->
+  <path d="M435,470 L435,262" fill="none" stroke="#8894a8" stroke-width="2.2" marker-end="url(#aGrey)"/>
+  <path d="M452,262 L452,470" fill="none" stroke="#d62f45" stroke-width="2.2" marker-end="url(#aRed)" stroke-dasharray="2 3"/>
+  <circle cx="486" cy="366" r="12" fill="#8894a8"/><text class="num" x="482" y="370">1</text>
+  <text class="t-step" x="500" y="362" fill="#5c6b86">beacon / tasking</text>
+
+  <!-- 2 agent -> broker : the injection -->
+  <path d="M550,545 C600,520 640,470 680,432" fill="none" stroke="#d62f45" stroke-width="3.4" marker-end="url(#aRed)"/>
+  <circle cx="612" cy="494" r="12" fill="#d62f45"/><text class="num" x="608" y="498">2</text>
+  <text class="t-step" x="300" y="636" fill="#d62f45">2 · FORGED readings injected on the broker</text>
+  <text class="t-tech" x="300" y="654">T0846 discover → T0856 spoof reporting → T0855 unauthorized command</text>
+
+  <!-- 3 real phone -> broker -->
+  <path d="M705,226 L710,296" fill="none" stroke="#1a9150" stroke-width="2.2" marker-end="url(#aGreen)" stroke-dasharray="5 4"/>
+  <circle cx="742" cy="262" r="12" fill="#1a9150"/><text class="num" x="738" y="266">3</text>
+  <text class="t-step" x="760" y="258" fill="#1a9150">real readings</text>
+  <text class="t-tech" x="760" y="274">(what the forgery imitates)</text>
+
+  <!-- 4 broker -> PLC -->
+  <path d="M820,360 L996,368" fill="none" stroke="#d62f45" stroke-width="3" marker-end="url(#aRed)"/>
+  <circle cx="905" cy="345" r="12" fill="#d62f45"/><text class="num" x="901" y="349">4</text>
+  <text class="t-step" x="838" y="340" fill="#d62f45">controller trusts it</text>
+  <text class="t-tech" x="840" y="402">T0835 Manipulate I/O Image</text>
+
+  <!-- 5 detector watches broker -->
+  <path d="M715,500 L715,434" fill="none" stroke="#2f6bd6" stroke-width="2.2" marker-end="url(#aBlue)" stroke-dasharray="2 3"/>
+  <circle cx="748" cy="466" r="12" fill="#2f6bd6"/><text class="num" x="744" y="470">5</text>
+  <text class="t-step" x="764" y="470" fill="#2f6bd6">E4 inspects (red vs blue)</text>
+
+  <!-- footer legend -->
+  <text class="t-sub" x="40" y="735">Delivery (0) is emulated — the dropper stands in for USB/phishing; nothing is exploited. Steps 1–4 are the CALDERA operation. The broker's lack of authentication (2)</text>
+  <text class="t-sub" x="40" y="755">is what lets the agent sit "in the middle" of the trust; the controller then acts on the forged value (4, T0835) — RELAY moves with no cause at IN1. Blue (5) is extension E4 —</text>
+  <text class="t-sub" x="40" y="775">detection, not prevention. ATT&amp;CK for ICS + CAPEC; CS460 Weeks 10–12.</text>
+</svg></div></body></html>

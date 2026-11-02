@@ -18,6 +18,10 @@ IDs match the Threat Map.
 
 ## The chain this models
 
+![E5 CALDERA phone-sensor attack in action: a USB/phishing dropper lands a Sandcat agent on the engineer station, which beacons to the CALDERA C2; the operation discovers the broker and injects forged phone readings it accepts without authentication, so the controller acts on a value no one measured (T0835). The E4 detector watches the same stream.](../docs/img/caldera-aitm-architecture.png)
+
+*The adversary ends up **in the middle of the sensor → controller trust**: on the unauthenticated broker a forged reading is indistinguishable from the real phone's. Source for the figure: [`architecture.html`](architecture.html) (render it with Playwright/Chromium like the Threat-Map figures).*
+
 ```
  (earlier in the real attack)        CALDERA C2 (10.20.30.50)
   USB dropper / phishing attach.     ┌───────────────────────────┐
