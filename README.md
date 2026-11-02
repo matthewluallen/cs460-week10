@@ -14,14 +14,16 @@ hardware"), never as something you need to own or connect to.
 
 ## Open the lab
 
-**GitHub Codespaces (recommended):** click **Code → Codespaces → Create codespace**.
-Wait for the one-time setup to finish (installs the SBOM tools and fetches the firmware twin).
+**New here? Do [`docs/SETUP.md`](docs/SETUP.md) once** to get your environment running — it
+needs only a GitHub account and a browser (nothing to install). In short: **Code → Codespaces
+→ Create codespace on main**, wait for the `CS460 Weeks 10–12 lab ready.` banner, then come
+back here and start Part 1.
 
-**Local VS Code:** install the **Dev Containers** extension, clone this repo, then
-**Reopen in Container**. Same environment as Codespaces.
-
-Either way, when setup finishes you'll have Node 20, Python 3.12, the SBOM tools, and the
-QEMU firmware twin for Parts 6–7 — built for x86-64 (Codespaces) or arm64 (local Apple-silicon Mac).
+> **The core lab (Parts 1–9) runs entirely in the Codespace against the firmware _twin_ — no
+> Docker.** You start it with one command (`./qemu/studio.sh`). Only the optional
+> CALDERA / stations extensions use Docker; see their READMEs. A local install (Dev Containers)
+> is possible but needs Docker Desktop — [`docs/SETUP.md`](docs/SETUP.md) covers it as the
+> advanced path.
 
 ## What you'll do
 
