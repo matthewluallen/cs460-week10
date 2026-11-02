@@ -6,8 +6,10 @@
 #
 #   plc       10.20.30.10   the controller — the QEMU twin + bridge (Modbus :502, HTTP :80, web HMI :8080, Studio :8088)
 #   hmi       10.20.30.20   a SCADA HMI that polls the controller over Modbus (dashboard :8800)
-#   engineer  10.20.30.30   an engineering/attacker workstation — a Modbus master
+#   engineer  10.20.30.30   an engineering/attacker workstation — a Modbus master, and the host
+#                           the CALDERA agent lands on (emulated USB/phishing delivery)
 #   mqtt      10.20.30.40   the phone broker + sensor page (MQTT :1883, phone page / MQTT-over-WS :8090)
+#   caldera   10.20.30.50   the adversary C2 (MITRE CALDERA) — runs the phone-sensor kill chain (UI :8888)
 #   capture                 a passive sniffer (Wireshark/tshark) watching the plant network
 #                           (Modbus :502, DNP3 :20000, MQTT :1883, phone MQTT-over-WS :8090,
 #                           firmware update HTTP :80, web HMI :8080)
@@ -91,6 +93,27 @@ services:
     # station's entrypoint runs `mqtt connect 10.20.30.40` once the twin is up (the firmware saves
     # it for later boots), so the controller subscribes to phone/+/… here and keeps every value as a
     # network-only phone point (never on the IN1–IN8 terminals).
+
+  caldera:
+    # The adversary C2. Builds MITRE CALDERA (pinned) with the sandcat + stockpile plugins; the
+    # course's custom MQTT phone-sensor abilities are mounted at /cs460 and merged into stockpile
+    # at startup. The linux agent is compiled on demand, so the engineer station's dropper can
+    # fetch it from http://10.20.30.50:8888. First build is slow (the magma UI is a Vue build);
+    # for a fast headless server pass  --build-arg WITH_UI=false  and set CALDERA_PLUGINS below.
+    build:
+      context: ./caldera
+      dockerfile: Dockerfile
+      # args: { WITH_UI: "false" }     # uncomment for a fast, UI-less C2 (scripted scenario only)
+    image: cs460/caldera-station
+    environment:
+      - CALDERA_PLUGINS=sandcat,stockpile,magma,compass,debrief
+    volumes:
+      - ../caldera:/cs460:ro           # the custom MQTT phone-sensor abilities (edit without rebuild)
+    networks:
+      plant:
+        ipv4_address: 10.20.30.50
+    ports:
+      - "8888:8888"                    # CALDERA UI + REST API + agent beacons (login red/admin)
 
   capture:
     build:

@@ -1,0 +1,17 @@
+---
+
+- id: 6473a186-c1b3-414a-8f26-b1bd8fa36a8c
+  name: MQTT - Discover Phone Broker
+  description: |
+    Confirm the plant's MQTT broker is reachable and accepts a connection without
+    authentication — the broker the StampLC controller subscribes to for its phone-sensor
+    points. Reconnaissance before injection.
+  tactic: discovery
+  technique_id: T0846
+  technique_name: Remote System Discovery
+  executors:
+  - platform: linux
+    name: sh
+    command: >
+      python3 -c "import socket; s=socket.create_connection(('#{mqtt.broker.ip}',#{mqtt.broker.port}),3);
+      print('broker reachable at #{mqtt.broker.ip}:#{mqtt.broker.port} - connected with no credentials'); s.close()"

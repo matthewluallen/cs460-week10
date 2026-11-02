@@ -119,8 +119,9 @@
   anomaly detector (the phone-sensor stream, and the model's own update/supply chain in Parts 6–7). The other eight involve no AI
   model, so their ATLAS cell is correctly <code>—</code>. The <code>↳ defend</code> chips are ATLAS <i>mitigations</i> (AML.M…), not techniques.
   <b>CALDERA reality check:</b> caldera-ot ships six protocol plugins (modbus, bacnet, dnp3, profinet, iec61850, gems) — only the two Modbus
-  attacks have a real public plugin; MQTT, credential, overflow and RE attacks need a custom ability. Mappings are teaching approximations
-  for CS460 Week&nbsp;10, not an official crosswalk.</p>
+  attacks have a real public plugin; credential, overflow and RE attacks need a custom ability. The phone-sensor attack now has one in this
+  repo (<code>caldera/</code>): a custom MQTT ability run from a CALDERA C2 station, with the agent delivered to the engineer station by an
+  emulated USB/phishing dropper. Mappings are teaching approximations for CS460 Weeks&nbsp;10–11, not an official crosswalk.</p>
 </div>
 
 <script>
@@ -261,7 +262,7 @@ const ATTACKS = [
       cwe:[{id:'CWE-345',title:'Insufficient Verification of Data Authenticity'},{id:'CWE-306',title:'Missing Authentication'}],
       capec:{id:'CAPEC-594',title:'Traffic Injection'},
       attack:[{id:'T1692.001',title:'Unauthorized Message: Command Message'},{id:'T0835',title:'Manipulate I/O Image'}],
-      caldera:null,
+      caldera:{id:'mqtt_phone (custom)',title:'Custom CALDERA ability + dropper + operation in this repo (caldera/): T0846 discover → T0856 spoof → T0855 command',url:'https://github.com/matthewluallen/cs460-week10/tree/main/caldera'},
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
       atlas:[{id:'AML.T0015',title:'Evade AI Model (extension E4: a crafted in-distribution spoof the anomaly model misses)'},{id:'AML.T0043.003',title:'Craft Adversarial Data: Manual Modification'},{id:'AML.T0041',title:'Physical Environment Access (tilt/cover the real phone)'},{id:'AML.M0009',title:'↳ defend: Multi-Sensor Fusion',url:ATM('AML.M0009')},{id:'AML.M0015',title:'↳ defend: Adversarial Input Detection',url:ATM('AML.M0015')}],
       controls:[{id:'FR3 SI',title:'System Integrity'},{id:'FR1 IAC',title:'Identification & Authentication'},{id:'SI-10',title:'Information Input Validation'}]

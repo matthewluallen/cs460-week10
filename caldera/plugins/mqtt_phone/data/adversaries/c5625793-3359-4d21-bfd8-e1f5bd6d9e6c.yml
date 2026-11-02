@@ -1,0 +1,15 @@
+---
+
+id: c5625793-3359-4d21-bfd8-e1f5bd6d9e6c
+name: CS460 Phone-Sensor False-Data Injection
+description: |
+  Emulates the Part 8 / E3 phone-sensor attack as an ICS kill chain run from the engineer
+  station: discover the unauthenticated MQTT broker, spoof an analog sensor the controller
+  trusts, then send an unauthorized button/command message. Delivery of the agent itself (the
+  USB / phishing dropper) is the engineer station's deploy-sandcat.sh, which stands outside this
+  profile the way initial access precedes execution. ATT&CK for ICS: T0846 -> T0856 -> T0855,
+  with the effect T0835 Manipulate I/O Image.
+atomic_ordering:
+- 6473a186-c1b3-414a-8f26-b1bd8fa36a8c
+- 9bfa1525-7095-48f3-92fb-fa4c7a34687a
+- b4291546-baaf-4b3b-a9b9-fb7235b7bfe5
