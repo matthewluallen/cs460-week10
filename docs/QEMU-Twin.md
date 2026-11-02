@@ -40,7 +40,7 @@ silent at `begin()`.)
 ## Quick start (prebuilt binary — recommended)
 
 A de‑branded prebuilt twin for your platform is hosted on the repo's
-`qemu-twin-v1` release (patched `qemu-system-xtensa` + its ROM + the 8 MB firmware
+`qemu-twin-v2` release (patched `qemu-system-xtensa` + its ROM + the 8 MB firmware
 image). You don't need to build anything:
 
 ```bash

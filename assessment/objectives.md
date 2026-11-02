@@ -105,8 +105,8 @@ their component counts differ, and **classify** a scanner hit as library-present
 reachable-in-code.
 - **Observable:** two SBOMs exist from one tree; the student states the count divergence and
   picks one CVE to argue reachability for/against using the CWE bridge.
-- **Anchor:** `verify-lab.py P5` (confirms both formats generate and differ; SKIPs if
-  syft/grype absent) · reachability argument graded by rubric.
+- **Anchor:** `verify-lab.py P5` (confirms both formats generate and differ; SKIPs if the
+  two SBOM outputs aren't generated yet — run `sbom/run_sbom.sh` first) · reachability argument graded by rubric.
 - **Mapping:** ATT&CK **T0862** (Supply Chain Compromise, recon side) · CWE: library-vs-reachable · CIE: presence ≠ exploitability.
 
 **Section C · Break** — Parts 6–8

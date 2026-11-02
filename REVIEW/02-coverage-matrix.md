@@ -17,7 +17,7 @@ anomaly detector on the phone stream and ships its model through the Part 6/7 up
 | 5 | MQTT DCMD → coil (no broker auth) (P3) | TID-310 | 306, 862 | CAPEC-1 | T1692.001 | — | D3-MAN | — |
 | 6 | Buffer overflow → phantom relay force (P6/7) | TID-327 | 787, 788 | CAPEC-100 | **T0866 ⚠** | — | D3-SFCV | — |
 | 7 | Firmware extraction & RE (P5) | TID-115, 108 | 312, 1191 | CAPEC-37, 167 | T0845 | — | D3-DENCR | — |
-| 8 | Unauth phone-sensor → PLC input (P8) | TID-406, 310 | 345, 306 | CAPEC-594 | T1692.001, T0835 | — | D3-MAN | **T0015, T0043.003, T0041** · def M0009, M0015 |
+| 8 | Unauth phone-sensor → PLC input (P8) | TID-406, 310 | 345, 306 | CAPEC-594 | T1692.002, T1692.001, T0835 | — | D3-MAN | **T0015, T0043.003, T0041** · def M0009, M0015 |
 | 9 | Unsigned firmware update accepted (P6) | — | 347, 345, 319 | CAPEC-186 | T1693.001 | — | D3-MAN | **T0011.000** · def M0013, M0014 |
 | 10 | Supply-chain dormant payload (P7) | — | 506, 494 | CAPEC-439 | T0862 | — | — | **T0010.003, T0018.000** · def M0014, M0023 |
 | 11 | Rogue network time → Y2038 wrap (P8) | — | 197, 190, 191 | CAPEC-94 | T0830, T0815 | — | D3-MAN | — |

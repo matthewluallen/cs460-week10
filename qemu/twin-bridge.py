@@ -798,7 +798,7 @@ def _serve_fw_proxy(conn, path):
 
 
 # ───────────────────────── live I2C capture of the running twin ─────────────────────────
-OBS_EVENT = "esp32_i2c_observe"                      # released twin (qemu-twin-v1)
+OBS_EVENT = "esp32_i2c_observe"                      # released twin (qemu-twin-v2)
 GENERIC_EVENTS = ("i2c_event", "i2c_send", "i2c_recv")   # fallback for other builds
 BUS_OUT_DIR = os.environ.get("BUS_OUT_DIR", os.path.join(REPO_ROOT, "bus-analysis", "out"))
 BUS_TRACE_FILE = os.environ.get("BUS_TRACE_FILE", "/tmp/plc-bustap-%d.log" % os.getuid())

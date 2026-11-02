@@ -86,7 +86,8 @@ pip3 install --quiet --break-system-packages z3-solver pyserial 2>/dev/null \
 
 echo "==> Fetching the firmware twin (QEMU) for $(uname -s)/$(uname -m)…"
 # Downloads the patched qemu-system-xtensa + the 8 MB image(s) for this platform
-# and installs the QEMU runtime libraries. Non-fatal: Parts 1–5 need no device.
+# and installs the QEMU runtime libraries. Non-fatal: Parts 2–5 are pure analysis;
+# Part 1 and Parts 6–9 drive the twin (no PHYSICAL device is ever needed).
 bash qemu/fetch-qemu.sh \
   || echo "   (twin fetch skipped — run ./qemu/fetch-qemu.sh later; see qemu/README.md)"
 
@@ -116,7 +117,7 @@ node bus-analysis/tools/decode.js rtu-request bus-analysis/serial/physical-0-req
   && echo "   bus-analysis decoder OK" \
   || echo "   bus-analysis decoder FAILED — check Node install"
 
-TWIN="not fetched (optional; Parts 1–5 need no device)"
+TWIN="not fetched (needed from Part 1 on; run ./qemu/fetch-qemu.sh)"
 [ -f qemu/twin/stamplc-flash-8MB.bin ] && TWIN="ready for $(uname -m)  →  ./qemu/run.sh"
 PIOST="not installed"
 [ -x "$HOME/.platformio/penv/bin/pio" ] && PIOST="installed + toolchain cached"
