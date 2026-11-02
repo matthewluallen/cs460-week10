@@ -7,8 +7,8 @@
     the unauthenticated broker: an unauthorized command message, not just a falsified report.
     Repeats a few times so a momentary point is seen. CWE-306 / CWE-345.
   tactic: impair-process-control
-  technique_id: T0855
-  technique_name: Unauthorized Command Message
+  technique_id: T1692.001
+  technique_name: "Unauthorized Message: Command Message"
   executors:
   - platform: linux
     name: sh

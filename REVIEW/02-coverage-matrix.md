@@ -45,17 +45,17 @@ manipulation — should be **T0835** (and keep T0866 only for the remote-reach s
 | T0843 Program Download | load to controller | P2 | demonstrated | no |
 | T0832 Manipulation of View | falsified operator view | P2 | cited (Stuxnet) | no |
 | T0836 Modify Parameter | change a setpoint | P3, P9 | demonstrated (overlong tag) | partial |
-| T1692.001 (was T0855) Unauthorized Command | command w/o auth | P3 | demonstrated | **yes** |
+| T1692.001 (formerly T0855) Unauthorized Command | command w/o auth | P3 | demonstrated | **yes** |
 | T0835 Manipulate I/O Image | write the output image | P3, P8 | demonstrated | **yes** |
 | T0862 Supply Chain Compromise | trojaned image/parts | P4, P7 | demonstrated (P7) | no |
 | T0866 Exploitation of Remote Services | reach a service | P5 | demonstrated | **yes (⚠ mislabel)** |
-| T1694.002 (was T0891) Hardcoded Creds | creds in image | P5 | demonstrated (recovered) | yes (as T1694.001 on #1) |
-| T1693.001 (was T0857) System Firmware | overwrite firmware | P6 | demonstrated (unsigned OTA) | no |
+| T1694.002 (formerly T0891) Hardcoded Creds | creds in image | P5 | demonstrated (recovered) | yes (as T1694.001 on #1) |
+| T1693.001 (formerly T0857) System Firmware | overwrite firmware | P6 | demonstrated (unsigned OTA) | no |
 | T1695.001 Block Comms: Serial | brick comms | P6 | cited (Ukraine 2015) | no |
-| T1692.002 (was T0856) Reporting Message | spoof a reading | P8 | demonstrated | **yes** |
+| T1692.002 (formerly T0856) Reporting Message | spoof a reading | P8 | demonstrated | **yes** |
 | T0830 Adversary-in-the-Middle | on-path (NTP) | P8 | demonstrated (rogue NTP) | no |
 | T0815 Denial of View | hide state | P8 | partial | no |
-| T1694.001 (was T0812) Default Creds | factory creds | P9 | demonstrated (refused) | **yes** |
+| T1694.001 (formerly T0812) Default Creds | factory creds | P9 | demonstrated (refused) | **yes** |
 | T0838 ...(credential/parameter) | — | P9 | — | no |
 
 ### Immediate Stage-1 findings (seed the backlog)
