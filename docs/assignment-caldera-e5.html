@@ -1,0 +1,48 @@
+<h2 style="color:#13325b;">Extension E5 &middot; Automate the attack with CALDERA (red vs blue)</h2>
+<p><em>Builds on Part 8 / E3 (the phone-sensor attack) and pairs with E4 (the detector it tests). Runs in the stations stack; no hardware. You used <strong>CALDERA</strong> on the wind farm in Module 4 (Week 8) &mdash; here it is on the controller you have been attacking by hand.</em></p>
+
+<div style="border-left:5px solid #e64100;background:#fff5f0;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;">
+<p style="margin:0 0 8px;"><strong>Why this part exists.</strong> In E3 you spoofed the phone sensor by clicking the phone page. A real adversary does not click &mdash; they <strong>automate</strong>, and they had to <strong>get in first</strong>. E5 runs the exact same forgery as a MITRE CALDERA operation, and it makes the step every other Part skips explicit: <strong>initial access</strong>. Every Part so far assumed the attacker was already on the plant network; here you see how the agent got there, and you get the attacker&rsquo;s own <strong>event log</strong> of the whole chain.</p>
+<p style="margin:0;"><strong>The setup.</strong> Bring up the stations stack including the C2 (<code>docker compose -f stations/docker-compose.yml up --build</code>; the first build is slow &mdash; it builds CALDERA and its UI). Then run the two steps below. Full walkthrough and the kill-chain diagram: <code>caldera/README.md</code>.</p>
+</div>
+
+<h3 style="color:#13325b;">Attack A &mdash; Initial access: how the agent got there</h3>
+<p>The C2 agent does not appear on the engineering workstation by itself. In the real world it rides an earlier link in the chain &mdash; a <strong>USB stick</strong> left in a parking lot, or a <strong>phishing email attachment</strong> an engineer opens. The dropper script stands in for that delivery: it fetches the agent from the C2 and runs it.</p>
+<pre style="background:#0b0e14;color:#e7eef6;padding:10px 14px;border-radius:6px;overflow:auto;font-size:13px;">docker compose -f stations/docker-compose.yml run -d --rm --name cs460-dropper engineer /app/deploy-sandcat.sh</pre>
+<ul>
+<li><strong>SHOW</strong> &mdash; the dropper fetching and launching the agent, and the agent <strong>checking in</strong> to the CALDERA server (the UI at <code>:8888</code>, login <code>red</code>/<code>admin</code>, or the agents list).</li>
+<li><strong>SAY</strong> &mdash; which real delivery you are emulating and what it assumes (a human plugged in a stick, or opened an attachment). Nothing here <em>exploits</em> anything &mdash; the exploitation already happened, upstream.</li>
+<li><strong>WHY</strong> &mdash; every attack in this lab starts <em>after</em> this step. If initial access is where the chain really begins, what does that say about defending only the last gate?</li>
+</ul>
+<p style="font-size:14px;"><strong>Maps to:</strong> ATT&amp;CK for ICS <strong>T0847 Replication Through Removable Media</strong> (CAPEC-452 Infected Hardware) or <strong>T0865 Spearphishing Attachment</strong> (CAPEC-163 Spear Phishing); then <strong>T0863 User Execution</strong> + <strong>T1105 Ingress Tool Transfer</strong>.</p>
+
+<h3 style="color:#13325b;">Attack B &mdash; The operation: the kill chain and its event log</h3>
+<p>With an agent in place, run the operation. CALDERA executes the adversary profile step by step and records each one.</p>
+<pre style="background:#0b0e14;color:#e7eef6;padding:10px 14px;border-radius:6px;overflow:auto;font-size:13px;">docker compose -f stations/docker-compose.yml exec caldera python3 /usr/src/app/run-scenario.py</pre>
+<ul>
+<li><strong>SHOW</strong> &mdash; the <strong>event log</strong>: discover the broker, spoof a sensor reading, spoof a button (command). Point at the forged <code>phone/&lt;id&gt;/&hellip;</code> on the wire (the capture station) and the controller acting on it (<code>mqtt status</code> / the HMI tile) &mdash; the same consequence as E3, now automated.</li>
+<li><strong>SAY</strong> &mdash; what the automation adds over the manual E3 attack: repeatability, the technique IDs, and a <strong>record</strong> an analyst can read. Name each kill-chain stage and its technique.</li>
+<li><strong>WHY</strong> &mdash; the event log is the attacker&rsquo;s view; the defender gets the capture and the controller state. Which lens would a blue team actually have?</li>
+</ul>
+<p style="font-size:14px;"><strong>Maps to:</strong> ATT&amp;CK for ICS <strong>T0846 Remote System Discovery</strong> &rarr; <strong>T0856 Spoof Reporting Message</strong> &rarr; <strong>T0855 Unauthorized Command Message</strong> &rarr; <strong>T0835 Manipulate I/O Image</strong>. Tooling: CALDERA with a <em>custom</em> MQTT ability (<code>caldera-ot</code> has no MQTT plugin).</p>
+
+<h3 style="color:#13325b;">Attack C &mdash; Red vs blue: run it against the E4 detector</h3>
+<p>If you built <strong>E4</strong>, this is the payoff. Start the detector (<code>ai-detector/detect.py</code>) against the broker, then run the CALDERA operation again and watch the detector&rsquo;s verdicts. The naive spoof is flagged; the <em>crafted</em> spoof (edit the fact source to a gentle, in-range value) slips past the model and is caught only by the accelerometer cross-check.</p>
+<ul>
+<li><strong>SHOW</strong> &mdash; the CALDERA operation running on one side and the detector&rsquo;s <code>ai/&lt;id&gt;/verdict</code> on the other: which steps alarm, which do not.</li>
+<li><strong>SAY</strong> &mdash; the red and blue views of the <em>same</em> event, and where they disagree.</li>
+<li><strong>WHY</strong> &mdash; automation lets the attacker tune the spoof against the detector quickly (that is an ATLAS move, AML.T0015/T0043). Detection raises the attacker&rsquo;s cost; it does not make the sensor trustworthy.</li>
+</ul>
+
+<div style="border:1px solid #1a7f37;border-left:6px solid #1a7f37;background:#f2fbf4;padding:10px 14px;margin:12px 0;border-radius:6px;">
+<p style="margin:0;"><strong>CYBER-INFORMED ENGINEERING &mdash; assume the attacker gets in.</strong> The kill chain starts with initial access, so a single gate at the end is not a plan &mdash; consequence reduction has to hold even after the adversary has an agent on the network and can automate. Where in <em>your</em> design does one compromised workstation reach something that matters, and what bounds the damage once it does?</p>
+</div>
+
+<h3 style="color:#13325b;">What to submit</h3>
+<ul>
+<li><strong>Initial access</strong> (Attack A): Show / Say / Why, with the agent checking in &mdash; name the real delivery and its CAPEC.</li>
+<li><strong>The operation</strong> (Attack B): Show / Say / Why, with the event log, and one sentence on what the automation adds over clicking the phone page.</li>
+<li><strong>Red vs blue</strong> (Attack C, if you did E4): which spoof the detector caught, which it missed, and the control that caught the miss.</li>
+<li>One paragraph on the <strong>kill chain</strong>: name each stage&rsquo;s ATT&amp;CK-for-ICS technique, and say which single control would break the most links.</li>
+</ul>
+<p style="font-size:13px;color:#555;"><em>Full walkthrough: <code>caldera/README.md</code>. Objectives + complete ATT&amp;CK/CAPEC mapping: <code>assessment/objectives.md</code> (E5). Pairs with E4 (<code>ai-detector/</code>).</em></p>

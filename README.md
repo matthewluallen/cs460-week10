@@ -56,7 +56,7 @@ bridges it to your twin, so the connection is same-origin — nothing to configu
 
 ### Extensions (Weeks 10–11)
 
-Four short extensions deepen the core parts above. Do each after the part it builds on; they
+Five short extensions deepen the core parts above. Do each after the part it builds on; they
 are graded the same way and their objectives + MITRE/CWE mapping are in
 [`assessment/objectives.md`](assessment/objectives.md).
 
@@ -66,11 +66,17 @@ are graded the same way and their objectives + MITRE/CWE mapping are in
 | **E2 — Signal Journey** | 1 · 2 · 3 · 7 | Follow one byte across five lenses — Wireshark → sigrok → firmware source → ladder → relay — and say what each lens can and cannot show | [`web/public/signal_journey.html`](web/public/signal_journey.html) |
 | **E3 — Phone-as-sensor false-data injection** | 1 · 8 | Withhold a sensor the PLC trusts (availability) and spoof its value (integrity), then build a plausibility gate that still passes the real reading | [`docs/assignment-phone-sensor-fdi.html`](docs/assignment-phone-sensor-fdi.html) |
 | **E4 — AI anomaly detector on the sensor stream** | 3 · 8 · E3 | Train an ML anomaly detector on normal operation, then **evade the model, poison it, and attack its supply chain** the way MITRE **ATLAS** catalogs — and show the controls (sensor fusion, dataset provenance, model signing) that hold. The moment a model decides, the model is a new attack surface | [`ai-detector/`](ai-detector/) |
+| **E5 — Automate the attack with CALDERA (red vs blue)** | 8 · E3 · (pairs with E4) | Run the phone-sensor attack as a **MITRE CALDERA** operation — after an emulated **USB/phishing dropper** lands the agent (the *initial access* every other Part skips). Read the kill chain (discover → spoof → command) and the attacker's **event log**, then run it **against the E4 detector** to watch detection work — or watch a crafted spoof slip past | [`caldera/`](caldera/) |
 
 E4 is where **MITRE [ATLAS](https://atlas.mitre.org)** (the adversarial-AI companion to ATT&CK) enters
 the lab; Parts 5–7 also carry the model's **supply chain** (an AI bill of materials; shipping the model
 through the same unsigned-update path). Until E4 there is no AI in the system, so ATLAS correctly does not
 apply to the other parts.
+
+**E4 and E5 are a red/blue pair on the same attack surface.** E3 is the attack by hand; E4 puts a model
+in the way and attacks *it* (ATLAS); E5 automates the whole attack as a red-team operation (ATT&CK for
+ICS, including how the attacker got in) and pits it against E4's detector. Run them together for the full
+loop — the same move you saw on the wind farm in Module 4, now on the controller you've been attacking by hand.
 
 ### Week 12 — Level 3: formally verified updates
 

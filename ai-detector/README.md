@@ -11,6 +11,10 @@ Everything here runs in the Codespace with **no hardware** and, for the core, **
 the same simulated phone drives the offline verifier and the live MQTT path. ATLAS IDs below are
 from the **ATLAS 2026.10** release.
 
+> **Pairs with E5 (red vs blue).** This detector is the blue side. [Extension E5](../caldera/)
+> runs the attack as an automated MITRE CALDERA operation — point it at this detector and watch
+> the naive spoof get flagged and the crafted one slip past the model to the fusion check.
+
 ```bash
 pip install -r ai-detector/requirements.txt      # numpy + scikit-learn (+ paho-mqtt, skops, cryptography)
 python ai-detector/verify.py                      # prove every property offline (no broker/twin)
