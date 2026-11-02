@@ -26,6 +26,7 @@ Week-4 wind-turbine lab, applied to the TBD controller — and it stands alone (
 | **hmi** (10.20.30.20) | a SCADA HMI that **polls the controller over Modbus** and shows a live dashboard | 8800 |
 | **engineer** (plant, dynamic IP) | an engineering / attacker workstation — a **Modbus master** that reads and (on the vulnerable build) writes the controller with no auth | — |
 | **mqtt** (10.20.30.40) | the phone broker + sensor page: phones scan a QR code and publish their sensors; the controller subscribes | 8090 phone page, 1883 MQTT |
+| **caldera** (10.20.30.50) | the adversary C2 (MITRE CALDERA) — lands an agent on the engineer station and runs the phone-sensor kill chain as an automated, event-logged operation | 8888 UI + REST + agent beacons |
 | **capture** | a passive sniffer (Wireshark/tshark) that sees the Modbus **and MQTT** frames between the stations | writes `captures/plant.pcap` |
 
 ## Run it
@@ -79,6 +80,22 @@ points — separate from the IN1–IN8 terminals, so a wired switch and a phone 
 In the capture you can read each value in the clear (`mqtt.topic`, `mqtt.msg`): anyone on this
 network can read it, and anyone who can publish can forge it. The phone page's **spoof** and
 **transmit off** controls are those two attacks (integrity and availability).
+
+### Automate the attack with CALDERA (the adversary C2)
+The phone page's spoof is you clicking. A red team automates it. The **caldera** station runs that
+same forgery as an event-logged MITRE CALDERA operation — after first emulating how the agent got
+onto the engineer station (a USB/phishing dropper). See [`caldera/README.md`](../caldera/README.md).
+
+```bash
+# 1. land the agent on the engineer station (emulated USB/phishing delivery)
+docker compose -f stations/docker-compose.yml run -d --rm --name cs460-dropper engineer /app/deploy-sandcat.sh
+# 2. run the kill chain (discover broker -> spoof sensor -> spoof button) and print the event log
+docker compose -f stations/docker-compose.yml exec caldera python3 /usr/src/app/run-scenario.py
+```
+
+The forged `phone/<id>/…` messages land on the broker exactly as the phone page's would, so the
+controller ingests them the same way — now with an attacker's event log to read. (First
+`docker compose up` builds CALDERA and its UI, which is slow; the UI is at `:8888`, login `red`/`admin`.)
 
 ## The point
 This is the **network plane**. The same points the ladder drives over the **I²C bus** (the

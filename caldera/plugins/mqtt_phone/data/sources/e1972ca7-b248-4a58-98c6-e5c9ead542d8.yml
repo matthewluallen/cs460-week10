@@ -1,0 +1,21 @@
+---
+
+id: e1972ca7-b248-4a58-98c6-e5c9ead542d8
+name: CS460 Phone-Sensor Facts
+facts:
+- trait: mqtt.broker.ip
+  value: 10.20.30.40
+- trait: mqtt.broker.port
+  value: 1883
+- trait: mqtt.phone.id
+  value: ph-abc12
+- trait: mqtt.phone.topic
+  value: light
+- trait: mqtt.phone.key
+  value: lux
+- trait: mqtt.phone.value
+  value: 60000
+- trait: mqtt.phone.button
+  value: btn1
+rules: []
+relationships: []
