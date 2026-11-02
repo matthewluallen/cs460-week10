@@ -52,6 +52,8 @@ Everything is cached, so later runs are quick. Focus on one function by name, e.
 supported **natively** in Ghidra 12.2 — no plugin, no manual load address. A Ghidra
 project is left under `~/ghidra/proj` to open in the GUI if you want to explore live.
 
+![Ghidra 12.2 decompiler output for `fc_write_single_coil`: an unauthenticated Modbus write-single-coil reaches the coil array with only a range check — no login (CWE-306 / CWE-862).](../docs/img/firmware-re-ghidra-decompile.png)
+
 ## MITRE
 Baked-in creds/keys → **CWE-798 / CWE-321**; recovering them from a shipped image maps
 to ATT&CK for ICS **T0877 (I/O Image)** / the firmware-analysis tradecraft behind
