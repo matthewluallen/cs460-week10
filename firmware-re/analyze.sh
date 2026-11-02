@@ -50,5 +50,5 @@ dd if="$F" bs=4096 skip=96 count=1 of=/tmp/irom.bin 2>/dev/null   # IROM segment
 "$OD" -D -b binary -m xtensa --adjust-vma=0x42000020 /tmp/irom.bin | sed -n '8,40p'
 echo
 echo "Done. Addresses in step 4 are relative to the IROM segment base (0x42000020 from step 1)."
-echo "To go deeper with symbols, load firmware.elf (after 'pio run') or the segments at their"
-echo "step-1 load addresses into Ghidra's Xtensa loader."
+echo "To read this as decompiled C with real function names, run:   ./firmware-re/ghidra.sh"
+echo "(headless Ghidra; v12.2 decodes ESP32-S3 Xtensa natively - no plugin, no manual load address)."
