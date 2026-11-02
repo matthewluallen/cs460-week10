@@ -26,9 +26,31 @@ bash firmware-re/analyze.sh
    be rotated (**CWE-798/CWE-321**).
 4. **`xtensa-…-objdump`** — radare2 in the Codespace has no Xtensa plugin, so we use the
    cross-`objdump` PlatformIO already installed to disassemble the IROM region into real
-   Xtensa instructions (`l32r`, `call12`, `s32i`…). To get symbols, load `firmware.elf`
-   (after `pio run`) or the segments at their step-1 load addresses into **Ghidra**'s
-   Xtensa loader.
+   Xtensa instructions (`l32r`, `call12`, `s32i`…). To read the same code as near-source **C with
+   real function names**, run one command: `./firmware-re/ghidra.sh` (see below).
+
+
+## Decompile it with Ghidra — one command
+
+`objdump` (step 4) gives you raw Xtensa instructions. To read the firmware as
+near-source **C with real function names**, run:
+
+```sh
+./firmware-re/ghidra.sh
+```
+
+The first run installs a private Ghidra 12.2 + JDK under `~/ghidra` (~700 MB, one
+time), builds `firmware.elf` with PlatformIO if you have not already (so Ghidra reads
+the DWARF symbols), analyzes it, and writes:
+
+- `firmware-re/out/firmware.elf.decompiled.c` — the security-relevant functions, decompiled
+- `firmware-re/out/firmware.elf.functions.txt` — the full name → address index
+
+Everything is cached, so later runs are quick. Focus on one function by name, e.g.
+`./firmware-re/ghidra.sh fc_write_single_coil`, or point it at a flash image:
+`./firmware-re/ghidra.sh qemu/twin/stamplc-secure-8MB.bin`. ESP32-S3 Xtensa is
+supported **natively** in Ghidra 12.2 — no plugin, no manual load address. A Ghidra
+project is left under `~/ghidra/proj` to open in the GUI if you want to explore live.
 
 ## MITRE
 Baked-in creds/keys → **CWE-798 / CWE-321**; recovering them from a shipped image maps

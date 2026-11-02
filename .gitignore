@@ -21,3 +21,6 @@ __pycache__/
 # PlatformIO firmware build output (students build into these; never commit them)
 .pio/
 **/.pio/
+
+# firmware-re Ghidra output (generated)
+firmware-re/out/
