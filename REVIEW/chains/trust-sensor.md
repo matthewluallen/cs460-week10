@@ -21,9 +21,13 @@
 - **Freshness bit** (stale after 8 s) — catches withholding; the *fix* is to require fresh.
 - **Range + rate plausibility gate** (E3: require fresh ∧ in-range ∧ bounded rate) — the compensating
   control the assignment makes students build and prove the real reading still passes.
-- **Out-of-band cross-check** (a second independent sensor) — the control the lab asks "name" but doesn't
-  implement.
-- *(If an ML anomaly detector is ever added on the stream → **ATLAS AML.T0043** Craft Adversarial Data.)*
+- **Out-of-band cross-check** (a second independent sensor) — the control the lab asks "name"; the
+  **extension-E4** detector now *implements* one (the accelerometer cross-check, ATLAS **AML.M0009**),
+  closing gap S3.
+- *(The AI anomaly detector added in **E4** (`ai-detector/`) makes the stream an ATLAS surface: crafting an
+  in-distribution spoof the model misses is **AML.T0015** Evade AI Model via **AML.T0043.003** Craft
+  Adversarial Data: Manual Modification; the accelerometer cross-check that catches it is **AML.M0009**
+  Multi-Sensor Fusion. ATLAS 2026.10.)*
 
 ## Residual risk
 "Even with the gate, the alarm still trusts ___" — a single phone id and the plausibility bounds; a
@@ -32,6 +36,6 @@ patient attacker who stays in-range + fresh still passes. The gate is **detect/l
 ## Gaps
 | # | Gap | Type | Fix | Pri |
 |---|---|---|---|---|
-| S1 | The E3 plausibility gate is **graded prose**, no machine-checkable anchor. | G5/G6 | a verifier that submits a spoof + a real reading and checks refuse/pass. | P1 |
+| S1 | The E3 plausibility gate is **graded prose**, no machine-checkable anchor. | G5/G6 | **Addressed by E4:** `ai-detector/verify.py` (and `verify-lab.py E4`) submits spoof + real readings and asserts refuse/pass. | P1 |
 | S2 | Freshness is **phone-timed** on the trend graph but **twin-timed** on the controller (the twin clock runs ~0.45× real), so the 8 s stale mark differs — already noted in the phone page; ensure the assignment says so. | G7 | doc note | P3 |
-| S3 | "Name an out-of-band cross-check" is asked but no artifact shows one — the strongest compensating control is conceptual only. | G4 | optional: a second sensor / cross-check demo. | P2 |
+| S3 | "Name an out-of-band cross-check" is asked but no artifact shows one — the strongest compensating control is conceptual only. | G4 | **Addressed by E4:** the detector's accelerometer cross-check (ATLAS AML.M0009) is a working out-of-band check; its residual risk (same-phone channels aren't independent) is stated. | P2 |

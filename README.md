@@ -56,7 +56,7 @@ bridges it to your twin, so the connection is same-origin — nothing to configu
 
 ### Extensions (Weeks 10–11)
 
-Three short extensions deepen the core parts above. Do each after the part it builds on; they
+Four short extensions deepen the core parts above. Do each after the part it builds on; they
 are graded the same way and their objectives + MITRE/CWE mapping are in
 [`assessment/objectives.md`](assessment/objectives.md).
 
@@ -65,6 +65,12 @@ are graded the same way and their objectives + MITRE/CWE mapping are in
 | **E1 — Provenance Studio** | 1 · 3 · 9 | Match a live `/api/log` event to the firmware **source line + CWE**, and spot the **provenance gap** — an output change with no WRITE/FORCE row (the signature of an unaudited, memory-corruption write) | [`web/public/provenance_studio.html`](web/public/provenance_studio.html) |
 | **E2 — Signal Journey** | 1 · 2 · 3 · 7 | Follow one byte across five lenses — Wireshark → sigrok → firmware source → ladder → relay — and say what each lens can and cannot show | [`web/public/signal_journey.html`](web/public/signal_journey.html) |
 | **E3 — Phone-as-sensor false-data injection** | 1 · 8 | Withhold a sensor the PLC trusts (availability) and spoof its value (integrity), then build a plausibility gate that still passes the real reading | [`docs/assignment-phone-sensor-fdi.html`](docs/assignment-phone-sensor-fdi.html) |
+| **E4 — AI anomaly detector on the sensor stream** | 3 · 8 · E3 | Train an ML anomaly detector on normal operation, then **evade the model, poison it, and attack its supply chain** the way MITRE **ATLAS** catalogs — and show the controls (sensor fusion, dataset provenance, model signing) that hold. The moment a model decides, the model is a new attack surface | [`ai-detector/`](ai-detector/) |
+
+E4 is where **MITRE [ATLAS](https://atlas.mitre.org)** (the adversarial-AI companion to ATT&CK) enters
+the lab; Parts 5–7 also carry the model's **supply chain** (an AI bill of materials; shipping the model
+through the same unsigned-update path). Until E4 there is no AI in the system, so ATLAS correctly does not
+apply to the other parts.
 
 ### Week 12 — Level 3: formally verified updates
 

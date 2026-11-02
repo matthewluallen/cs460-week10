@@ -169,6 +169,17 @@ assignment:
 
 Part 7 shows what an attacker does with this primitive when it's left open.
 
+### The AI add-on (extension E4): a model is firmware for a decision
+
+If you built the [E4 detector](../ai-detector/), notice its model ships the **same way** firmware
+does — a file pulled from an update source (`ai-detector/registry/`). The `vuln` profile loads a
+**pickle**, which *executes code while loading* — so an unsigned, unverified model file isn't just
+untrusted data, it's untrusted *code*. That is MITRE ATLAS **AML.T0011.000 Unsafe AI Artifacts**,
+and the fix is exactly this part's lesson applied to the model: sign it and verify it before load
+(**AML.M0013 Code Signing**, **AML.M0014 Verify AI Artifacts**). The `secure` profile does that —
+a signed, hash-pinned, non-pickle artifact — and `ai-detector/verify.py` proves a crafted "model"
+runs code on the `vuln` load path and is refused on the `secure` one.
+
 ---
 
 ## Your finding (what you hand in for Part 6)

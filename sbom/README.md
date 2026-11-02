@@ -109,6 +109,26 @@ real-world catch:
 Say clearly in your finding **which scope** your SBOM covered, and what it therefore
 could not have caught.
 
+### Going further — the AI add-on (extension E4): an **AI-BOM**
+
+The optional [extension E4](../ai-detector/) adds a machine-learning anomaly detector to the
+phone-sensor stream. Scan its folder and watch the same blind spot, one level up:
+
+```bash
+syft dir:ai-detector            # finds the Python libraries in requirements.txt…
+python ai-detector/aibom.py --artifact ai-detector/registry/current \
+    --dataset ai-detector/out/baseline.jsonl --out ai-detector/out/aibom.cdx.json
+```
+
+`syft` lists scikit-learn, numpy and the rest — and says **nothing** about the two components that
+actually decide anything: the **model** and the **data it was trained on**. The AI-BOM
+(`aibom.py`) is a CycloneDX 1.6 **ML-BOM** that records both, with SHA-256 hashes and a model card
+(what it was trained on, what it accepts, and — stated plainly — what it cannot catch). This is
+MITRE ATLAS **AML.M0023 Maintain an AI Bill of Materials**: the exact same move as "a BOM can't see
+the ~624 added bytes" from Part 7, now for a model instead of firmware. `aibom.py --check` compares
+a deployed model against the AI-BOM and reports drift — which is how Part 7's model-swap gets
+caught. See [`ai-detector/README.md`](../ai-detector/README.md).
+
 ## The connection:  analyzer ↔ SBOM ↔ CWE ↔ CVE
 
 A scanner finding is a *library* fact: "this component has CVE‑X." Whether it is an

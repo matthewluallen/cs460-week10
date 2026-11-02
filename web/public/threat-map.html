@@ -68,7 +68,7 @@
   <p class="sub">Every weakness you exercise on the TBD controller maps onto the same public frameworks a real OT security team uses.
   This page ties each lab attack across seven taxonomies — the embedded threat (<b>EMB3D</b>), the code weakness (<b>CWE</b>),
   the attack pattern (<b>CAPEC</b>), the ICS technique (<b>ATT&amp;CK for ICS</b>), how a red team emulates it (<b>CALDERA</b>),
-  the defensive countermeasure (<b>D3FEND</b>), and — where an AI/ML surface exists — <b>ATLAS</b>.</p>
+  the defensive countermeasure (<b>D3FEND</b>), and — where an AI surface exists — <b>ATLAS</b> (the extension-E4 anomaly detector).</p>
 
   <div class="tabs" role="tablist" aria-label="Threat map view">
     <button class="tab active" role="tab" aria-selected="true" data-view="matrix" id="tab-matrix">Matrix</button>
@@ -115,8 +115,9 @@
 
   <p class="foot">IDs link to the official framework entry. Frameworks: EMB3D (emb3d.mitre.org), CWE (cwe.mitre.org),
   CAPEC (capec.mitre.org), ATT&amp;CK for ICS (attack.mitre.org), D3FEND (d3fend.mitre.org), CALDERA / caldera-ot (github.com/mitre),
-  ATLAS (atlas.mitre.org). <b>ATLAS is N/A for all eleven</b> — none involve a machine-learning model today; if the course adds an ML
-  anomaly detector on the sensor stream, the phone-sensor false-data attack would then map to ATLAS <code>AML.T0043</code> (Craft Adversarial Data).
+  ATLAS (atlas.mitre.org, 2026.10 release). <b>ATLAS applies to 3 of the 11</b> — only the attacks that touch the extension-E4
+  anomaly detector (the phone-sensor stream, and the model's own update/supply chain in Parts 6–7). The other eight involve no AI
+  model, so their ATLAS cell is correctly <code>—</code>. The <code>↳ defend</code> chips are ATLAS <i>mitigations</i> (AML.M…), not techniques.
   <b>CALDERA reality check:</b> caldera-ot ships six protocol plugins (modbus, bacnet, dnp3, profinet, iec61850, gems) — only the two Modbus
   attacks have a real public plugin; MQTT, credential, overflow and RE attacks need a custom ability. Mappings are teaching approximations
   for CS460 Week&nbsp;10, not an official crosswalk.</p>
@@ -124,6 +125,7 @@
 
 <script>
 const D3 = s => `https://d3fend.mitre.org/technique/d3f:${s}/`;
+const ATM = s => `https://atlas.mitre.org/mitigations/${s}`;   // ATLAS mitigation deep-link (techniques use the FW builder)
 const FW = {
   emb3d:  {name:'EMB3D',   color:'var(--f-emb3d)',  url:id=>`https://emb3d.mitre.org/threats/${id}/`},
   cwe:    {name:'CWE',     color:'var(--f-cwe)',    url:id=>`https://cwe.mitre.org/data/definitions/${id.replace(/\D/g,'')}.html`},
@@ -261,7 +263,7 @@ const ATTACKS = [
       attack:[{id:'T1692.001',title:'Unauthorized Message: Command Message'},{id:'T0835',title:'Manipulate I/O Image'}],
       caldera:null,
       d3fend:{id:'D3-MAN',title:'Message Authentication',url:D3('MessageAuthentication')},
-      atlas:null,
+      atlas:[{id:'AML.T0015',title:'Evade AI Model (extension E4: a crafted in-distribution spoof the anomaly model misses)'},{id:'AML.T0043.003',title:'Craft Adversarial Data: Manual Modification'},{id:'AML.T0041',title:'Physical Environment Access (tilt/cover the real phone)'},{id:'AML.M0009',title:'↳ defend: Multi-Sensor Fusion',url:ATM('AML.M0009')},{id:'AML.M0015',title:'↳ defend: Adversarial Input Detection',url:ATM('AML.M0015')}],
       controls:[{id:'FR3 SI',title:'System Integrity'},{id:'FR1 IAC',title:'Identification & Authentication'},{id:'SI-10',title:'Information Input Validation'}]
     }
   },
@@ -277,7 +279,7 @@ const ATTACKS = [
       attack:{id:'T1693.001',title:'Modify Firmware: System Firmware (formerly T0857)'},
       caldera:null,
       d3fend:{id:'D3-MAN',title:'Message Authentication (sign/verify the update)',url:D3('MessageAuthentication')},
-      atlas:null,
+      atlas:[{id:'AML.T0011.000',title:'Unsafe AI Artifacts (E4: the same unsigned path ships the detector model; a pickle runs code on load)'},{id:'AML.M0013',title:'↳ defend: Code Signing',url:ATM('AML.M0013')},{id:'AML.M0014',title:'↳ defend: Verify AI Artifacts',url:ATM('AML.M0014')}],
       controls:[{id:'FR3 SI',title:'System Integrity (update integrity)'},{id:'SA-10',title:'Developer Configuration Management / code signing'}]
     }
   },
@@ -293,7 +295,7 @@ const ATTACKS = [
       attack:{id:'T0862',title:'Supply Chain Compromise'},
       caldera:null,
       d3fend:null,
-      atlas:null,
+      atlas:[{id:'AML.T0010.003',title:'AI Supply Chain Compromise: Model Repository (E4: swap the detector model in the registry)'},{id:'AML.T0018.000',title:'Poison AI Model'},{id:'AML.M0014',title:'↳ defend: Verify AI Artifacts',url:ATM('AML.M0014')},{id:'AML.M0023',title:'↳ defend: Maintain an AI Bill of Materials',url:ATM('AML.M0023')}],
       controls:[{id:'FR3 SI',title:'System Integrity'},{id:'SR-4',title:'Provenance'},{id:'SR-11',title:'Component Authenticity'}]
     }
   },
@@ -322,7 +324,7 @@ const STEP_ORDER = [
   {fw:'attack', cls:'offense',  label:'ICS technique',     lead:'The adversary technique against the control system (ATT&CK for ICS).'},
   {fw:'caldera',cls:'emulate',  label:'Emulate it',        lead:'How a red team would automate/emulate this (CALDERA / caldera-ot).'},
   {fw:'d3fend', cls:'defense',  label:'Countermeasure',    lead:'The defensive technique that neutralizes it (D3FEND).'},
-  {fw:'atlas',  cls:'offense',  label:'AI/ML angle',       lead:'Where an ML component would change the picture (ATLAS).'},
+  {fw:'atlas',  cls:'offense',  label:'AI angle',          lead:'Where the extension-E4 anomaly detector becomes the target, and how it is defended (ATLAS 2026.10). N/A unless the attack touches that model.'},
   {fw:'controls',cls:'defense', label:'Control standard',   lead:'The required control + security level (IEC 62443 FR/SL, NIST 800-53).'},
 ];
 

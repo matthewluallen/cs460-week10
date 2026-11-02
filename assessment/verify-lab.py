@@ -30,7 +30,7 @@ Verdicts:  PASS (observable achieved) · FAIL (not achieved) · SKIP (tool/targe
 Exit 0 iff no requested check FAILed (a SKIP is not a failure). The printed verdict is the
 "mechanics" share of the rubric; the student's written finding is the larger "reasoning" share.
 """
-import argparse, os, re, select, shutil, signal, socket, subprocess, sys, tempfile, time
+import argparse, json, os, re, select, shutil, signal, socket, subprocess, sys, tempfile, time
 import urllib.request
 
 ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -354,6 +354,29 @@ def W12_formal(_c):
         return PASS, "Z3 proved all six controls on the verified build"
     return FAIL, (r.stdout.strip().splitlines() or ["proof assertion failed"])[-1]
 
+
+def E4_aidetector(_c):
+    """Offline (extension E4): the AI anomaly detector's own verifier — the model alone can be
+    evaded, the secure profile's fusion / provenance / signing controls hold. ATLAS 2026.10."""
+    script = os.path.join(ROOT, "ai-detector", "verify.py")
+    if not os.path.exists(script):
+        return SKIP, "ai-detector/verify.py not present"
+    r = subprocess.run([sys.executable, "-I", script, "--json"], capture_output=True, text=True)
+    blob = (r.stdout or "") + (r.stderr or "")
+    if "No module named" in blob and ("sklearn" in blob or "numpy" in blob):
+        return SKIP, "numpy / scikit-learn not installed (pip install -r ai-detector/requirements.txt)"
+    try:
+        checks = json.loads(r.stdout)
+    except (ValueError, json.JSONDecodeError):
+        return FAIL, (blob.strip().splitlines() or ["ai-detector/verify.py did not return JSON"])[-1]
+    npass = sum(c["verdict"] == "PASS" for c in checks)
+    nfail = sum(c["verdict"] == "FAIL" for c in checks)
+    nskip = sum(c["verdict"] == "SKIP" for c in checks)
+    if nfail:
+        bad = next(c for c in checks if c["verdict"] == "FAIL")
+        return FAIL, f"{bad['id']}: {bad['note']}"
+    return PASS, f"{npass} detector checks PASS ({nskip} SKIP — signing checks need skops+cryptography)"
+
 CHECKS = {
     # Section A · Build
     "P1": (P1_wire,   True,  "Wire & run — fail-safe motor: seal-in, stop, E-stop latch, reset"),
@@ -369,6 +392,7 @@ CHECKS = {
     # Section D · Secure
     "P9": (P9_secure, True,  "Remediation — secure build refuses the attacks"),
     "W12":(W12_formal,False, "Formal verification — Z3 proves all controls (Level 3)"),
+    "E4": (E4_aidetector, False, "AI anomaly detector (ATLAS) — model evaded, secure controls hold"),
 }
 # Default set when none named: everything except P9 (which needs the secure target).
 DEFAULT = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]

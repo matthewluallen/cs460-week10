@@ -1,0 +1,9 @@
+# E4 — AI anomaly detector on the phone-sensor stream.
+# The core (simulate, train, detect, verify) needs only the first two.
+numpy>=1.26
+scikit-learn>=1.4
+# Live MQTT (record.py, phonesim.py --publish, detect.py live):
+paho-mqtt>=2.0
+# Secure profile's signed, non-pickle model artifact (train/detect secure, verify's last 3 checks):
+skops>=0.10
+cryptography>=42

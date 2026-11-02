@@ -1,0 +1,52 @@
+<h2 style="color:#13325b;">Extension E4 &middot; Attack the AI that watches the sensor</h2>
+<p><em>Builds on Part 8 / E3 (phone-as-sensor false-data injection). No extra hardware &mdash; the same phone stream, now with a machine-learning anomaly detector watching it. Everything runs in the Codespace; the core needs no broker. Pairs with the <strong>Threat Map</strong> (ATLAS column) in the Logic Studio toolbar.</em></p>
+
+<div style="border-left:5px solid #e64100;background:#fff5f0;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;">
+<p style="margin:0 0 8px;"><strong>Why this part exists.</strong> In E3 you defended one trusted sensor with a <em>rule</em> you wrote by hand. The next thing a real OT team reaches for is a model that <em>learns</em> what normal looks like. But the moment a model makes a decision, the model is a new attack surface &mdash; the one MITRE <strong>ATLAS</strong> (<code>atlas.mitre.org</code>, the adversarial-AI companion to ATT&amp;CK) catalogs. Here you build that detector, then attack it.</p>
+<p style="margin:0;"><strong>The setup.</strong> <code>pip install -r ai-detector/requirements.txt</code>. Record a normal-operation baseline from your phone (<code>python ai-detector/record.py --seconds 300 --out ai-detector/out/baseline.jsonl</code>) or simulate one (<code>python ai-detector/phonesim.py --scenario baseline --out ai-detector/out/baseline.jsonl</code>) &mdash; share <strong>both Motion and Orientation</strong> so the accelerometer is in it. Train both profiles: <code>train.py --profile vuln</code> (model only, one pickle, learns online) and, after <code>vendor.py keygen</code> + <code>approve-dataset</code>, <code>train.py --profile secure</code> (gate + model + accelerometer cross-check; signed, frozen). The detector raises an <strong>alarm</strong> on <code>ai/&lt;id&gt;/verdict</code>; it never writes the controller &mdash; keeping AI out of the actuation path is the point, not a limitation.</p>
+</div>
+
+<p style="font-size:14px;"><strong>One command proves every property below offline:</strong> <code>python ai-detector/verify.py</code> (also <code>python assessment/verify-lab.py E4</code>). Drive any attack live with <code>phonesim.py --scenario &lt;name&gt; --publish 127.0.0.1:1883</code> while <code>detect.py</code> runs. Each check names its ATLAS 2026.10 ID.</p>
+
+<h3 style="color:#13325b;">Attack A &mdash; Evasion: a spoof the model can&rsquo;t see</h3>
+<p>First try the blunt E3 move: slam the reported tilt to a wild value (<code>--scenario naive-spoof</code>). The model flags it &mdash; and the secure profile&rsquo;s gate rejects it before the model even runs. Now do better: follow the real tilt until it nears the alarm limit, then slide the reported value <em>gently</em> (a normal rate) back to a perfectly ordinary tilt and hold it there (<code>--scenario crafted-spoof</code>). Every value you report is one the model has seen a thousand times, so <strong>the model alone never alarms</strong> &mdash; while the real phone is tipped past the limit.</p>
+<ul>
+<li><strong>SHOW</strong> &mdash; <code>detect.py --profile vuln --replay</code> on your crafted capture: the hidden window stays <code>OK</code>. Then the same capture under <code>--profile secure</code>: the accelerometer cross-check fires (<code>fusion: reported tilt is N&deg; from the tilt gravity implies</code>).</li>
+<li><strong>SAY</strong> &mdash; which signal betrayed the spoof. You changed what the phone <em>reported</em>; you did not change the gravity its accelerometer still feels. That gap is the detection.</li>
+<li><strong>WHY</strong> &mdash; a learned model only knows the distribution it was shown; an in-distribution lie is invisible to it. Detection came from an <em>independent physical channel</em>, not a smarter model.</li>
+</ul>
+<p style="font-size:14px;"><strong>Maps to:</strong> ATLAS <strong>AML.T0015 Evade AI Model</strong> via <strong>AML.T0043.003 Craft Adversarial Data: Manual Modification</strong>; tilting/covering the real phone is <strong>AML.T0041 Physical Environment Access</strong>; the defence is <strong>AML.M0009 Multi-Sensor Fusion</strong> (and the gate, <strong>AML.M0015</strong>).</p>
+
+<h3 style="color:#13325b;">Attack B &mdash; Integrity of the model itself: poison or erode it</h3>
+<p>Two ways to make the model call your value normal. <strong>Poison the baseline</strong> (<code>--scenario poisoned-baseline</code>): publish your target tilt <em>while the recording is being made</em>, so &ldquo;normal&rdquo; is defined to include it; later that tilt passes (<code>poison-target</code>). <strong>Erode it</strong> (<code>--scenario erode</code>): if the model learns online (<code>detect.py --adapt</code>), drift the reported value down so slowly that each small step is accepted and folded into the next baseline &mdash; over ~17 minutes it re-centres onto you.</p>
+<ul>
+<li><strong>SHOW</strong> &mdash; a <code>-30&deg;</code> reading alarming on a clean model but accepted after a poisoned baseline; or the online model&rsquo;s alarm rate decaying to near zero as it drifts (<code>verify.py</code> E4-07 / E4-09 print both).</li>
+<li><strong>SAY</strong> &mdash; which did it: you changed the <em>training data</em>, not the input. The model is exactly as designed; its <em>idea of normal</em> is what you corrupted.</li>
+<li><strong>WHY</strong> &mdash; a model is only as trustworthy as its data and its re-training policy. Whatever is on the wire while you record becomes truth.</li>
+</ul>
+<p style="font-size:14px;"><strong>Maps to:</strong> ATLAS <strong>AML.T0020 Training Data Poisoning</strong>, <strong>AML.T0031 Erode AI Model Integrity</strong>; the defences are <strong>AML.M0007 Sanitize Training Data</strong> + <strong>AML.M0025 Maintain AI Dataset Provenance</strong> (the secure profile trains only on a reviewed, hash-approved recording and drops uncorroborated frames).</p>
+
+<h3 style="color:#13325b;">Attack C &mdash; Supply chain: own the model, own the decision</h3>
+<p>You never have to beat the model if you can replace it. The detector loads its model from a registry &mdash; the same shape of update source as the firmware OTA in Parts 6&ndash;7. <code>attack.py swap-model</code> drops in a model whose alarm can never fire; <code>attack.py evil-pickle</code> drops in a &ldquo;model&rdquo; that <strong>runs code the moment it is loaded</strong> (the <code>vuln</code> profile unpickles it; proof lands at <code>/tmp/aidet-model-ran-code</code>). Query the <code>/score</code> endpoint first (<code>attack.py probe</code>) to see how an exposed raw score hands you a free optimization oracle.</p>
+<ul>
+<li><strong>SHOW</strong> &mdash; the <code>vuln</code> loader accepting the swapped/evil model (and the marker file appearing); the <code>secure</code> loader <code>REFUSED</code>ing it (<em>signature does NOT verify</em> / <em>SHA-256 does not match</em>); <code>aibom.py --check</code> reporting the drift.</li>
+<li><strong>SAY</strong> &mdash; you never touched a reading or the training data &mdash; you replaced the artifact. An unsigned model file is not just untrusted data; a pickle is untrusted <em>code</em>.</li>
+<li><strong>WHY</strong> &mdash; this is Part 7&rsquo;s kill switch, one layer up: whoever controls the model source controls every decision it makes.</li>
+</ul>
+<p style="font-size:14px;"><strong>Maps to:</strong> ATLAS <strong>AML.T0010.003 AI Supply Chain Compromise: Model Repository</strong>, <strong>AML.T0018.000 Poison AI Model</strong>, <strong>AML.T0011.000 Unsafe AI Artifacts</strong>, <strong>AML.T0040 AI Model Inference API Access</strong>; defences <strong>AML.M0013 Code Signing</strong> + <strong>AML.M0014 Verify AI Artifacts</strong> + <strong>AML.M0023 Maintain an AI Bill of Materials</strong> (Part 5), and <strong>AML.M0004 / M0002</strong> for the query oracle.</p>
+
+<h3 style="color:#13325b;">Then defend it &mdash; and name what still gets through</h3>
+<p>The <code>secure</code> profile <em>is</em> those controls; turn one off and watch the matching attack land. One honest limit remains: the accelerometer cross-check compares two channels <strong>from the same phone</strong>. Forge both (<code>--scenario forge-all</code>) and fusion is defeated &mdash; because real corroboration needs an <em>independent</em> sensor, not a second reading from the same source. State that residual risk; don&rsquo;t hide it.</p>
+
+<div style="border:1px solid #1a7f37;border-left:6px solid #1a7f37;background:#f2fbf4;padding:10px 14px;margin:12px 0;border-radius:6px;">
+<p style="margin:0;"><strong>CYBER-INFORMED ENGINEERING &mdash; the detector&rsquo;s verdict is one more claim.</strong> A model adds work for the attacker and buys detection; it does not make a single unauthenticated sensor trustworthy, and it must never sit in the actuation path. Adding AI to defend a system adds a system to defend. Where in <em>your</em> design would a model&rsquo;s verdict decide something that matters &mdash; and what independent check guards the model itself?</p>
+</div>
+
+<h3 style="color:#13325b;">What to submit</h3>
+<ul>
+<li><strong>One evasion</strong> (Attack A): Show / Say / Why, with the capture, and the channel that caught it &mdash; mark which part is observation and which is inference.</li>
+<li><strong>One integrity attack on the model itself</strong> (Attack B <em>or</em> C): Show / Say / Why, and the specific <code>secure</code>-profile control that stops it.</li>
+<li>Your <strong>AI-BOM</strong> (<code>aibom.py</code>) and one sentence on what <code>syft</code> listed that it did <em>not</em> &mdash; the model and its training data.</li>
+<li>One paragraph on the <strong>residual risk</strong>: what a patient attacker still gets through, and why &ldquo;add a detector&rdquo; is not the same as &ldquo;trust the sensor.&rdquo;</li>
+</ul>
+<p style="font-size:13px;color:#555;"><em>Full walkthrough, every scenario and the design notes: <code>ai-detector/README.md</code>. Objectives + complete ATLAS mapping: <code>assessment/objectives.md</code> (E4). All IDs are from the ATLAS 2026.10 release.</em></p>
