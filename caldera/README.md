@@ -1,4 +1,9 @@
-# CALDERA — emulating the phone-sensor attack as a full kill chain
+# E5 — CALDERA: emulating the phone-sensor attack as a full kill chain
+
+> Extension **E5** (builds on Part 8 / E3; pairs with **E4**, the detector it tests). The red side
+> of the red/blue loop: E3 is the attack by hand, E4 puts a model in the way, E5 automates the
+> whole thing — including how the attacker got in. Student assignment:
+> [`docs/assignment-caldera-e5.html`](../docs/assignment-caldera-e5.html).
 
 The Threat Map leaves the **CALDERA** cell empty for most lab attacks for an honest reason:
 MITRE's OT plugin [`caldera-ot`](https://github.com/mitre/caldera-ot) ships six protocol plugins
