@@ -4,7 +4,7 @@
         "type": "tab",
         "label": "Plant HMI",
         "disabled": false,
-        "info": "HMI station: Modbus/TCP poll of the StampLC twin -> decode -> dashboard. Left: three Modbus-read nodes. Middle: decode functions. Right: dashboard widgets (/ui).",
+        "info": "Single-screen Plant HMI: four Modbus reads -> one merge/event hub -> one dashboard template (/ui).",
         "env": []
     },
     {
@@ -49,8 +49,8 @@
                 "reset": false
             },
             "darkTheme": {
-                "default": "#097479",
-                "baseColor": "#00b3b3",
+                "default": "#0b1220",
+                "baseColor": "#0f7a86",
                 "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
                 "edited": true,
                 "reset": false
@@ -63,45 +63,45 @@
             },
             "themeState": {
                 "base-color": {
-                    "default": "#097479",
-                    "value": "#097479",
-                    "edited": false
+                    "default": "#0f7a86",
+                    "value": "#0f7a86",
+                    "edited": true
                 },
                 "page-titlebar-backgroundColor": {
-                    "value": "#097479",
-                    "edited": false
+                    "value": "#0b1220",
+                    "edited": true
                 },
                 "page-backgroundColor": {
-                    "value": "#111827",
-                    "edited": false
+                    "value": "#0b1220",
+                    "edited": true
                 },
                 "page-sidebar-backgroundColor": {
-                    "value": "#1b2330",
-                    "edited": false
+                    "value": "#0b1220",
+                    "edited": true
                 },
                 "group-textColor": {
                     "value": "#d9e2ec",
-                    "edited": false
+                    "edited": true
                 },
                 "group-borderColor": {
-                    "value": "#2b3648",
-                    "edited": false
+                    "value": "#0b1220",
+                    "edited": true
                 },
                 "group-backgroundColor": {
-                    "value": "#1b2330",
-                    "edited": false
+                    "value": "#0b1220",
+                    "edited": true
                 },
                 "widget-textColor": {
                     "value": "#eaf6ff",
-                    "edited": false
+                    "edited": true
                 },
                 "widget-backgroundColor": {
-                    "value": "#097479",
-                    "edited": false
+                    "value": "#0b1220",
+                    "edited": true
                 },
                 "widget-borderColor": {
-                    "value": "#1b2330",
-                    "edited": false
+                    "value": "#0b1220",
+                    "edited": true
                 },
                 "base-font": {
                     "value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"
@@ -116,18 +116,18 @@
         },
         "site": {
             "name": "CS460 Plant HMI",
-            "hideToolbar": "false",
+            "hideToolbar": "true",
             "allowSwipe": "false",
-            "lockMenu": "false",
-            "allowTempTheme": "true",
+            "lockMenu": "true",
+            "allowTempTheme": "false",
             "dateFormat": "DD/MM/YYYY",
             "sizes": {
                 "sx": 48,
                 "sy": 48,
-                "gx": 6,
-                "gy": 6,
-                "cx": 6,
-                "cy": 6,
+                "gx": 5,
+                "gy": 5,
+                "cx": 5,
+                "cy": 5,
                 "px": 0,
                 "py": 0
             }
@@ -143,60 +143,20 @@
         "hidden": false
     },
     {
-        "id": "g_proc",
+        "id": "g_main",
         "type": "ui_group",
-        "name": "Process",
+        "name": "",
         "tab": "uitab0",
         "order": 1,
-        "disp": true,
-        "width": 6,
-        "collapse": false
-    },
-    {
-        "id": "g_stat",
-        "type": "ui_group",
-        "name": "Controller status",
-        "tab": "uitab0",
-        "order": 2,
-        "disp": true,
-        "width": 6,
-        "collapse": false
-    },
-    {
-        "id": "g_relay",
-        "type": "ui_group",
-        "name": "Relays & outputs",
-        "tab": "uitab0",
-        "order": 3,
-        "disp": true,
-        "width": 6,
-        "collapse": false
-    },
-    {
-        "id": "g_in",
-        "type": "ui_group",
-        "name": "Wired inputs IN1-IN8",
-        "tab": "uitab0",
-        "order": 4,
-        "disp": true,
-        "width": 6,
-        "collapse": false
-    },
-    {
-        "id": "g_phone",
-        "type": "ui_group",
-        "name": "Phone points (network-only)",
-        "tab": "uitab0",
-        "order": 5,
-        "disp": true,
-        "width": 6,
+        "disp": false,
+        "width": 25,
         "collapse": false
     },
     {
         "id": "rd_hr",
         "type": "modbus-read",
         "name": "Read HR 0..32",
-        "topic": "",
+        "topic": "hr",
         "showStatusActivities": false,
         "showErrors": false,
         "showWarnings": true,
@@ -215,12 +175,11 @@
         "useIOForPayload": false,
         "emptyMsgOnFail": true,
         "keepMsgProperties": false,
-        "x": 150,
+        "x": 160,
         "y": 120,
         "wires": [
             [
-                "fn_proc",
-                "fn_stat"
+                "fn_merge"
             ],
             []
         ],
@@ -230,7 +189,7 @@
         "id": "rd_phone",
         "type": "modbus-read",
         "name": "Read HR 140..165 (phone)",
-        "topic": "",
+        "topic": "phone",
         "showStatusActivities": false,
         "showErrors": false,
         "showWarnings": true,
@@ -249,350 +208,21 @@
         "useIOForPayload": false,
         "emptyMsgOnFail": true,
         "keepMsgProperties": false,
-        "x": 150,
-        "y": 560,
+        "x": 160,
+        "y": 220,
         "wires": [
             [
-                "fn_phone"
+                "fn_merge"
             ],
             []
         ],
         "z": "f_hmi"
     },
     {
-        "id": "fn_proc",
-        "type": "function",
-        "name": "process",
-        "func": "const r = msg.payload;\n// reg2 = temp x10, reg30 = setpoint x10 (see plc_point_map.h)\nconst temp = {payload: (r[2]||0)/10};\nconst sp   = {payload: (r[30]||0)/10};\nreturn [temp, sp];",
-        "outputs": 2,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 380,
-        "y": 120,
-        "wires": [
-            [
-                "ui_temp"
-            ],
-            [
-                "ui_sp"
-            ]
-        ],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_temp",
-        "type": "ui_gauge",
-        "name": "Temperature",
-        "group": "g_proc",
-        "order": 1,
-        "width": 0,
-        "height": 0,
-        "gtype": "gage",
-        "title": "Temperature",
-        "label": "\u00b0C",
-        "format": "{{value}}",
-        "min": "0",
-        "max": "80",
-        "colors": [
-            "#00b500",
-            "#e6e600",
-            "#ca3838"
-        ],
-        "seg1": "",
-        "seg2": "",
-        "diff": false,
-        "className": "",
-        "x": 650,
-        "y": 80,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_sp",
-        "type": "ui_gauge",
-        "name": "Setpoint",
-        "group": "g_proc",
-        "order": 2,
-        "width": 0,
-        "height": 0,
-        "gtype": "gage",
-        "title": "Setpoint",
-        "label": "\u00b0C",
-        "format": "{{value}}",
-        "min": "0",
-        "max": "80",
-        "colors": [
-            "#00b500",
-            "#e6e600",
-            "#ca3838"
-        ],
-        "seg1": "",
-        "seg2": "",
-        "diff": false,
-        "className": "",
-        "x": 650,
-        "y": 160,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "fn_stat",
-        "type": "function",
-        "name": "status",
-        "func": "const r = msg.payload;\nconst n = v => (v==null ? 0 : v);   // Modbus may return a short array before RUN\nconst mode = ['BOOT','IDLE','RUN','FAULT'][n(r[20])] || ('mode '+n(r[20]));\nreturn [\n  {payload: mode},\n  {payload: n(r[25])},              // heartbeat\n  {payload: n(r[22]) + ' us'},      // scan max\n  {payload: n(r[23])},              // fault count\n  {payload: n(r[24])}               // forces active\n];",
-        "outputs": 5,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 380,
-        "y": 260,
-        "wires": [
-            [
-                "ui_mode"
-            ],
-            [
-                "ui_hb"
-            ],
-            [
-                "ui_scan"
-            ],
-            [
-                "ui_flt"
-            ],
-            [
-                "ui_frc"
-            ]
-        ],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_mode",
-        "type": "ui_text",
-        "group": "g_stat",
-        "order": 1,
-        "width": 0,
-        "height": 0,
-        "name": "Mode",
-        "label": "Mode",
-        "format": "{{msg.payload}}",
-        "layout": "row-spread",
-        "className": "",
-        "style": false,
-        "font": "",
-        "fontSize": 16,
-        "color": "#ffffff",
-        "x": 650,
-        "y": 240,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_hb",
-        "type": "ui_text",
-        "group": "g_stat",
-        "order": 2,
-        "width": 0,
-        "height": 0,
-        "name": "Heartbeat",
-        "label": "Heartbeat",
-        "format": "{{msg.payload}}",
-        "layout": "row-spread",
-        "className": "",
-        "style": false,
-        "font": "",
-        "fontSize": 16,
-        "color": "#ffffff",
-        "x": 650,
-        "y": 300,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_scan",
-        "type": "ui_text",
-        "group": "g_stat",
-        "order": 3,
-        "width": 0,
-        "height": 0,
-        "name": "Scan max",
-        "label": "Scan max",
-        "format": "{{msg.payload}}",
-        "layout": "row-spread",
-        "className": "",
-        "style": false,
-        "font": "",
-        "fontSize": 16,
-        "color": "#ffffff",
-        "x": 650,
-        "y": 360,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_flt",
-        "type": "ui_text",
-        "group": "g_stat",
-        "order": 4,
-        "width": 0,
-        "height": 0,
-        "name": "Faults",
-        "label": "Faults",
-        "format": "{{msg.payload}}",
-        "layout": "row-spread",
-        "className": "",
-        "style": false,
-        "font": "",
-        "fontSize": 16,
-        "color": "#ffffff",
-        "x": 650,
-        "y": 420,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_frc",
-        "type": "ui_text",
-        "group": "g_stat",
-        "order": 5,
-        "width": 0,
-        "height": 0,
-        "name": "Forces active",
-        "label": "Forces active",
-        "format": "{{msg.payload}}",
-        "layout": "row-spread",
-        "className": "",
-        "style": false,
-        "font": "",
-        "fontSize": 16,
-        "color": "#ffffff",
-        "x": 650,
-        "y": 480,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "fn_phone",
-        "type": "function",
-        "name": "phone points",
-        "func": "const r = msg.payload;  // index 0 = register 140 (sbom/firmware/point_map.json phone_points)\n// Every phone point has its own 8 s freshness bit (reg 159 = points 0-15, reg 160 = 16+).\n// A stale value FREEZES at its last sample, so show 0 unless the point is fresh.\nconst n = v => (v==null ? 0 : v);\nconst s16 = v => (n(v) & 0x8000) ? n(v) - 0x10000 : n(v);\nconst fresh = (n(r[20]) << 16 | n(r[19])) >>> 0;\nconst f = i => ((fresh >>> i) & 1) === 1;\nconst lux  = {payload: f(0) ? n(r[0]) : 0};          // phone_light_lux (reg 140)\nconst acc  = {payload: f(1) ? n(r[1]) / 100 : 0};    // phone_accel_x100 (reg 141)\nconst tilt = {payload: f(6) ? s16(r[6]) : 0};        // phone_tilt_b (reg 146)\nconst btn  = {payload: {BTN1: f(15) && n(r[17]) === 1, BTN2: f(16) && n(r[18]) === 1}}; // regs 157/158\nreturn [lux, acc, tilt, btn];",
-        "outputs": 4,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 380,
-        "y": 560,
-        "wires": [
-            [
-                "ui_lux"
-            ],
-            [
-                "ui_acc"
-            ],
-            [
-                "ui_tilt"
-            ],
-            [
-                "ui_pbtn"
-            ]
-        ],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_lux",
-        "type": "ui_gauge",
-        "name": "Light",
-        "group": "g_phone",
-        "order": 1,
-        "width": 0,
-        "height": 0,
-        "gtype": "gage",
-        "title": "Light",
-        "label": "lux",
-        "format": "{{value}}",
-        "min": "0",
-        "max": "1000",
-        "colors": [
-            "#00b500",
-            "#e6e600",
-            "#ca3838"
-        ],
-        "seg1": "",
-        "seg2": "",
-        "diff": false,
-        "className": "",
-        "x": 650,
-        "y": 540,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_acc",
-        "type": "ui_gauge",
-        "name": "Accel",
-        "group": "g_phone",
-        "order": 2,
-        "width": 0,
-        "height": 0,
-        "gtype": "gage",
-        "title": "Accel",
-        "label": "m/s\u00b2",
-        "format": "{{value}}",
-        "min": "0",
-        "max": "30",
-        "colors": [
-            "#00b500",
-            "#e6e600",
-            "#ca3838"
-        ],
-        "seg1": "",
-        "seg2": "",
-        "diff": false,
-        "className": "",
-        "x": 650,
-        "y": 620,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_tilt",
-        "type": "ui_gauge",
-        "name": "Tilt \u03b2",
-        "group": "g_phone",
-        "order": 3,
-        "width": 0,
-        "height": 0,
-        "gtype": "gage",
-        "title": "Tilt \u03b2",
-        "label": "\u00b0",
-        "format": "{{value}}",
-        "min": "-90",
-        "max": "90",
-        "colors": [
-            "#ca3838",
-            "#00b500",
-            "#ca3838"
-        ],
-        "seg1": "",
-        "seg2": "",
-        "diff": false,
-        "className": "",
-        "x": 650,
-        "y": 700,
-        "wires": [],
-        "z": "f_hmi"
-    },
-    {
         "id": "rd_coil",
         "type": "modbus-read",
         "name": "Read coils 0..9",
-        "topic": "",
+        "topic": "coil",
         "showStatusActivities": false,
         "showErrors": false,
         "showWarnings": true,
@@ -611,53 +241,12 @@
         "useIOForPayload": false,
         "emptyMsgOnFail": true,
         "keepMsgProperties": false,
-        "x": 150,
-        "y": 760,
+        "x": 160,
+        "y": 320,
         "wires": [
             [
-                "fn_relay"
+                "fn_merge"
             ],
-            []
-        ],
-        "z": "f_hmi"
-    },
-    {
-        "id": "fn_relay",
-        "type": "function",
-        "name": "coils -> leds",
-        "func": "const c = msg.payload;  // array of booleans, index = coil #\n// map: 0 ESTOP,1 RELAY0,2 RELAY1,3 RELAY2,4 RELAY3,5 SSR1,6 SSR2,9 CMD_RUN\nmsg.payload = {\n  ESTOP:!!c[0], QX0:!!c[1], QX1:!!c[2], QX2:!!c[3], QX3:!!c[4],\n  SSR1:!!c[5], SSR2:!!c[6], RUN:!!c[9]\n};\nreturn msg;",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 380,
-        "y": 760,
-        "wires": [
-            [
-                "ui_relays"
-            ]
-        ],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_relays",
-        "type": "ui_template",
-        "group": "g_relay",
-        "name": "Relay LEDs",
-        "order": 1,
-        "width": 6,
-        "height": 2,
-        "format": "<style>\n.ledrow{display:flex;flex-wrap:wrap;gap:10px}\n.led{flex:1 1 60px;text-align:center;padding:8px 4px;border-radius:8px;background:#1b2330;color:#9fb0c3;font:600 12px system-ui}\n.led .dot{width:14px;height:14px;border-radius:50%;margin:0 auto 6px;background:#30405a;box-shadow:inset 0 0 3px #000}\n.led.on{color:#eaf6ff}\n.led.on .dot{background:#39d98a;box-shadow:0 0 10px #39d98a}\n.led.estop.on .dot{background:#ff5d5d;box-shadow:0 0 10px #ff5d5d}\n</style>\n<div class=\"ledrow\">\n  <div class=\"led estop\" ng-class=\"{on:msg.payload.ESTOP}\"><div class=\"dot\"></div>E-STOP</div>\n  <div class=\"led\" ng-class=\"{on:msg.payload.QX0}\"><div class=\"dot\"></div>QX0 R0</div>\n  <div class=\"led\" ng-class=\"{on:msg.payload.QX1}\"><div class=\"dot\"></div>QX1 R1</div>\n  <div class=\"led\" ng-class=\"{on:msg.payload.QX2}\"><div class=\"dot\"></div>QX2 R2</div>\n  <div class=\"led\" ng-class=\"{on:msg.payload.QX3}\"><div class=\"dot\"></div>QX3 R3</div>\n  <div class=\"led\" ng-class=\"{on:msg.payload.SSR1}\"><div class=\"dot\"></div>SSR1</div>\n  <div class=\"led\" ng-class=\"{on:msg.payload.SSR2}\"><div class=\"dot\"></div>SSR2</div>\n  <div class=\"led\" ng-class=\"{on:msg.payload.RUN}\"><div class=\"dot\"></div>RUN</div>\n</div>",
-        "storeOutMessages": true,
-        "fwdInMessages": true,
-        "resendOnRefresh": true,
-        "templateScope": "local",
-        "className": "",
-        "x": 650,
-        "y": 760,
-        "wires": [
             []
         ],
         "z": "f_hmi"
@@ -666,7 +255,7 @@
         "id": "rd_di",
         "type": "modbus-read",
         "name": "Read DI 100..107",
-        "topic": "",
+        "topic": "di",
         "showStatusActivities": false,
         "showErrors": false,
         "showWarnings": true,
@@ -685,73 +274,52 @@
         "useIOForPayload": false,
         "emptyMsgOnFail": true,
         "keepMsgProperties": false,
-        "x": 150,
-        "y": 860,
+        "x": 160,
+        "y": 420,
         "wires": [
             [
-                "fn_di"
+                "fn_merge"
             ],
             []
         ],
         "z": "f_hmi"
     },
     {
-        "id": "fn_di",
+        "id": "fn_merge",
         "type": "function",
-        "name": "DI mirror -> leds",
-        "func": "const c = msg.payload;  // DI_MIRROR_BASE=100; index 0..7 = DI0..DI7 = IN1..IN8\n// names: the factory motor program's tags (motor-start-stop-estop)\nmsg.payload = {\n  START:!!c[0], STOP:!!c[1], ESTOP_OK:!!c[2], RESET:!!c[3]\n};\nreturn msg;",
+        "name": "merge + events",
+        "func": "// One hub: decode all four reads, keep the world + a rolling event log, and emit the\n// full merged payload (for the single-screen template) on every poll.\nconst n = v => (v==null ? 0 : v);\nconst s16 = v => (n(v)&0x8000)?n(v)-0x10000:n(v);\nconst T = () => { const d=new Date(); const p=x=>('0'+x).slice(-2); return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); };\nlet w = flow.get('world') || {relays:{},inputs:{}};\n\nif (msg.topic === 'hr') {\n  const r = msg.payload; const mi = n(r[20]);\n  w.modeClass = ['BOOT','IDLE','RUN','FAULT'][mi] || 'UNK';\n  w.mode = ['BOOT','IDLE','RUN','FAULT'][mi] || ('MODE'+mi);\n  w.scan = n(r[22]); w.faults = n(r[23]); w.forces = n(r[24]); w.hb = n(r[25]);\n  w.temp = (n(r[2])/10); w.sp = (n(r[30])/10);\n} else if (msg.topic === 'coil') {\n  const c = msg.payload;\n  w.relays = {ESTOP:!!c[0],QX0:!!c[1],QX1:!!c[2],QX2:!!c[3],QX3:!!c[4],SSR1:!!c[5],SSR2:!!c[6],RUN:!!c[9]};\n} else if (msg.topic === 'di') {\n  const c = msg.payload;\n  w.inputs = {START:!!c[0],STOP:!!c[1],ESTOP_OK:!!c[2],RESET:!!c[3]};\n} else if (msg.topic === 'phone') {\n  const r = msg.payload; const fresh = ((n(r[20])<<16)|n(r[19]))>>>0; const f = i => ((fresh>>>i)&1)===1;\n  w.lux = f(0)?n(r[0]):0; w.acc = f(1)?(n(r[1])/100):0; w.tilt = f(6)?s16(r[6]):0;\n  w.btn1 = f(15)&&n(r[17])===1; w.btn2 = f(16)&&n(r[18])===1; w.phoneStale = !f(0);\n}\nflow.set('world', w);\n\n// --- event detection ---\nconst prev = flow.get('prev');\nconst ev = [];\nconst push = (sev,m) => ev.push({sev,m,t:T()});\nif (!prev) {\n  push('INFO','HMI station connected — polling PLC 10.20.30.10 over Modbus/TCP :502');\n} else {\n  if (w.mode && prev.mode && w.mode!==prev.mode) push(w.mode==='FAULT'?'ALARM':'INFO','Controller mode '+prev.mode+' → '+w.mode);\n  if (w.faults>0 && !(prev.faults>0)) push('ALARM','Controller fault latched (count '+w.faults+')');\n  if (!(w.faults>0) && prev.faults>0) push('INFO','Fault cleared by operator reset');\n  if (w.forces>0 && !(prev.forces>0)) push('WARN','Forces active — '+w.forces+' output(s) overridden from the console');\n  if (!(w.forces>0) && prev.forces>0) push('INFO','Forces released — outputs follow the program again');\n  if (w.inputs && prev.inputs) {\n    if (w.inputs.ESTOP_OK===false && prev.inputs.ESTOP_OK!==false) push('ALARM','E-STOP opened — safety chain not healthy (IN3)');\n    if (w.inputs.ESTOP_OK===true && prev.inputs.ESTOP_OK===false) push('INFO','E-STOP restored — chain healthy');\n    const inm = {START:'IN1 start_pb',STOP:'IN2 stop_pb',RESET:'IN4 reset_pb'};\n    ['START','STOP','RESET'].forEach(k => { if (w.inputs[k]!==prev.inputs[k]) push('INFO', inm[k]+' '+(w.inputs[k]?'asserted':'released')); });\n  }\n  if (w.relays && prev.relays) {\n    const nm = {QX0:'RELAY 1 (motor)',QX1:'RELAY 2 (run light)',QX2:'RELAY 3 (phone alarm)',QX3:'RELAY 4 (fault lamp)',SSR1:'SSR1',SSR2:'SSR2'};\n    ['QX0','QX1','QX2','QX3','SSR1','SSR2'].forEach(k => {\n      if (w.relays[k]!==prev.relays[k]) {\n        const on = w.relays[k];\n        if (k==='QX0' && on && w.inputs && !w.inputs.START && w.mode!=='RUN')\n          push('SEC','RELAY 1 energized with no local START — possible network/forced write (Modbus has no auth, CWE-306)');\n        else push('INFO', nm[k]+' → '+(on?'ON':'OFF'));\n      }\n    });\n  }\n  if (w.phoneStale===true && prev.phoneStale!==true) push('WARN','Phone sensor point went stale (>8 s) — value frozen at last sample');\n  if (w.phoneStale===false && prev.phoneStale===true) push('INFO','Phone sensor point fresh again');\n}\nflow.set('prev', JSON.parse(JSON.stringify(w)));\n\nlet log = flow.get('log') || [];\nif (ev.length) { ev.forEach(e => { const id=(flow.get('eid')||0)+1; flow.set('eid',id); e.id=id; log.unshift(e); }); if (log.length>60) log=log.slice(0,60); flow.set('log',log); }\n\nif (w.mode == null) return null;   // wait until the first HR read\nconst r1 = x => Math.round(x*10)/10;\nmsg.payload = {\n  mode:w.mode, modeClass:w.modeClass, hb:w.hb, scan:w.scan, faults:w.faults, forces:w.forces,\n  temp:r1(w.temp||0), sp:r1(w.sp||0), lux:Math.round(w.lux||0), acc:r1(w.acc||0), tilt:Math.round(w.tilt||0),\n  btn1:!!w.btn1, btn2:!!w.btn2, relays:w.relays||{}, inputs:w.inputs||{}, clock:T(), log:log\n};\nreturn msg;",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,
         "initialize": "",
         "finalize": "",
         "libs": [],
-        "x": 380,
-        "y": 860,
+        "x": 430,
+        "y": 270,
         "wires": [
             [
-                "ui_di"
+                "ui_dash"
             ]
         ],
         "z": "f_hmi"
     },
     {
-        "id": "ui_pbtn",
+        "id": "ui_dash",
         "type": "ui_template",
-        "group": "g_phone",
-        "name": "Phone buttons",
-        "order": 4,
-        "width": 6,
-        "height": 2,
-        "format": "<style>.drow{display:flex;gap:10px}.di{flex:1 1 70px;text-align:center;padding:8px 4px;border-radius:8px;background:#1b2330;color:#9fb0c3;font:600 12px system-ui}.di .dot{width:14px;height:14px;border-radius:50%;margin:0 auto 6px;background:#30405a}.di.on{color:#eaf6ff}.di.on .dot{background:#b084ff;box-shadow:0 0 10px #b084ff}</style>\n<div class=\"drow\">\n  <div class=\"di\" ng-class=\"{on:msg.payload.BTN1}\"><div class=\"dot\"></div>phone_btn1 (reg 157)</div>\n  <div class=\"di\" ng-class=\"{on:msg.payload.BTN2}\"><div class=\"dot\"></div>phone_btn2 (reg 158)</div>\n</div>",
-        "storeOutMessages": true,
-        "fwdInMessages": true,
-        "resendOnRefresh": true,
-        "templateScope": "local",
-        "className": "",
-        "x": 650,
-        "y": 780,
-        "wires": [
-            []
-        ],
-        "z": "f_hmi"
-    },
-    {
-        "id": "ui_di",
-        "type": "ui_template",
-        "group": "g_in",
-        "name": "Input LEDs",
+        "group": "g_main",
+        "name": "Plant HMI",
         "order": 1,
-        "width": 6,
-        "height": 2,
-        "format": "<style>\n.drow{display:flex;flex-wrap:wrap;gap:10px}\n.di{flex:1 1 70px;text-align:center;padding:8px 4px;border-radius:8px;background:#1b2330;color:#9fb0c3;font:600 12px system-ui}\n.di .dot{width:14px;height:14px;border-radius:50%;margin:0 auto 6px;background:#30405a}\n.di.on{color:#eaf6ff}.di.on .dot{background:#4aa3ff;box-shadow:0 0 10px #4aa3ff}\n.di.phone.on .dot{background:#b084ff;box-shadow:0 0 10px #b084ff}\n</style>\n<div class=\"drow\">\n  <div class=\"di\" ng-class=\"{on:msg.payload.START}\"><div class=\"dot\"></div>IN1 start_pb</div>\n  <div class=\"di\" ng-class=\"{on:msg.payload.STOP}\"><div class=\"dot\"></div>IN2 stop_pb</div>\n  <div class=\"di\" ng-class=\"{on:msg.payload.ESTOP_OK}\"><div class=\"dot\"></div>IN3 estop_ok (NC: lit = healthy)</div>\n  <div class=\"di\" ng-class=\"{on:msg.payload.RESET}\"><div class=\"dot\"></div>IN4 reset_pb</div>\n</div>",
+        "width": 25,
+        "height": 16,
+        "format": "<style>\n.cs{--bg:#0b1220;--panel:#111a28;--pan2:#0f1724;--line:#243049;--mut:#7d8ba3;--ink:#eaf6ff;\n  font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,sans-serif;color:var(--ink);\n  background:var(--bg);width:100%;box-sizing:border-box}\n.cs *{box-sizing:border-box}\n.cs .hdr{display:flex;align-items:center;gap:14px;padding:10px 16px;background:linear-gradient(90deg,#0f7a86,#0b5a63);border-radius:10px;margin-bottom:10px}\n.cs .hdr .logo{font-weight:800;font-size:18px;letter-spacing:.02em}\n.cs .hdr .sub{color:#bfe9ee;font-size:12.5px}\n.cs .hdr .sp{flex:1}\n.cs .pill{display:inline-block;padding:4px 14px;border-radius:999px;font-weight:800;font-size:15px;color:#0d1117}\n.cs .m-RUN{background:#39d98a}.cs .m-IDLE{background:#f0c33e}.cs .m-BOOT{background:#9fb0c3}\n.cs .m-FAULT{background:#ff5d5d;color:#fff}.cs .m-UNK{background:#9fb0c3}\n.cs .comms{font-size:13px;color:#eafff6}.cs .comms .d{color:#aeffd9}\n.cs .grid{display:grid;grid-template-columns:1.15fr 1fr;grid-auto-rows:min-content;gap:10px}\n.cs .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px}\n.cs .card h3{margin:0 0 9px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);font-weight:700}\n.cs .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-bottom:10px}\n.cs .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px}\n.cs .kpi .l{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:700}\n.cs .kpi .v{font-size:21px;font-weight:800;margin-top:2px;line-height:1.1}\n.cs .kpi .u{font-size:11px;color:var(--mut);font-weight:600}\n.cs .kpi.alarm{border-color:#ff5d5d;background:#241315}.cs .kpi.warn{border-color:#f0a33e;background:#241e12}\n.cs .bars{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}\n.cs .bar .t{display:flex;justify-content:space-between;font-size:12px;color:#c4d0e0;margin-bottom:4px}\n.cs .bar .t b{color:var(--ink);font-weight:800;font-size:13px}\n.cs .bar .track{height:8px;background:#0b1320;border:1px solid var(--line);border-radius:6px;overflow:hidden}\n.cs .bar .fill{height:100%;background:linear-gradient(90deg,#2bd47f,#39d98a)}\n.cs .bar.warnf .fill{background:linear-gradient(90deg,#f0c33e,#ffd56b)}\n.cs .leds{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}\n.cs .led{text-align:center;padding:8px 3px;border-radius:8px;background:var(--pan2);border:1px solid #1d2941;color:#8fa0b8;font-weight:700;font-size:11px}\n.cs .led .dot{width:13px;height:13px;border-radius:50%;margin:0 auto 5px;background:#2a3952;box-shadow:inset 0 0 3px #000}\n.cs .led.on{color:var(--ink);border-color:#2f6b4e}.cs .led.on .dot{background:#39d98a;box-shadow:0 0 9px #39d98a}\n.cs .led.estop.on{border-color:#7a2f2f}.cs .led.estop.on .dot{background:#ff5d5d;box-shadow:0 0 9px #ff5d5d}\n.cs .led.in.on .dot{background:#4aa3ff;box-shadow:0 0 9px #4aa3ff}\n.cs .led.ph.on .dot{background:#b084ff;box-shadow:0 0 9px #b084ff}\n.cs .led small{display:block;font-size:8.5px;color:#6f7f98;font-weight:600;margin-top:1px}\n.cs .logwrap{display:flex;flex-direction:column;min-height:0}\n.cs .log{flex:1;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--pan2);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}\n.cs .lrow{display:grid;grid-template-columns:66px 54px 1fr;gap:7px;align-items:center;padding:6px 10px;border-bottom:1px solid #18212f}\n.cs .lrow:last-child{border-bottom:none}\n.cs .lrow .lt{color:#6f7f98}.cs .lrow .lb{justify-self:start;padding:1px 7px;border-radius:5px;font-weight:800;font-size:10px;font-family:-apple-system,sans-serif}\n.cs .s-INFO .lb{background:#22304a;color:#9fc0ff}\n.cs .s-WARN{background:#1f1a10}.cs .s-WARN .lb{background:#6a4a12;color:#ffd58a}.cs .s-WARN .lm{color:#ffe6bd}\n.cs .s-ALARM{background:#241113}.cs .s-ALARM .lb{background:#7a1f22;color:#ff9ea0}.cs .s-ALARM .lm{color:#ffc9cb}\n.cs .s-SEC{background:#1c1226}.cs .s-SEC .lb{background:#5a2a86;color:#e0b6ff}.cs .s-SEC .lm{color:#eccbff}\n.cs .empty{color:#6f7f98;padding:16px;text-align:center}\n.cs .ph{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;text-align:center}\n.cs .ph .pv{background:var(--pan2);border:1px solid #1d2941;border-radius:8px;padding:8px 4px}\n.cs .ph .pv .pl{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;font-weight:700}\n.cs .ph .pv .pn{font-size:18px;font-weight:800;margin-top:2px}.cs .ph .pv .pu{font-size:10px;color:var(--mut)}\n.cs .colL{display:flex;flex-direction:column;gap:10px}\n.cs .colR{display:flex;flex-direction:column;gap:10px;min-height:0}\n</style>\n<div class=\"cs\" ng-init=\"d=msg.payload||{}\">\n  <div class=\"hdr\">\n    <span class=\"logo\">&#9893; CS460 Plant HMI</span>\n    <span class=\"sub\">PLC 10.20.30.10 &middot; Modbus/TCP :502</span>\n    <span class=\"pill\" ng-class=\"'m-'+(msg.payload.modeClass||'UNK')\">{{msg.payload.mode||'&mdash;'}}</span>\n    <span class=\"sp\"></span>\n    <span class=\"comms\"><span class=\"d\">&#9679;</span> live &middot; {{msg.payload.clock}}</span>\n  </div>\n  <div class=\"kpis\">\n    <div class=\"kpi\"><div class=\"l\">Heartbeat</div><div class=\"v\">{{msg.payload.hb}}</div></div>\n    <div class=\"kpi\"><div class=\"l\">Scan max</div><div class=\"v\">{{msg.payload.scan}} <span class=\"u\">&micro;s</span></div></div>\n    <div class=\"kpi\" ng-class=\"{alarm:msg.payload.faults>0}\"><div class=\"l\">Faults</div><div class=\"v\">{{msg.payload.faults}}</div></div>\n    <div class=\"kpi\" ng-class=\"{warn:msg.payload.forces>0}\"><div class=\"l\">Forces</div><div class=\"v\">{{msg.payload.forces}}</div></div>\n    <div class=\"kpi\"><div class=\"l\">Temp</div><div class=\"v\">{{msg.payload.temp}} <span class=\"u\">&deg;C</span></div></div>\n    <div class=\"kpi\"><div class=\"l\">Setpoint</div><div class=\"v\">{{msg.payload.sp}} <span class=\"u\">&deg;C</span></div></div>\n  </div>\n  <div class=\"grid\">\n    <div class=\"colL\">\n      <div class=\"card\">\n        <h3>Process &amp; phone points (network-only)</h3>\n        <div class=\"bars\">\n          <div class=\"bar\"><div class=\"t\"><span>Temperature</span><b>{{msg.payload.temp}} &deg;C</b></div><div class=\"track\"><div class=\"fill\" ng-style=\"{width:(msg.payload.temp/80*100)+'%'}\"></div></div></div>\n          <div class=\"bar\"><div class=\"t\"><span>Setpoint</span><b>{{msg.payload.sp}} &deg;C</b></div><div class=\"track\"><div class=\"fill\" ng-style=\"{width:(msg.payload.sp/80*100)+'%'}\"></div></div></div>\n        </div>\n        <div class=\"ph\" style=\"margin-top:10px\">\n          <div class=\"pv\"><div class=\"pl\">Light</div><div class=\"pn\">{{msg.payload.lux}}</div><div class=\"pu\">lux</div></div>\n          <div class=\"pv\"><div class=\"pl\">Accel</div><div class=\"pn\">{{msg.payload.acc}}</div><div class=\"pu\">m/s&sup2;</div></div>\n          <div class=\"pv\"><div class=\"pl\">Tilt &beta;</div><div class=\"pn\">{{msg.payload.tilt}}</div><div class=\"pu\">&deg;</div></div>\n        </div>\n      </div>\n      <div class=\"card\">\n        <h3>Relays &amp; outputs</h3>\n        <div class=\"leds\">\n          <div class=\"led estop\" ng-class=\"{on:msg.payload.relays.ESTOP}\"><div class=\"dot\"></div>E-STOP</div>\n          <div class=\"led\" ng-class=\"{on:msg.payload.relays.QX0}\"><div class=\"dot\"></div>QX0<small>RELAY 1</small></div>\n          <div class=\"led\" ng-class=\"{on:msg.payload.relays.QX1}\"><div class=\"dot\"></div>QX1<small>RELAY 2</small></div>\n          <div class=\"led\" ng-class=\"{on:msg.payload.relays.QX2}\"><div class=\"dot\"></div>QX2<small>RELAY 3</small></div>\n          <div class=\"led\" ng-class=\"{on:msg.payload.relays.QX3}\"><div class=\"dot\"></div>QX3<small>RELAY 4</small></div>\n          <div class=\"led\" ng-class=\"{on:msg.payload.relays.SSR1}\"><div class=\"dot\"></div>SSR1</div>\n          <div class=\"led\" ng-class=\"{on:msg.payload.relays.SSR2}\"><div class=\"dot\"></div>SSR2</div>\n          <div class=\"led\" ng-class=\"{on:msg.payload.relays.RUN}\"><div class=\"dot\"></div>RUN</div>\n        </div>\n      </div>\n      <div class=\"card\">\n        <h3>Wired inputs IN1&ndash;IN8</h3>\n        <div class=\"leds\">\n          <div class=\"led in\" ng-class=\"{on:msg.payload.inputs.START}\"><div class=\"dot\"></div>IN1<small>start_pb</small></div>\n          <div class=\"led in\" ng-class=\"{on:msg.payload.inputs.STOP}\"><div class=\"dot\"></div>IN2<small>stop_pb</small></div>\n          <div class=\"led in\" ng-class=\"{on:msg.payload.inputs.ESTOP_OK}\"><div class=\"dot\"></div>IN3<small>estop_ok (NC)</small></div>\n          <div class=\"led in\" ng-class=\"{on:msg.payload.inputs.RESET}\"><div class=\"dot\"></div>IN4<small>reset_pb</small></div>\n          <div class=\"led ph\" ng-class=\"{on:msg.payload.btn1}\"><div class=\"dot\"></div>phone_btn1<small>reg 157</small></div>\n          <div class=\"led ph\" ng-class=\"{on:msg.payload.btn2}\"><div class=\"dot\"></div>phone_btn2<small>reg 158</small></div>\n        </div>\n      </div>\n    </div>\n    <div class=\"colR\">\n      <div class=\"card logwrap\" style=\"height:100%\">\n        <h3>&#9888; Events &amp; alarms &middot; <span style=\"color:#9fb0c3;text-transform:none;letter-spacing:0\">{{(msg.payload.log||[]).length}} events, newest first</span></h3>\n        <div class=\"log\">\n          <div class=\"lrow\" ng-class=\"'s-'+r.sev\" ng-repeat=\"r in msg.payload.log track by r.id\">\n            <span class=\"lt\">{{r.t}}</span><span class=\"lb\">{{r.sev}}</span><span class=\"lm\">{{r.m}}</span>\n          </div>\n          <div class=\"empty\" ng-if=\"!(msg.payload.log && msg.payload.log.length)\">Waiting for plant activity&hellip;</div>\n        </div>\n      </div>\n    </div>\n  </div>\n</div>",
         "storeOutMessages": true,
         "fwdInMessages": true,
         "resendOnRefresh": true,
         "templateScope": "local",
         "className": "",
-        "x": 650,
-        "y": 860,
+        "x": 660,
+        "y": 270,
         "wires": [
             []
         ],
