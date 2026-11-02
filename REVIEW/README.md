@@ -31,7 +31,7 @@ One fixed set of lenses, each answering a different question. A gap is usually a
 | Countermeasure | What defense stops/detects it? | **D3FEND** | yes |
 | Control (standard) | Required control + security level? | **ISA/IEC 62443** (FR/SL), **NIST 800-82/800-53/CSF** | **no** |
 | Engineering stance | Which CIE principle governs trust? | **CIE / CCE** | yes (objectives) |
-| AI/ML surface | Any ML/data-poisoning surface? | **ATLAS** | N/A today (Threat Map notes the hook) |
+| AI surface | Any AI/data-poisoning surface? | **ATLAS** (2026.10) | yes — extension **E4** (`ai-detector/`); 3 Threat-Map rows |
 | Supply chain | How is provenance established? | **SLSA / in-toto** | referenced (P7) |
 | Threat model (per flow) | What can go wrong on this flow? | **STRIDE** | **no** |
 | Chain reasoning | How links combine; where barriers sit? | **attack trees / bowtie**, ATT&CK-ICS kill-chain | implicit |

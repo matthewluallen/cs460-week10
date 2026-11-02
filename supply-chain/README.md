@@ -160,6 +160,18 @@ Those controls are not hypothetical here: the **hardened `m5stamplc_secure` buil
 refuses the unsigned OTA that Part 6 pushed, so this kill switch never reaches the device.
 You'll run exactly these attacks against that build and watch them fail in **Part 9**.
 
+### The AI add-on (extension E4): own the model source, own the decision
+
+The [E4 detector](../ai-detector/) has its own update source — a model registry — and the same
+story plays out. An attacker who can write to the registry doesn't touch any device; they **swap
+the model** (`attack.py swap-model`) for one whose alarm can never fire, or **poison** it. That is
+MITRE ATLAS **AML.T0010.003 AI Supply Chain Compromise: Model Repository** and **AML.T0018.000
+Poison AI Model** — the direct analog of this part's dormant-payload swap. The controls are the
+same shape too: a **signed** model the loader verifies (**AML.M0014**), and an **AI bill of
+materials** whose hashes reveal the swap (**AML.M0023**, built in Part 5 — `aibom.py --check`
+flags the drift). Run it and watch the `secure` loader refuse the swapped model. Details in
+[`ai-detector/README.md`](../ai-detector/README.md).
+
 ---
 
 ## Your finding (what you hand in for Part 7)

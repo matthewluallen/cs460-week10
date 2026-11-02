@@ -120,3 +120,18 @@ jobs:
         run: pip install z3-solver
       - name: Prove the controls (verified build)
         run: python formal-verify/verify_controls.py --profile verified --assert-proven
+
+  ai-detector:
+    # Extension E4: the AI anomaly-detector anchor. Offline (no twin, no broker) — trains both
+    # detector profiles on a simulated baseline and asserts the ATLAS attacks/mitigations: the
+    # model alone is evadable, the secure profile's fusion / provenance / signing controls hold.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the detector's dependencies
+        run: pip install -r ai-detector/requirements.txt
+      - name: Verify the AI detector (ATLAS E4)
+        run: python -I ai-detector/verify.py

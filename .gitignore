@@ -24,3 +24,9 @@ __pycache__/
 
 # firmware-re Ghidra output (generated)
 firmware-re/out/
+
+# E4 AI-detector: generated models, recordings, AI-BOM, local model registry
+ai-detector/out/
+ai-detector/registry/
+ai-detector/reg-vuln/
+ai-detector/**/__pycache__/

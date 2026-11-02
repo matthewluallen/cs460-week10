@@ -3,8 +3,10 @@
 Seeded from the three sources of truth at merge time. Blanks and ⚠ are candidate gaps to work in later
 stages. `—` = the framework entry is intentionally null/N-A in the source; **(blank)** = not mapped.
 
-## Matrix A — the 8 Threat-Map attacks × taxonomy
-(from `web/public/threat-map.html`, `ATTACKS[]`)
+## Matrix A — the 11 Threat-Map attacks × taxonomy
+(from `web/public/threat-map.html`, `ATTACKS[]`. ATLAS column = ATLAS 2026.10; `—` where no AI model is
+in the loop. The three AI cells come from extension **E4** (`ai-detector/`), which puts a machine-learning
+anomaly detector on the phone stream and ships its model through the Part 6/7 update path.)
 
 | # | Attack (Part) | EMB3D | CWE | CAPEC | ATT&CK ICS | CALDERA | D3FEND | ATLAS |
 |---|---|---|---|---|---|---|---|---|
@@ -15,7 +17,14 @@ stages. `—` = the framework entry is intentionally null/N-A in the source; **(
 | 5 | MQTT DCMD → coil (no broker auth) (P3) | TID-310 | 306, 862 | CAPEC-1 | T1692.001 | — | D3-MAN | — |
 | 6 | Buffer overflow → phantom relay force (P6/7) | TID-327 | 787, 788 | CAPEC-100 | **T0866 ⚠** | — | D3-SFCV | — |
 | 7 | Firmware extraction & RE (P5) | TID-115, 108 | 312, 1191 | CAPEC-37, 167 | T0845 | — | D3-DENCR | — |
-| 8 | Unauth phone-sensor → PLC input (P8) | TID-406, 310 | 345, 306 | CAPEC-594 | T1692.001, T0835 | — | D3-MAN | — |
+| 8 | Unauth phone-sensor → PLC input (P8) | TID-406, 310 | 345, 306 | CAPEC-594 | T1692.001, T0835 | — | D3-MAN | **T0015, T0043.003, T0041** · def M0009, M0015 |
+| 9 | Unsigned firmware update accepted (P6) | — | 347, 345, 319 | CAPEC-186 | T1693.001 | — | D3-MAN | **T0011.000** · def M0013, M0014 |
+| 10 | Supply-chain dormant payload (P7) | — | 506, 494 | CAPEC-439 | T0862 | — | — | **T0010.003, T0018.000** · def M0014, M0023 |
+| 11 | Rogue network time → Y2038 wrap (P8) | — | 197, 190, 191 | CAPEC-94 | T0830, T0815 | — | D3-MAN | — |
+
+**ATLAS note:** 8 of 11 rows are `—` because no AI model is in the loop — correct, not a gap (filling them
+would be a G9 overclaim). The three AI rows exist only because E4 adds a real model; `def M…` are ATLAS
+*mitigations* the `secure` detector profile implements. IDs verified against the ATLAS 2026.10 data release.
 
 **Lenses absent from every row (Stage-5 adopt-decisions, all G8):** ISA/IEC 62443 (FR/SL), NIST
 800-82/800-53/CSF, STRIDE, ATT&CK **Enterprise** (the HMI container / engineering station are IT, not

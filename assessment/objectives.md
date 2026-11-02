@@ -170,7 +170,24 @@ WRITE/FORCE log row — as the signature of an unaudited (memory-corruption) wri
 **integrity** attack (spoof its value), then **build a plausibility gate** and **prove** the
 legitimate reading still passes.
 - **Mapping:** ATT&CK **T1692.002** (Unauthorized Message: Reporting Message; formerly T0856 Spoof Reporting Message), **T0814** (Denial of Service),
-  **T0815** (Denial of View); ATLAS **AML.T0043** · CIE: every sensor value is a claim, not a fact.
+  **T0815** (Denial of View) · CIE: every sensor value is a claim, not a fact.
+  *(E3's plausibility gate is a rule, not a model, so no ATLAS technique applies here — ATLAS enters
+  in E4, when a machine-learning detector becomes the thing under attack.)*
+
+### E4 — AI anomaly detector on the phone-sensor stream `[offline]`
+**SWBAT** train a machine-learning anomaly detector on a normal-operation baseline, **evade the
+model alone** with an in-distribution spoof, then show the engineering controls that catch it —
+an accelerometer **cross-check**, training-data **provenance**, and a **signed** model artifact —
+and **state the residual risk** (same-source fusion is not independent corroboration).
+- **Mapping (MITRE ATLAS 2026.10):** attacks **AML.T0015** Evade AI Model · **AML.T0043.003** Craft
+  Adversarial Data: Manual Modification · **AML.T0040** AI Model Inference API Access ·
+  **AML.T0041** Physical Environment Access · **AML.T0020** Training Data Poisoning ·
+  **AML.T0031** Erode AI Model Integrity · **AML.T0010.003 / T0018.000 / T0011.000** (model supply
+  chain, with Parts 5–7). Controls **AML.M0009** Multi-Sensor Fusion · **AML.M0015** Adversarial
+  Input Detection · **AML.M0007** Sanitize Training Data · **AML.M0025** Dataset Provenance ·
+  **AML.M0004 / M0002** query limits · **AML.M0013 / M0014** signing & artifact verification.
+  Anchor: `ai-detector/verify.py` (and `assessment/verify-lab.py E4`). CIE: the detector's verdict
+  is one more claim, kept out of the actuation path.
 
 ---
 
