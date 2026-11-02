@@ -90,7 +90,10 @@ docker compose -f stations/docker-compose.yml up --build
 The first build is slow (it builds CALDERA's UI). Forwarded ports: **8800** (plant HMI),
 **8088** (Studio), **8888** (CALDERA UI, login `red`/`admin`). See
 [`stations/README.md`](../stations/README.md) and [`caldera/README.md`](../caldera/README.md).
-The core parts do **not** need this.
+
+**Machine size:** the twin plus the stations containers want a **4-core / 8 GB** Codespace —
+pick that size when you create the Codespace (or change it in the repo's Codespaces settings).
+The core lab (Parts 1–9) needs no Docker and is fine on the default 2-core / 4 GB machine.
 
 ---
 

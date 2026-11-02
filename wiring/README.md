@@ -14,8 +14,8 @@ twin**: boot it, drive the input, and read the output back — no bench, no team
 No bench and no team code — each student drives their own twin, which boots the real firmware:
 
 ```bash
-./qemu/run.sh        # boot your twin (leave it running)
-./qemu/console.sh    # the plc> console, in another shell
+./qemu/studio.sh     # boot your twin + serve the Logic Studio on :8088 (leave it running)
+./qemu/console.sh    # the plc> console, in another shell (where `force`/`io` live)
 ```
 
 ### The factory program: motor start/stop + E-stop (fail-safe)

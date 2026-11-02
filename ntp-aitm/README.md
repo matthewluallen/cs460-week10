@@ -20,6 +20,9 @@ service's place.
 Tools (set up for you): the **twin** (`qemu/run.sh`), a **rogue SNTP server**
 ([`ntp_server.py`](ntp_server.py)), **curl**, and **nc**.
 
+> **Going further (optional):** `attacker/` runs the rogue time/update services as a
+> standalone container (its own `docker compose`) — see [`attacker/README.md`](../attacker/README.md).
+
 ---
 
 ## Before you start

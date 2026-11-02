@@ -13,6 +13,9 @@ You will run both images, measure the difference, and detonate the switch in the
 Tools (set up for you): the **twin** with **both** images, **python3**, and the mock C2
 "update server" in [`c2_server.py`](c2_server.py).
 
+> **Going further (optional):** `attacker/` packages the rogue update source as a realistic
+> standalone container (its own `docker compose`) — see [`attacker/README.md`](../attacker/README.md).
+
 ---
 
 ## Before you start
