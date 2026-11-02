@@ -189,7 +189,7 @@ and **state the residual risk** (same-source fusion is not independent corrobora
   Anchor: `ai-detector/verify.py` (and `assessment/verify-lab.py E4`). CIE: the detector's verdict
   is one more claim, kept out of the actuation path.
 
-### E5 — Automate the attack with CALDERA: red vs blue `[offline]`
+### E5 — Automate the attack with CALDERA: red vs blue `[stations]`
 **SWBAT** emulate the phone-sensor attack as a **MITRE CALDERA** operation — after an **emulated
 initial-access delivery** (a USB/phishing dropper) lands the agent on the engineer station — **read
 the kill chain and the attacker's event log**, and (paired with E4) **run it against the detector**
@@ -197,7 +197,7 @@ to show detection working, then explain what the automation adds over the manual
 - **Mapping (ATT&CK for ICS + CAPEC):** *initial access* **T0847** Replication Through Removable
   Media (**CAPEC-452**) / **T0865** Spearphishing Attachment (**CAPEC-163**), with **T0863** User
   Execution + **T1105** Ingress Tool Transfer; *operation* **T0846** Remote System Discovery →
-  **T0856** Spoof Reporting Message → **T0855** Unauthorized Command Message → **T0835** Manipulate
+  **T1692.002** Unauthorized Message: Reporting Message (formerly T0856) → **T1692.001** Unauthorized Message: Command Message (formerly T0855) → **T0835** Manipulate
   I/O Image. Tooling: **CALDERA** with a custom MQTT ability (caldera-ot ships no MQTT plugin).
   Pairs with E4 (the ATLAS detection it tests) and with Module 4's Caldera work. Anchor: the
   operation's event log via `stations/caldera/run-scenario.py`. CIE: consequence reduction must

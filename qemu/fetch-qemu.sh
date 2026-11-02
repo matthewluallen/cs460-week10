@@ -4,7 +4,7 @@
 # Optional — only needed to run the firmware in QEMU (see ../docs/QEMU-Twin.md).
 set -euo pipefail
 REPO="${QEMU_TWIN_REPO:-matthewluallen/cs460-week10}"
-TAG="${QEMU_TWIN_TAG:-qemu-twin-v1}"
+TAG="${QEMU_TWIN_TAG:-qemu-twin-v2}"   # v2 adds the esp32_i2c_observe trace event (live I2C bus-capture fix)
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DEST="$HERE/twin"
 mkdir -p "$DEST"

@@ -7,8 +7,9 @@ any host with python3 (the Sandcat agent assumes nothing). Mirrors the broker th
 controller subscribes to; whatever is published to phone/<id>/<topic> lands in the controller's
 network-only phone points (Modbus 140-165).
 
-ATT&CK for ICS: T0856 Spoof Reporting Message (analog topics) / T0855 Unauthorized Command
-Message (the button topics) -> T0835 Manipulate I/O Image. CWE-345 / CWE-306.
+ATT&CK for ICS: T1692.002 Unauthorized Message: Reporting Message (analog topics; formerly T0856)
+/ T1692.001 Unauthorized Message: Command Message (button topics; formerly T0855)
+-> T0835 Manipulate I/O Image. CWE-345 / CWE-306.
 
     python3 mqtt_spoof.py --broker 10.20.30.40:1883 --id ph-abc12 --topic light --message '{"lux":60000}'
     python3 mqtt_spoof.py --broker 10.20.30.40:1883 --topic phone/ph-abc12/btn1 --message '{"v":1}'

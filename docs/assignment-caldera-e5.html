@@ -24,7 +24,7 @@
 <li><strong>SAY</strong> &mdash; what the automation adds over the manual E3 attack: repeatability, the technique IDs, and a <strong>record</strong> an analyst can read. Name each kill-chain stage and its technique.</li>
 <li><strong>WHY</strong> &mdash; the event log is the attacker&rsquo;s view; the defender gets the capture and the controller state. Which lens would a blue team actually have?</li>
 </ul>
-<p style="font-size:14px;"><strong>Maps to:</strong> ATT&amp;CK for ICS <strong>T0846 Remote System Discovery</strong> &rarr; <strong>T0856 Spoof Reporting Message</strong> &rarr; <strong>T0855 Unauthorized Command Message</strong> &rarr; <strong>T0835 Manipulate I/O Image</strong>. Tooling: CALDERA with a <em>custom</em> MQTT ability (<code>caldera-ot</code> has no MQTT plugin).</p>
+<p style="font-size:14px;"><strong>Maps to:</strong> ATT&amp;CK for ICS <strong>T0846 Remote System Discovery</strong> &rarr; <strong>T1692.002 Unauthorized Message: Reporting Message</strong> (formerly T0856) &rarr; <strong>T1692.001 Unauthorized Message: Command Message</strong> (formerly T0855) &rarr; <strong>T0835 Manipulate I/O Image</strong>. Tooling: CALDERA with a <em>custom</em> MQTT ability (<code>caldera-ot</code> has no MQTT plugin).</p>
 
 <h3 style="color:#13325b;">Attack C &mdash; Red vs blue: run it against the E4 detector</h3>
 <p>If you built <strong>E4</strong>, this is the payoff. Start the detector (<code>ai-detector/detect.py</code>) against the broker, then run the CALDERA operation again and watch the detector&rsquo;s verdicts. The naive spoof is flagged; the <em>crafted</em> spoof (edit the fact source to a gentle, in-range value) slips past the model and is caught only by the accelerometer cross-check.</p>

@@ -27,8 +27,8 @@ IDs match the Threat Map.
   engineer station (10.20.30.30) ◀── agent beacons ─┘
         │  Sandcat agent runs the operation:
         │     1. T0846  Discover the MQTT broker
-        │     2. T0856  Spoof a phone sensor reading   ─┐  forged
-        │     3. T0855  Spoof a phone button (command) ─┤  phone/<id>/… →
+        │     2. T1692.002  Spoof a phone sensor reading   ─┐  forged
+        │     3. T1692.001  Spoof a phone button (command) ─┤  phone/<id>/… →
         ▼                                               ▼
   mqtt broker (10.20.30.40) ──────────────────▶ the StampLC controller (10.20.30.10)
                                                  ingests them as network points (T0835
@@ -69,7 +69,7 @@ source. The REST script and the UI do the same thing; the script is what CI / gr
 | File | What it is |
 |---|---|
 | `plugins/mqtt_phone/data/abilities/discovery/…`  | **T0846** Discover the MQTT broker |
-| `plugins/mqtt_phone/data/abilities/impair-process-control/…` | **T0856** Spoof sensor reading · **T0855** Spoof button (command) |
+| `plugins/mqtt_phone/data/abilities/impair-process-control/…` | **T1692.002** Spoof sensor reading · **T1692.001** Spoof button (command) (formerly T0856/T0855) |
 | `plugins/mqtt_phone/data/adversaries/…` | the ordered profile: discover → spoof → command |
 | `plugins/mqtt_phone/data/sources/…` | the facts (broker, phone id, sensor, value) you edit to retarget |
 | `plugins/mqtt_phone/data/payloads/mqtt_spoof.py` | no-deps raw-socket MQTT publisher the abilities run |

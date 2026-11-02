@@ -43,14 +43,22 @@ pip3 install --quiet flawfinder 2>/dev/null || pip3 install --quiet --break-syst
 # Pre-cache the mirror CVE data so the first Exercise-3 scan is quick. json-mirror = cve-bin-tool's
 # public CVE snapshot (no NVD key, no NVD API). GAD (GitLab advisories) is disabled: its multi-doc
 # YAML crashes cve-bin-tool's parser. Non-fatal; the offline 'strings' proof always works.
-if command -v cve-bin-tool >/dev/null 2>&1; then
-  echo "==> Pre-caching the CVE mirror + warming the Exercise-3 scan (no NVD key needed)…"
+# OPT-IN only: this pre-cache is HEAVY (~8 GB RAM, several minutes building cve-bin-tool's CVE DB)
+# and was long enough to abort Codespace setup before the remaining tools (tshark, sigrok, z3,
+# pio…) installed — leaving a half-provisioned container. It is purely an optimization: Part 5
+# Exercise 3 builds the same data on demand (sbom/run_cve_bin_tool.sh). So it is OFF by default;
+# set CS460_PRECACHE_CVE=1 (e.g. a Codespaces secret) to pre-cache during setup.
+if [ "${CS460_PRECACHE_CVE:-0}" = "1" ] && command -v cve-bin-tool >/dev/null 2>&1; then
+  echo "==> Pre-caching the CVE mirror + warming the Exercise-3 scan (CS460_PRECACHE_CVE=1)…"
   FW=sbom/firmware/prebuilt/stamplc-factory-8MB.bin
   mkdir -p sbom/out
   { [ -f "$FW" ] && PATH="$HOME/.local/bin:$PATH" cve-bin-tool "$FW" -n json-mirror --disable-data-source GAD \
       -f html -o sbom/out/cve-bin-tool-firmware.html >/dev/null 2>&1 \
       && echo "   CVE mirror cached; report pre-generated at sbom/out/cve-bin-tool-firmware.html"; } \
     || echo "   (CVE mirror pre-cache skipped — run 'bash sbom/run_cve_bin_tool.sh' later)"
+else
+  echo "==> Skipping the optional CVE-mirror pre-cache (heavy). Part 5 Exercise 3 builds it on demand:"
+  echo "    bash sbom/run_cve_bin_tool.sh   (or set CS460_PRECACHE_CVE=1 to pre-cache during setup)."
 fi
 
 echo "==> Installing bus & network tooling (sigrok-cli, tshark, nc, cppcheck)…"

@@ -2142,7 +2142,7 @@ const HARDWARE_CATALOG = [
   ].map(([id, title, address]) => ({
     id, title, status: 'bench-tool-only', bindableFields: [], locations: [{bus: 0, addresses: [address]}],
     limits: 'Represented in bench tooling; no native StampPLC acquisition binding is implemented. Presence or a spoofing preset does not establish driver support.',
-    sources: ['bus-analysis/pahub-controller/src/main.cpp', 'bus-analysis/sensor-spoofer/src/main.cpp']
+    sources: []
   }))
 ];
 

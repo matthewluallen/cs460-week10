@@ -9,8 +9,8 @@
     as fresh as a real one. CWE-345 (insufficient verification of data authenticity) / CWE-306
     (missing authentication). The effect on the controller is T0835 Manipulate I/O Image.
   tactic: impair-process-control
-  technique_id: T0856
-  technique_name: Spoof Reporting Message
+  technique_id: T1692.002
+  technique_name: "Unauthorized Message: Reporting Message"
   executors:
   - platform: linux
     name: sh

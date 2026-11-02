@@ -14,8 +14,8 @@ twin**: boot it, drive the input, and read the output back — no bench, no team
 No bench and no team code — each student drives their own twin, which boots the real firmware:
 
 ```bash
-./qemu/run.sh        # boot your twin (leave it running)
-./qemu/console.sh    # the plc> console, in another shell
+./qemu/studio.sh     # boot your twin + serve the Logic Studio on :8088 (leave it running)
+./qemu/console.sh    # the plc> console, in another shell (where `force`/`io` live)
 ```
 
 ### The factory program: motor start/stop + E-stop (fail-safe)
@@ -147,11 +147,7 @@ own twin.
   "add an AtomS3 to drive the input" idea: `force` needs no second device, no loop‑voltage
   supply, and no power for a remote student.[^atom])
 
-[^atom]: **Not the same Atom you meet elsewhere.** The dropped idea was an AtomS3 wired to
-    *inject the DI 0 input* for this part. It is **not** the Atom **sensor spoofer**
-    (`bus-analysis/sensor-spoofer`, an AtomS3 Lite that impersonates an I²C sensor) you use in
-    Part 3. That spoofer sits **out‑of‑band** on the sensor bus and is a separate exercise;
-    here in Part 1 there is no Atom at all — the input is `force`d in software.
+[^atom]: **Why no second device here.** The dropped "add an AtomS3 to drive the input" idea is not needed in Part 1 — there is no Atom here at all. The input is `force`d in software, which needs no second device, no loop-voltage supply, and no power.
 
 > **Relay names.** The board prints **RELAY 1–4**; the firmware calls them **relay0–relay3**.
 > Names like `motor` or `run_light` are *labels a PLC program gives a relay* (the factory program
