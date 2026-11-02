@@ -88,7 +88,9 @@ docker compose -f stations/docker-compose.yml up --build
 ```
 
 The first build is slow (it builds CALDERA's UI). Forwarded ports: **8800** (plant HMI),
-**8088** (Studio), **8888** (CALDERA UI, login `red`/`admin`). See
+**8088** (Studio), **8888** (CALDERA UI, login `red`/`admin`), **8090** (phone-sensor bridge —
+made **Public** automatically at Codespace start so the E3 phone can reach it; if your org blocks
+public ports, set **8090** to Public yourself in the **Ports** tab). See
 [`stations/README.md`](../stations/README.md) and [`caldera/README.md`](../caldera/README.md).
 
 **Machine size:** the twin plus the stations containers want a **4-core / 8 GB** Codespace —

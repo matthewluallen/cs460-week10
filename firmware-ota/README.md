@@ -111,8 +111,8 @@ from the client's numeric IP, which can't contain `../`. The weakness lives else
 HMI **log viewer** builds a file path straight from your input with no sanitization. The
 sanitizer is switched off by a build flag, and the path is then concatenated raw:
 
-- **Define:** `sbom/firmware/src/config.h:133` — `#define LOG_VIEWER_PATH_SANITIZE 0`
-- **Bad build:** `sbom/firmware/src/web_hmi.cpp:86` — `String filepath = String(LOG_DIR) + "/" + filename;`
+- **Define:** `sbom/firmware/src/config.h:135` — `#define LOG_VIEWER_PATH_SANITIZE 0`
+- **Bad build:** `sbom/firmware/src/web_hmi.cpp:158` — `String filepath = String(LOG_DIR) + "/" + filename;`
   (`LOG_DIR` is `"/logs"`; `filename` comes straight from `?file=`, so `../` is kept verbatim)
 
 You can read those two lines in the source, and watch the device accept an un-sanitized

@@ -29,7 +29,7 @@ command -v pio   >/dev/null && echo "  platformio  : OK" || echo "  platformio  
 if ls qemu/twin/qemu-twin-*/qemu-system-xtensa >/dev/null 2>&1 && [ -f qemu/twin/stamplc-flash-8MB.bin ]; then
   echo "  twin        : ready  ->  ./qemu/studio.sh   (twin + Studio + console, one command)"
 else
-  echo "  twin        : not fetched ->  ./qemu/fetch-qemu.sh   (needed for Parts 6-9)"
+  echo "  twin        : not fetched ->  ./qemu/fetch-qemu.sh   (needed for Part 1 + Parts 6-9)"
 fi
 echo
 echo "Open README.md and work the parts in order."
