@@ -32,8 +32,13 @@ Feature set (all verified in CI qualification):
   stripped — so the binary loads with only glib/pixman/slirp/gcrypt present.
 
 ## Builds
-- **x86_64** was built this way in a Codespace and is live on `qemu-twin-v2`
-  (sha256 `85c1ab63…`, 4,378,120 B), full CI green.
-- **arm64** is built + qualified natively by `.github/workflows/twin-arm64.yml`
-  on an `ubuntu-24.04-arm` runner. Dispatch it, confirm green, then
-  `gh release upload qemu-twin-v2 qemu-twin-linux-arm64.tar.xz --clobber`.
+Both arches rebuild + qualify from THIS source via dispatch-only workflows, so the
+shipped binary is never un-rebuildable again:
+- **x86_64** — `.github/workflows/twin-x86_64.yml` (`ubuntu-latest`). Live on
+  `qemu-twin-v2`: sha256 `85c1ab63…`, 4,378,120 B.
+- **arm64** — `.github/workflows/twin-arm64.yml` (`ubuntu-24.04-arm`). Live on
+  `qemu-twin-v2`: sha256 `5bf0de32…`, 23,047,488 B.
+
+To re-ship either: dispatch its workflow, confirm green, download the artifact, then
+`gh release upload qemu-twin-v2 <asset> --clobber` (release upload must run off a
+normal gh, e.g. a laptop — the Claude Code sandbox can't upload release assets).

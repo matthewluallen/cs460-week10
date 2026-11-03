@@ -1,0 +1,86 @@
+name: twin-x86_64 build+qualify
+
+# Builds the reconstructed StamPLC QEMU twin for linux/x86_64 NATIVELY on a GitHub
+# ubuntu-latest runner (free for public repos) and runs the SAME qualification
+# the x86_64 twin passes (smoke + lab parts + twin-reuse + bridge-security incl.
+# /lcd 200 and FIELD_ANALOG). Source of truth: qemu/twin-src/recon/ (committed).
+# On green, download the artifact and `gh release upload qemu-twin-v2 ... --clobber`.
+# Manual dispatch only — this never touches the live release itself.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  x86_64-build-qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git ninja-build meson pkg-config \
+            libglib2.0-dev libpixman-1-dev libgcrypt20-dev libslirp-dev \
+            flex bison build-essential ca-certificates xz-utils sigrok-cli
+
+      - name: Build reconstructed x86_64 twin (slim, from committed source)
+        run: |
+          set -euxo pipefail
+          export QEMU_DIR="$HOME/qemu-esp"
+          bash qemu/twin-src/recon/qemu-esp32s3-fixes/apply_and_build.sh
+          OUT=qemu/twin/qemu-twin-linux-x86_64
+          mkdir -p "$OUT/pc-bios"
+          cp "$QEMU_DIR/build/qemu-system-xtensa" "$OUT/qemu-system-xtensa"
+          cp -r "$QEMU_DIR/pc-bios/." "$OUT/pc-bios/" 2>/dev/null || true
+          cp -r "$QEMU_DIR/build/pc-bios/." "$OUT/pc-bios/" 2>/dev/null || true
+          echo "=== built binary ==="
+          ls -la "$OUT/qemu-system-xtensa"
+          echo "=== ldd (must be slim) ==="
+          ldd "$OUT/qemu-system-xtensa" || true
+          "$OUT/qemu-system-xtensa" --version | head -1
+          "$OUT/qemu-system-xtensa" -M help | grep -i esp32s3 && echo "esp32s3-machine-OK"
+
+      - name: Package x86_64 tarball (artifact for reship)
+        run: |
+          set -eux
+          ( cd qemu/twin && tar cJf /tmp/qemu-twin-linux-x86_64.tar.xz qemu-twin-linux-x86_64 )
+          ls -la /tmp/qemu-twin-linux-x86_64.tar.xz
+          sha256sum /tmp/qemu-twin-linux-x86_64.tar.xz
+
+      - name: Flash image + runtime libs (keep OUR freshly-built twin)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eux
+          sudo apt-get install -y -qq libglib2.0-0 libpixman-1-0 libslirp0 libgcrypt20 libcap2-bin libpng16-16 xz-utils
+          gh release download qemu-twin-v2 -R matthewluallen/cs460-week10 -p 'stamplc-flash-8MB.bin.xz' -D qemu/twin --clobber
+          gh release download qemu-twin-v2 -R matthewluallen/cs460-week10 -p 'stamplc-flash-8MB-MALICIOUS.bin.xz' -D qemu/twin --clobber || true
+          xz -dkf qemu/twin/stamplc-flash-8MB.bin.xz
+          [ -f qemu/twin/stamplc-flash-8MB-MALICIOUS.bin.xz ] && xz -dkf qemu/twin/stamplc-flash-8MB-MALICIOUS.bin.xz || true
+          sudo setcap cap_net_bind_service=+ep qemu/twin/qemu-twin-linux-x86_64/qemu-system-xtensa || true
+
+      - name: Smoke-test the twin (boot invariants)
+        run: python qemu/smoke-test.py
+
+      - name: Verify lab parts on the twin
+        run: python assessment/verify-lab.py --boot-twin P1 P3 P4 P6 P8
+
+      - name: Already-running twin is reused, not re-booted
+        run: ./qemu/test-twin-status.sh
+
+      - name: Studio server bind/Origin/field (/lcd 200 + FIELD_ANALOG)
+        run: python3 qemu/test-bridge-security.py
+
+      - name: Upload qualified x86_64 twin
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-twin-linux-x86_64
+          path: /tmp/qemu-twin-linux-x86_64.tar.xz
+          retention-days: 7
