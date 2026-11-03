@@ -75,17 +75,26 @@ RUN npx --yes "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium \
 # 6) The v2 QEMU twin, staged OUT of the workspace mount at /opt/cs460/twin.
 #    (qemu/twin/ is overmounted by the repo at runtime, so the baked copy lives here and
 #    the thin runtime postCreate links it into qemu/twin instantly — no download.)
-#    .devcontainer/twin-assets/ is populated by the CI workflow before the build.
+#    .devcontainer/twin-assets/ is populated by the CI workflow before the build, with the
+#    tarball for THIS image's target arch (amd64 -> x86_64, arm64 -> arm64). The native
+#    arm64 twin lets Apple-Silicon Macs run the twin natively instead of under emulation.
 COPY .devcontainer/twin-assets/ /tmp/twin-assets/
-RUN mkdir -p /opt/cs460/twin \
- && tar xJf /tmp/twin-assets/qemu-twin-linux-x86_64.tar.xz -C /opt/cs460/twin \
- && xz -dkf /tmp/twin-assets/stamplc-flash-8MB.bin.xz \
- && cp /tmp/twin-assets/stamplc-flash-8MB.bin /opt/cs460/twin/ \
- && ( xz -dkf /tmp/twin-assets/stamplc-flash-8MB-MALICIOUS.bin.xz \
-        && cp /tmp/twin-assets/stamplc-flash-8MB-MALICIOUS.bin /opt/cs460/twin/ || true ) \
- && setcap cap_net_bind_service=+ep "$(ls /opt/cs460/twin/qemu-twin-linux-*/qemu-system-xtensa | head -1)" \
- && chown -R vscode:vscode /opt/cs460 \
- && rm -rf /tmp/twin-assets
+ARG TARGETARCH
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) TWIN_TARBALL=qemu-twin-linux-x86_64.tar.xz ;; \
+      arm64) TWIN_TARBALL=qemu-twin-linux-arm64.tar.xz ;; \
+      *) echo "unsupported TARGETARCH='${TARGETARCH}' (expected amd64 or arm64)" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /opt/cs460/twin; \
+    tar xJf "/tmp/twin-assets/${TWIN_TARBALL}" -C /opt/cs460/twin; \
+    xz -dkf /tmp/twin-assets/stamplc-flash-8MB.bin.xz; \
+    cp /tmp/twin-assets/stamplc-flash-8MB.bin /opt/cs460/twin/; \
+    ( xz -dkf /tmp/twin-assets/stamplc-flash-8MB-MALICIOUS.bin.xz \
+        && cp /tmp/twin-assets/stamplc-flash-8MB-MALICIOUS.bin /opt/cs460/twin/ || true ); \
+    setcap cap_net_bind_service=+ep "$(ls /opt/cs460/twin/qemu-twin-linux-*/qemu-system-xtensa | head -1)"; \
+    chown -R vscode:vscode /opt/cs460; \
+    rm -rf /tmp/twin-assets
 
 # 7) PlatformIO core + ESP32-S3 toolchain, warmed by one teaching build (caches
 #    ~/.platformio: platform, Xtensa toolchain, and libraries that both envs share).
