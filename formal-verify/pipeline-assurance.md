@@ -74,4 +74,4 @@ expressed as what the operator can trust:
 
 A pipeline that ships only PROVEN controls, attests their provenance, and documents the
 compensating controls at every boundary it does not own is what "formally verified updates"
-means here — and it is the subject of the Week 12 lab.
+means here — and it is the subject of the Part 10 lab (Week 12).

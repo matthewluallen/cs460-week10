@@ -1,10 +1,10 @@
-# Week 12 — Learning Objectives (measurable)
+# Part 10 (Week 12) — Learning Objectives (measurable)
 
 Level 3 of the security arc: from *fixing* a control to **proving** it, and reasoning about the
 CI/CD pipeline that carries the proof to a customer. All objectives are demonstrable with the
 Z3 engine in `formal-verify/` — no device needed (`[offline]`), because the proofs are about
 models of the firmware controls. Mapping key as in `../assessment/objectives.md`: MITRE
-ATT&CK-for-ICS / CWE / CIE principle. Verdicts use `assessment/verify-lab.py W12` and the
+ATT&CK-for-ICS / CWE / CIE principle. Verdicts use `assessment/verify-lab.py P10` and the
 `formal-verify` CI job as anchors.
 
 ## Course-level outcomes
@@ -33,6 +33,6 @@ By the end of Week 12 a student will be able to:
 
 ## Anchor
 
-`python assessment/verify-lab.py W12` reruns the Level-3 proof (`verify_controls.py --profile
+`python assessment/verify-lab.py P10` reruns the Level-3 proof (`verify_controls.py --profile
 verified --assert-proven`) as the mechanics check; the `formal-verify` CI job runs it on every
 change so a regression that re-opens a control fails the build.

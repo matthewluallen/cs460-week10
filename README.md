@@ -38,6 +38,7 @@ back here and start Part 1.
 | C · Break | 7 | **Supply-chain kill switch** — detonate a dormant OTA payload through a compromised update source; trace it to a relay | [`supply-chain/`](supply-chain/) | No (twin) |
 | C · Break | 8 | **NTP adversary-in-the-middle & Y2038** — spoof the unauthenticated network time the controller trusts; wrap its 32-bit clock to 1902 | [`ntp-aitm/`](ntp-aitm/) | No (twin) |
 | D · Secure | 9 | **Direct remediation and compensating controls** — preserve the vulnerable/secure build switch, compare a specific changed path or exposure control, and record its evidence and remaining limits | [`remediation/`](remediation/) | No (twin) |
+| D · Secure | 10 | **Formal verification** (Level 3, taught in Week 12) — prove each hardened control with the Z3 SMT solver and carry it through a CI/CD assurance pipeline | [`formal-verify/`](formal-verify/) · [`week12/`](week12/) | No |
 
 Work the parts in order; each builds on the last. In Part 1 you run **your own twin** and
 drive it from the **Logic Studio** in your browser — no teams, no shared bench, no hardware:
@@ -80,7 +81,7 @@ in the way and attacks *it* (ATLAS); E5 automates the whole attack as a red-team
 ICS, including how the attacker got in) and pits it against E4's detector. Run them together for the full
 loop — the same move you saw on the wind farm in Module 4, now on the controller you've been attacking by hand.
 
-### Week 12 — Level 3: formally verified updates
+### Part 10 (Week 12) — Level 3: formally verified updates
 
 A third security level beyond vulnerable/secure: each control is **proven** with the Z3 SMT
 solver (no device — the proofs are about models of the firmware controls) and carried through a

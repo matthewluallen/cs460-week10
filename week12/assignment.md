@@ -1,4 +1,4 @@
-# Week 12 assignment — Prove it, then compensate for what you can't
+# Part 10 (Week 12) assignment — Prove it, then compensate for what you can't
 
 **Goal.** Move from *fixing* a control to *proving* it, and then reason about the CI/CD pipeline
 and the system-of-systems boundaries where proof stops. Everything builds on
@@ -65,7 +65,7 @@ A short report (or a `finding.md` in your repo) with Parts A–D, plus:
 - for Part C, the diff and before/after proof output;
 - your individual contribution and any assistance.
 
-Run `python assessment/verify-lab.py W12` before you submit — it reruns the Level-3 proof as the
+Run `python assessment/verify-lab.py P10` before you submit — it reruns the Level-3 proof as the
 mechanics check. Graded on `week12/rubric.md`: the **mechanics** are the solver verdicts; the
 larger **reasoning** share is your attack narratives, the fidelity gap, and the
 compensating-control decisions with their residual risk.

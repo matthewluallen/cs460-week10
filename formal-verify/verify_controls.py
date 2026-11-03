@@ -23,7 +23,7 @@ Run it across the three build levels to see security *earned, then proven*:
 IMPORTANT (a cyber-informed-engineering point, not a disclaimer): this proves properties of a
 *model* of each control. The proof is only as good as the model's fidelity to the firmware. The
 model here is kept deliberately close to the C in sbom/firmware/src/ (same bound, same gate,
-same truncation), and Week 12 asks you to argue where model and implementation could diverge —
+same truncation), and Part 10 (Week 12) asks you to argue where model and implementation could diverge —
 that gap is exactly where a compensating control belongs. See pipeline-assurance.md.
 """
 import argparse, sys

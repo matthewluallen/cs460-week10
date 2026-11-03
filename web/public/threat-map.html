@@ -272,7 +272,7 @@ const ATTACKS = [
     key:'unsigned-ota', name:'Unsigned firmware update accepted', phase:'Part 6 · OTA',
     intro:`The update endpoint on <code>:80 /api/upload</code> takes bytes over cleartext HTTP with no login and <b>stores</b> them — it reports <code>verified=NO</code> but nothing authenticates the image. A malformed blob never boots (the boot-loader checks format), so the fingerprint is unchanged; a <i>well-formed</i> malicious image is Part 7.`,
     evidence:`$ ./firmware-ota/push-unsigned.sh\nendpoint accepted 22 bytes  →  verified=NO   (stored, not rejected)\n$ plc> diag json   →  elf_sha256 unchanged (the junk never ran)`,
-    fix:`Secure build requires auth + an HMAC-checked image (Part 9); Week 12 replaces the shared HMAC with public-key signatures + a build record.`,
+    fix:`Secure build requires auth + an HMAC-checked image (Part 9); Part 10 (Week 12) replaces the shared HMAC with public-key signatures + a build record.`,
     fw:{
       emb3d:null,
       cwe:[{id:'CWE-347',title:'Improper Verification of Cryptographic Signature'},{id:'CWE-345',title:'Insufficient Verification of Data Authenticity'},{id:'CWE-319',title:'Cleartext Transmission of Sensitive Information'}],
