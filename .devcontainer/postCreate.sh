@@ -117,6 +117,19 @@ node bus-analysis/tools/decode.js rtu-request bus-analysis/serial/physical-0-req
   && echo "   bus-analysis decoder OK" \
   || echo "   bus-analysis decoder FAILED — check Node install"
 
+echo "==> Installing Playwright headless Chromium (Part-2 ladder regression — verify-lab.py P2)…"
+# verify-lab.py P2 runs tools/studio-regression.js, which require()s playwright from the
+# repo root and launches headless Chromium. Installed into the gitignored ./node_modules
+# (no package.json / lockfile churn). Non-fatal: P2 SKIPs cleanly if the network blocks it.
+if command -v npm >/dev/null 2>&1; then
+  npm i --no-save --no-package-lock playwright >/dev/null 2>&1 \
+    && npx --yes playwright install --with-deps chromium >/dev/null 2>&1 \
+    && echo "   playwright + chromium OK" \
+    || echo "   playwright install skipped — verify-lab.py P2 will SKIP until:  npm i playwright && npx playwright install chromium"
+else
+  echo "   npm not found — skipping playwright (verify-lab.py P2 will SKIP until installed)"
+fi
+
 TWIN="not fetched (needed from Part 1 on; run ./qemu/fetch-qemu.sh)"
 [ -f qemu/twin/stamplc-flash-8MB.bin ] && TWIN="ready for $(uname -m)  →  ./qemu/run.sh"
 PIOST="not installed"
