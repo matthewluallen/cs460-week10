@@ -33,3 +33,6 @@ ai-detector/out/
 ai-detector/registry/
 ai-detector/reg-vuln/
 ai-detector/**/__pycache__/
+
+# cloudflared client downloaded on demand by mqtt/share.sh --tunnel
+mqtt/.cache/
