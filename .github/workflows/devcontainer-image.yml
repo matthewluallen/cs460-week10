@@ -1,0 +1,88 @@
+name: devcontainer image
+
+# Builds the prebuilt devcontainer image (.devcontainer/Dockerfile) and pushes it to
+# GHCR. This IS the "prebuild": it keeps a ready image warm so Codespaces and local
+# VS Code Dev Containers start from a pull instead of a ~10-minute build.
+#
+# Triggers:
+#   - push to main that touches the devcontainer or firmware -> publish :latest + :<sha>
+#   - push to a feature branch touching those paths           -> publish :<branch> (for validation)
+#   - weekly schedule                                         -> refresh tool/CVE layers
+#   - manual dispatch
+
+on:
+  push:
+    branches: [main, "feat/**", "chore/**", "fix/**"]
+    paths:
+      - ".devcontainer/Dockerfile"
+      - ".github/workflows/devcontainer-image.yml"
+      - "sbom/firmware/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 7 * * 1"   # Mondays 07:17 UTC — keep scanner/CVE layers fresh
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: devcontainer-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage the v2 QEMU twin into the build context
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .devcontainer/twin-assets
+          gh release download qemu-twin-v2 -R "${{ github.repository }}" \
+            -p 'qemu-twin-linux-x86_64.tar.xz' \
+            -p 'stamplc-flash-8MB.bin.xz' \
+            -D .devcontainer/twin-assets
+          gh release download qemu-twin-v2 -R "${{ github.repository }}" \
+            -p 'stamplc-flash-8MB-MALICIOUS.bin.xz' \
+            -D .devcontainer/twin-assets || echo "malicious image not published — baking without it"
+          ls -la .devcontainer/twin-assets
+
+      - name: Compute image name + tags
+        id: meta
+        run: |
+          repo_lc="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/${repo_lc}-devcontainer"
+          ref_slug="$(echo "${{ github.ref_name }}" | tr '/' '-' | tr -cd '[:alnum:]._-')"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "tags=${image}:latest,${image}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=${image}:${ref_slug}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache
+          cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache,mode=max
+
+      - name: Summary
+        run: |
+          echo "### Pushed devcontainer image" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
