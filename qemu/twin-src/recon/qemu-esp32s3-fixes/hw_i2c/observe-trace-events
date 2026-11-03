@@ -1,0 +1,1 @@
+esp32_i2c_observe(void *controller, const char *path, uint64_t seq, uint64_t epoch, int64_t virtual_ns, const char *event, int address, int direction, int data, int nack) "controller=%p path=%s seq=%" PRIu64 " epoch=%" PRIu64 " virtual_ns=%" PRId64 " event=%s address=%d direction=%d data=%d nack=%d"
