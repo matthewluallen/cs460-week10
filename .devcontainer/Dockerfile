@@ -49,13 +49,19 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # 3) SBOM / vulnerability scanners -> /usr/local/bin (pinned, matching postCreate.sh).
 ENV SYFT_VERSION=v1.55.0 GRYPE_VERSION=v0.121.0 TRIVY_VERSION=v0.58.0
+# syft + grype are required; trivy is an OPTIONAL second scanner (syft+grype cover
+# Exercise 2), so its installer's exit is tolerated — matching postCreate.sh.
 RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh  | sh -s -- -b /usr/local/bin "$SYFT_VERSION" \
  && curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin "$GRYPE_VERSION" \
- && curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "$TRIVY_VERSION"
+ && { curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "$TRIVY_VERSION" \
+      || echo "trivy optional — skipped (syft+grype cover Exercise 2)"; }
 
-# 4) Python assessment + SBOM libraries (Z3 proofs, Modbus, serial, SAST, CVE scan).
-RUN pip3 install --break-system-packages --no-cache-dir \
-      z3-solver pymodbus pyserial flawfinder gsutil cve-bin-tool
+# 4) Python assessment + SBOM libraries.
+#    z3-solver/pymodbus/pyserial are required; flawfinder/gsutil/cve-bin-tool are
+#    optional SAST/CVE extras (Part 5 Exercises 3-4), tolerated like postCreate.sh.
+RUN pip3 install --break-system-packages --no-cache-dir z3-solver pymodbus pyserial
+RUN pip3 install --break-system-packages --no-cache-dir flawfinder gsutil cve-bin-tool \
+ || echo "optional scanners (flawfinder/gsutil/cve-bin-tool) partially skipped"
 
 # 5) Playwright headless Chromium for the Part-2 ladder regression (verify-lab.py P2).
 #    Browser baked at a shared, world-readable path; OS deps installed here (needs root).
