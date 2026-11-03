@@ -46,6 +46,16 @@ if [ ! -x "$PIO" ]; then
 fi
 [ -x "$PIO" ] && sudo ln -sf "$PIO" "$BIN/pio" 2>/dev/null || true
 
+echo "==> Ensuring assessment libraries are importable (z3, pymodbus, pyserial)…"
+# The prebuilt image installs these into the PlatformIO penv (the python3 that ends up on PATH).
+# If an older cached image is missing them, self-heal by installing into the active python. This is
+# a no-op (fast import check) on a current image, so it does not slow normal startup.
+python3 -c "import z3, pymodbus, serial" 2>/dev/null \
+  && echo "   z3 + pymodbus + pyserial OK (baked)" \
+  || { echo "   installing z3-solver/pymodbus/pyserial into the active python…"; \
+       pip3 install --no-cache-dir z3-solver pymodbus pyserial >/dev/null 2>&1 \
+         && echo "   installed" || echo "   (install skipped — Part 10 needs: pip install z3-solver)"; }
+
 echo "==> Making Playwright require-able for verify-lab.py P2…"
 # The Chromium browser is baked at /ms-playwright (PLAYWRIGHT_BROWSERS_PATH is set in the image), so
 # this only installs the `playwright` npm package into ./node_modules (gitignored, --no-save). Pin it

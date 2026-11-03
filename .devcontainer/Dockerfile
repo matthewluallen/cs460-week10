@@ -106,6 +106,12 @@ ENV PATH=/home/vscode/.platformio/penv/bin:${PATH}
 COPY --chown=vscode:vscode sbom/firmware /tmp/fw
 RUN pio run -d /tmp/fw -e m5stamplc \
  && rm -rf /tmp/fw
+
+# 7b) The PlatformIO penv is now first on PATH (ENV above), so it is the python3/pip3 the lab
+#     uses at runtime. The assessment libraries were installed into the SYSTEM python in step 4,
+#     which this venv does not see — install them into the penv too so `import z3` (Part 10 formal
+#     verification) and pymodbus/pyserial (assessment/verify-lab.py) resolve for the on-PATH python.
+RUN pip install --no-cache-dir z3-solver pymodbus pyserial
 USER root
 
 LABEL org.opencontainers.image.title="CS460 Inside the Stack devcontainer" \
