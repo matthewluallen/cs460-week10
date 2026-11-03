@@ -8,8 +8,6 @@ name: twin-arm64 build+qualify
 # Manual dispatch only — this never touches the live release itself.
 
 on:
-  push:
-    branches: [feat/twin-arm64-recon]   # TEMP: auto-run qualification on this branch; revert to dispatch-only before merge
   workflow_dispatch:
 
 jobs:
