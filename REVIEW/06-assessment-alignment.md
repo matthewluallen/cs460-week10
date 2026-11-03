@@ -29,7 +29,7 @@ exists, is reasoning-weighted 40/60, and Part 9 already requires residual limits
 | E1 | provenance gap | `/api/log` line → source | OK | yes |
 | E2 | signal journey (5 lenses) | **— (none)** | reasoning-only | yes (per-lens can/can't) |
 | E3 | phone FDI + plausibility gate | **— (instructor-judged, CS1)** | no machine anchor | yes (gate + legit passes) |
-| W12 | formal proofs | `verify_controls.py` | OK | yes (residual-risk rule) |
+| P10 | formal proofs | `verify_controls.py` | OK | yes (residual-risk rule) |
 
 ## Gaps (typed)
 | # | Gap | Type | Fix | Pri |

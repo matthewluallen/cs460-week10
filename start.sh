@@ -15,6 +15,7 @@ CS460 Week 10 — StampLC: SBOM/HBOM + Bus & Firmware Analysis
   Part 8  ntp-aitm/       spoof network time; wrap the clock to 1902     (twin)
   D · Secure
   Part 9  remediation/    flip the secure build; watch the attacks fail  (twin)
+  Part 10 formal-verify/  prove every control with Z3 (Level 3, Week 12)  (no device)
 
 Helper scripts (Parts 6-9): short to type, annotated inside, and they print the
 full command before running it — so you see it without typing it. See qemu/README.md.

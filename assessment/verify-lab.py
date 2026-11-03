@@ -24,7 +24,7 @@ Part IDs follow the lab page (Build → Analyze → Break → Secure):
   A · Build    P1 wire & run · P2 ladder logic
   B · Analyze  P3 bus & network · P4 HBOM · P5 SBOM
   C · Break    P6 unsigned update · P7 supply chain · P8 NTP / Y2038
-  D · Secure   P9 harden (secure build)
+  D · Secure   P9 harden (secure build) · P10 prove (Z3 formal verification, Level 3 — Week 12)
 
 Verdicts:  PASS (observable achieved) · FAIL (not achieved) · SKIP (tool/target not available).
 Exit 0 iff no requested check FAILed (a SKIP is not a failure). The printed verdict is the
@@ -340,8 +340,8 @@ def P9_secure(c):
     ok = overflow_blocked and no_wrap
     return (PASS if ok else FAIL), f"overflow_blocked={overflow_blocked}, clock_no_wrap={no_wrap}"
 
-def W12_formal(_c):
-    """Offline (Week 12): Z3 proves all six security controls on the verified build (Level 3)."""
+def P10_formal(_c):
+    """Offline (Part 10, taught in Week 12): Z3 proves all six security controls on the verified build (Level 3)."""
     script = os.path.join(ROOT, "formal-verify", "verify_controls.py")
     if not os.path.exists(script):
         return SKIP, "formal-verify/verify_controls.py not present"
@@ -391,11 +391,12 @@ CHECKS = {
     "P8": (P8_ntp,    True,  "NTP AiTM / Y2038 wrap"),
     # Section D · Secure
     "P9": (P9_secure, True,  "Remediation — secure build refuses the attacks"),
-    "W12":(W12_formal,False, "Formal verification — Z3 proves all controls (Level 3)"),
+    "P10":(P10_formal,False, "Formal verification — Z3 proves all controls (Level 3)"),
     "E4": (E4_aidetector, False, "AI anomaly detector (ATLAS) — model evaded, secure controls hold"),
 }
 # Default set when none named: everything except P9 (which needs the secure target).
-DEFAULT = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"]
+# P10 (formal proof) is offline and runs on the verified profile, so it's always included.
+DEFAULT = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P10"]
 
 # ------------------------------------------------------------------ twin boot (for --boot-twin / CI)
 def boot_twin():

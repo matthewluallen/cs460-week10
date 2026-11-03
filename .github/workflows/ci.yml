@@ -107,7 +107,7 @@ jobs:
         run: python3 qemu/test-bridge-security.py
 
   formal-verify:
-    # Week 12 / Level 3: Z3 must prove every security control on the verified build. This is the
+    # Part 10 (Week 12) / Level 3: Z3 must prove every security control on the verified build. This is the
     # formal-verify stage of the assurance pipeline running as a CI gate — a regression that
     # re-opens a control (makes its violation satisfiable again) fails the build here.
     runs-on: ubuntu-latest

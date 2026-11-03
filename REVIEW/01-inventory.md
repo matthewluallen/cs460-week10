@@ -22,7 +22,7 @@ Every reviewable item in the project. `anchor` = the machine-checkable test that
 | E1 | Provenance Studio (event → source line + CWE; the provenance gap) | `web/public/provenance_studio.html` | none (G5) |
 | E2 | Signal Journey (one value across 5 lenses) | `web/public/signal_journey.html` | none (G5) |
 | E3 | Phone-as-sensor false-data injection (availability + integrity + plausibility gate) | `docs/assignment-phone-sensor-fdi.html` | none (graded prose) |
-| W12 | Formal verification (Z3 proofs; verified update pipeline) | `formal-verify/`, `week12/` | `verify_controls.py` |
+| P10 | Formal verification (Z3 proofs; verified update pipeline) | `formal-verify/`, `week12/` | `verify_controls.py` |
 
 ## C. Firmware weaknesses (the demonstrated vulnerabilities)
 | ID | Weakness | CWE | Twin-observable? |
@@ -81,5 +81,5 @@ Every reviewable item in the project. `anchor` = the machine-checkable test that
 | DOC1 | Lab page (Sections A–D, nine Parts) | Canvas / `web` fragments | source of truth #3 |
 | DOC2 | README, StampLC-User-Manual, QEMU-Twin | `README.md`, `docs/` | — |
 
-**Counts (v1):** 9 core Parts · 4 extension/W12 · 10 firmware weaknesses · 6 web tools · 12 script groups ·
+**Counts (v1):** 10 core Parts (P1–P10; P10 = Z3 formal verification, taught in Week 12) · extensions E1–E5 · 10 firmware weaknesses · 6 web tools · 12 script groups ·
 3 data artifacts · 4 assessment + 2 doc sets. Blanks in `anchor` = Stage-2 G5 candidates.

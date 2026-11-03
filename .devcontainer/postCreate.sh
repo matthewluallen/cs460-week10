@@ -77,7 +77,7 @@ pip3 install --quiet --break-system-packages pymodbus 2>/dev/null \
   || echo "   (pip pymodbus skipped — Part 6 notes the HMI fallback)"
 
 echo "==> Installing formal-verification + assessment tooling (Z3 solver, pyserial)…"
-# Week 12 / Level 3 proves the security controls with Z3 (formal-verify/verify_controls.py).
+# Part 10 (Week 12) / Level 3 proves the security controls with Z3 (formal-verify/verify_controls.py).
 # pyserial lets assessment/verify-lab.py drive a PHYSICAL StampLC over USB (the twin needs none).
 # Both non-fatal — 'pip install z3-solver pyserial' later if the network blocks it here.
 pip3 install --quiet --break-system-packages z3-solver pyserial 2>/dev/null \
@@ -158,7 +158,7 @@ echo
 echo "============================================================"
 echo " CS460 Weeks 10–12 lab ready."
 echo "   syft:  $(command -v syft  >/dev/null && echo installed || echo 'not installed')    grype: $(command -v grype >/dev/null && echo installed || echo 'not installed')"
-echo "   z3:    $(python3 -c 'import z3' 2>/dev/null && echo 'installed (Week 12 formal verification)' || echo 'not installed — pip install z3-solver')"
+echo "   z3:    $(python3 -c 'import z3' 2>/dev/null && echo 'installed (Part 10 formal verification)' || echo 'not installed — pip install z3-solver')"
 echo "   sigrok:$(command -v sigrok-cli >/dev/null && echo ' installed' || echo ' not installed')  tshark:$(command -v tshark >/dev/null && echo ' installed (capture: sudo tshark)' || echo ' not installed')  node: $(node --version)   python: $(python3 --version)"
 echo "   cve-bin-tool:$(command -v cve-bin-tool >/dev/null && echo ' installed' || echo ' not installed')  flawfinder:$(command -v flawfinder >/dev/null && echo ' installed' || echo ' not installed')  cppcheck:$(command -v cppcheck >/dev/null && echo ' installed' || echo ' not installed')  trivy:$(command -v trivy >/dev/null && echo ' installed' || echo ' optional/absent')"
 echo "   pio:   $PIOST"

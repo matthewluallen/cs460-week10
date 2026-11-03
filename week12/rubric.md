@@ -1,7 +1,7 @@
-# Week 12 — Assessment Rubric
+# Part 10 (Week 12) — Assessment Rubric
 
 Same stance as the rest of the lab: **a clean solver run is not a grade; the reasoning is.** The
-proofs are mechanical (Z3 returns PROVEN or a counterexample — `assessment/verify-lab.py W12`
+proofs are mechanical (Z3 returns PROVEN or a counterexample — `assessment/verify-lab.py P10`
 checks it); the grade is in the attack narratives, the fidelity analysis, and the
 compensating-control decisions.
 
@@ -9,7 +9,7 @@ compensating-control decisions.
 
 | Band | Share | Who checks it |
 |---|---|---|
-| Mechanics — the proofs ran and the code extension works | **35%** | `verify_controls.py` verdicts · `verify-lab.py W12` · the submitted diff |
+| Mechanics — the proofs ran and the code extension works | **35%** | `verify_controls.py` verdicts · `verify-lab.py P10` · the submitted diff |
 | Reasoning — the finding | **65%** | instructor, against the finding standard in `../assessment/rubric.md` |
 
 ## Per-part criteria (assignment Parts A–D)
@@ -39,7 +39,7 @@ while the underlying property stays unproven — naming what remains is the engi
 ```bash
 pip install z3-solver
 python formal-verify/verify_controls.py                       # the three-level matrix
-python assessment/verify-lab.py W12                           # the Level-3 mechanics check (exit 0)
+python assessment/verify-lab.py P10                           # the Level-3 mechanics check (exit 0)
 # Part C: apply the student's diff, then re-run their control:
 python formal-verify/verify_controls.py --control <name>
 ```

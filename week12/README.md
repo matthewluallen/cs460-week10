@@ -1,4 +1,4 @@
-# Week 12 — Formally verified updates & the assurance pipeline (Level 3)
+# Part 10 (Week 12) — Formally verified updates & the assurance pipeline (Level 3)
 
 Weeks 10–11 taught you to *find* a weakness (Level 1, the vulnerable build) and to *fix* it
 (Level 2, the secure build). This week is **Level 3**: you stop asserting that a control works
@@ -103,7 +103,7 @@ Keep one finding in your notebook. It must contain:
 3. **One compensating control** — boundary, control, MITRE technique, residual risk.
 
 **That is the required core of Week 12.** The verifier anchors are
-`python assessment/verify-lab.py W12` (runs the Level-3 proof) and the `formal-verify` CI job.
+`python assessment/verify-lab.py P10` (runs the Level-3 proof) and the `formal-verify` CI job.
 
 ---
 

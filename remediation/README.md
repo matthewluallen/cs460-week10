@@ -291,8 +291,8 @@ fixes is not a substitute for that evidence.
 
 ---
 
-**Next — Level 3 (Week 12): prove it.** This part *tests* that the secure build refuses each
-attack. [Week 12](../week12/) goes further: it **proves** each control with the Z3 SMT solver
+**Next — Part 10 (Level 3, Week 12): prove it.** This part *tests* that the secure build refuses each
+attack. [Part 10](../week12/) goes further: it **proves** each control with the Z3 SMT solver
 (the violation becomes unreachable for all inputs, not just the inputs you tried) and reasons
 about the CI/CD assurance pipeline and the compensating controls for the system-of-systems
 boundaries you can't prove. The engine is in [`formal-verify/`](../formal-verify/).

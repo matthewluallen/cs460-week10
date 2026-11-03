@@ -33,6 +33,6 @@ Z3 proves properties of a **model** of each control, not of the compiled C direc
 in `verify_controls.py` are kept deliberately close to the firmware in `sbom/firmware/src/`
 (same 32-byte bound, same REMOTE-mode gate, same 64-vs-32-bit store), but **the proof is only as
 strong as the model's fidelity to the implementation.** Closing that model↔implementation gap —
-and placing a compensating control wherever you can't — is the subject of the Week 12 lab
+and placing a compensating control wherever you can't — is the subject of the Part 10 lab (Week 12)
 ([`../week12/`](../week12/)). That gap is not a weakness of the method; recognizing it is the
 cyber-informed-engineering point.
