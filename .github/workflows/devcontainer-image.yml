@@ -4,10 +4,16 @@ name: devcontainer image
 # GHCR. This IS the "prebuild": it keeps a ready image warm so Codespaces and local
 # VS Code Dev Containers start from a pull instead of a ~10-minute build.
 #
+# Multi-arch: each arch is built on a NATIVE runner (ubuntu-24.04 for amd64,
+# ubuntu-24.04-arm for arm64 — both free on public repos), pushed by digest, then a
+# merge job assembles one multi-arch manifest. Native build avoids a slow emulated
+# PlatformIO toolchain build and keeps `setcap` working. The arm64 image lets
+# Apple-Silicon Macs run the lab (and the QEMU twin) natively instead of under emulation.
+#
 # Triggers:
 #   - push to main that touches the devcontainer or firmware -> publish :latest + :<sha>
 #   - push to a feature branch touching those paths           -> publish :<branch> (for validation)
-#   - weekly schedule                                         -> refresh tool/CVE layers
+#   - weekly schedule                                         -> refresh tool layers
 #   - manual dispatch
 
 on:
@@ -19,7 +25,7 @@ on:
       - "sbom/firmware/**"
   workflow_dispatch:
   schedule:
-    - cron: "17 7 * * 1"   # Mondays 07:17 UTC — keep scanner/CVE layers fresh
+    - cron: "17 7 * * 1"   # Mondays 07:17 UTC — keep tool layers fresh
 
 permissions:
   contents: read
@@ -31,36 +37,39 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+            twin: qemu-twin-linux-x86_64.tar.xz
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            twin: qemu-twin-linux-arm64.tar.xz
     steps:
       - uses: actions/checkout@v4
 
-      - name: Stage the v2 QEMU twin into the build context
+      - name: Compute image name
+        run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-devcontainer" >> "$GITHUB_ENV"
+
+      - name: Stage the v2 QEMU twin (this arch) into the build context
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p .devcontainer/twin-assets
           gh release download qemu-twin-v2 -R "${{ github.repository }}" \
-            -p 'qemu-twin-linux-x86_64.tar.xz' \
+            -p '${{ matrix.twin }}' \
             -p 'stamplc-flash-8MB.bin.xz' \
             -D .devcontainer/twin-assets
           gh release download qemu-twin-v2 -R "${{ github.repository }}" \
             -p 'stamplc-flash-8MB-MALICIOUS.bin.xz' \
             -D .devcontainer/twin-assets || echo "malicious image not published — baking without it"
           ls -la .devcontainer/twin-assets
-
-      - name: Compute image name + tags
-        id: meta
-        run: |
-          repo_lc="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
-          image="ghcr.io/${repo_lc}-devcontainer"
-          ref_slug="$(echo "${{ github.ref_name }}" | tr '/' '-' | tr -cd '[:alnum:]._-')"
-          echo "image=${image}" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            echo "tags=${image}:latest,${image}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tags=${image}:${ref_slug}" >> "$GITHUB_OUTPUT"
-          fi
 
       - uses: docker/setup-buildx-action@v3
 
@@ -70,19 +79,80 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: .devcontainer/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache
-          cache-to: type=registry,ref=${{ steps.meta.outputs.image }}:buildcache,mode=max
+          platforms: ${{ matrix.platform }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache-${{ matrix.arch }},mode=max
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: merge manifest
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute image name + tags
+        id: meta
+        run: |
+          image="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')-devcontainer"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "primary=${image}:latest" >> "$GITHUB_OUTPUT"
+            echo "tags=-t ${image}:latest -t ${image}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            slug="$(echo '${{ github.ref_name }}' | tr '/' '-' | tr -cd '[:alnum:]._-')"
+            echo "primary=${image}:${slug}" >> "$GITHUB_OUTPUT"
+            echo "tags=-t ${image}:${slug}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch manifest
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create ${{ steps.meta.outputs.tags }} \
+            $(for d in *; do printf '%s@sha256:%s ' "${{ steps.meta.outputs.image }}" "$d"; done)
+
+      - name: Inspect
+        run: docker buildx imagetools inspect "${{ steps.meta.outputs.primary }}"
 
       - name: Summary
         run: |
-          echo "### Pushed devcontainer image" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Pushed multi-arch devcontainer image"
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}" | tr ' ' '\n' | grep -v '^-t$' | grep .
+            echo '```'
+            echo "Platforms: linux/amd64, linux/arm64"
+          } >> "$GITHUB_STEP_SUMMARY"
