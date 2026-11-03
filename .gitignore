@@ -9,6 +9,9 @@ web/.netlify/
 # fetched QEMU twin binary + firmware image (downloaded by qemu/fetch-qemu.sh)
 qemu/twin/
 
+# twin assets staged into the build context by the devcontainer-image workflow
+.devcontainer/twin-assets/
+
 # os / editor
 .DS_Store
 .vscode/
