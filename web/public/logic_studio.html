@@ -5229,3 +5229,5 @@ function open(id){returnFocus=document.activeElement;dialog.querySelector('input
 dialog.querySelector('.help-close').onclick=()=>dialog.close();dialog.addEventListener('close',()=>returnFocus?.focus());dialog.querySelector('input').oninput=renderList;dialog.querySelector('.help-results').onclick=e=>{const b=e.target.closest('[data-topic]');if(b)select(b.dataset.topic);};launch.onclick=()=>open();document.addEventListener('click',e=>{const b=e.target.closest('[data-tbd-help]');if(b){e.preventDefault();open(b.dataset.tbdHelp);}});document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('[data-tbd-help]')){e.preventDefault();open(e.target.dataset.tbdHelp);}});window.TBDHelp={open};})();
 </script>
 <!-- TBD SHARED HELP END -->
+
+<script src="/keepalive.js" defer></script>

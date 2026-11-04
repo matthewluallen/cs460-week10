@@ -74,6 +74,7 @@ echo "  Open the Studio:  Codespaces → the auto-forwarded port 8088 (popup / P
 echo "                    local VS Code → http://localhost:8088"
 echo "  Text console (optional, another terminal):  ./qemu/console.sh"
 echo "  Phone-sensor part (later):  bash mqtt/share.sh        (local Dev Container: add --tunnel)"
+echo "  Keepalive  : while you use the Studio tab this Codespace stays awake; leave or close it and it idles out on its own, so idle credits are not spent."
 echo "  Ctrl-C stops the Studio server; the twin keeps running (./qemu/twin-status.sh)."
 echo
 exec ./qemu/studio.sh "$PROFILE"
