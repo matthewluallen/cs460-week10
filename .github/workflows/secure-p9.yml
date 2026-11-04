@@ -1,0 +1,40 @@
+name: secure-build P9
+
+# Part 9 is the one gap the core CI skips: it needs a from-source PlatformIO build of
+# the SECURE firmware (multi-minute toolchain), too heavy for every push. So this runs
+# only when the firmware or its build changes — and on manual dispatch — then boots the
+# secure twin and asserts it refuses the attacks the vulnerable build allowed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sbom/firmware/**'
+      - 'qemu/build-twin.sh'
+  workflow_dispatch:
+
+jobs:
+  secure-p9:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install PlatformIO
+        run: pip install -U platformio
+      - name: Fetch the QEMU twin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./qemu/fetch-qemu.sh
+      - name: Build the SECURE firmware from source
+        run: bash qemu/build-twin.sh secure
+      - name: Boot the secure twin and verify Part 9
+        run: |
+          RESTART=1 ./qemu/run.sh secure >/tmp/secure-run.log 2>&1 &
+          sleep 25
+          python assessment/verify-lab.py P9
