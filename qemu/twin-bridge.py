@@ -351,6 +351,34 @@ def ws_reader(conn):
             return
 
 
+def _serve_keepalive(conn):
+    """Presence-gated Codespace keepalive. The Studio tab pings this only
+    while it is visible and recently used; each hit prints a line to the lab
+    terminal, and that terminal activity resets the Codespaces idle timer.
+    No pings -> the Codespace idles out normally (credits are not burned on
+    an abandoned tab). A hard cap (KEEPALIVE_MAX_MIN, default 240) stops
+    holding it awake even if a tab is left open."""
+    import time as _time
+    now = _time.time()
+    ka = _serve_keepalive
+    if not hasattr(ka, "first"):
+        ka.first = now; ka.last = 0.0; ka.capped = False
+    try:
+        cap_min = float(os.environ.get("KEEPALIVE_MAX_MIN", "240") or 240)
+    except ValueError:
+        cap_min = 240.0
+    age = now - ka.first
+    capped = age > cap_min * 60.0
+    if capped and not ka.capped:
+        ka.capped = True
+        print("[keepalive] session cap %.0f min reached - letting the Codespace idle out normally" % cap_min, flush=True)
+    if (not capped) and (now - ka.last) >= 55.0:
+        ka.last = now
+        print("[keepalive] %s active Studio UI - holding the Codespace awake (hard cap in %.0f min)"
+              % (_time.strftime("%H:%M:%S"), max(0.0, cap_min * 60.0 - age) / 60.0), flush=True)
+    _send_json(conn, {"alive": (not capped), "capped": capped, "cap_min": cap_min, "age_s": int(age)})
+
+
 def serve_static(conn, path, root):
     """Serve a file from `root`. Path traversal is rejected."""
     rel = urllib.parse.urlparse(path).path
@@ -1177,6 +1205,12 @@ def handle(conn, hub, root):
                 _serve_field(conn, method, path)
             else:
                 _deny(conn, 405, "use GET to read or POST to write")
+            conn.close()
+        elif path.split("?", 1)[0] == "/__keepalive":
+            if method in ("GET", "HEAD", "POST"):
+                _serve_keepalive(conn)
+            else:
+                _deny(conn, 405, "GET only")
             conn.close()
         elif method in ("GET", "HEAD"):
             serve_static(conn, path, root)
