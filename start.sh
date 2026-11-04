@@ -53,11 +53,17 @@ if [ "$MODE" = info ]; then
 fi
 
 # ── quick launch ─────────────────────────────────────────────────────────────
-if ! ls qemu/twin/qemu-twin-*/qemu-system-xtensa >/dev/null 2>&1 || [ ! -f qemu/twin/stamplc-flash-8MB.bin ]; then
-  echo "Fetching the twin (first run only)…"
-  ./qemu/fetch-qemu.sh || { echo "Twin fetch failed — see the output above. Fix, then re-run ./start.sh"; exit 1; }
-  echo
+# Always fetch: this guarantees the live released twin, not a stale copy that a
+# prebuilt devcontainer image may have baked in. fetch-qemu is quick and idempotent.
+echo "Fetching the current twin + firmware (so you run the live release, not a stale baked copy)…"
+if ! ./qemu/fetch-qemu.sh; then
+  if ls qemu/twin/qemu-twin-*/qemu-system-xtensa >/dev/null 2>&1 && [ -f qemu/twin/stamplc-flash-8MB.bin ]; then
+    echo "  fetch failed (offline?) — continuing with the twin already present."
+  else
+    echo "  fetch failed and no twin is present — fix connectivity, then re-run ./start.sh"; exit 1
+  fi
 fi
+echo
 echo "Launching the twin + Logic Studio ($PROFILE build)…"
 echo "  Open the Studio:  Codespaces → the auto-forwarded port 8088 (popup / Ports tab)"
 echo "                    local VS Code → http://localhost:8088"
