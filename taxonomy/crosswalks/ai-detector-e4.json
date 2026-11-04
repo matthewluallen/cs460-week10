@@ -1,0 +1,33 @@
+{
+  "schema_version": "tbd.taxonomy-association/v1",
+  "content": "ai-detector/ (Extension E4 — AI anomaly detector on the phone-sensor stream)",
+  "title": "E4 AI detector — adversarial-ML taxonomy associations (MITRE ATLAS)",
+  "objects": [
+    {"id": "attack:evade-model", "kind": "attack_step", "title": "Evade the detector with a crafted spoof",
+     "refs": [{"framework": "atlas", "id": "AML.T0015", "relation": "is"},
+              {"framework": "atlas", "id": "AML.T0043.001", "relation": "enables", "note": "black-box optimization of the evasion"},
+              {"framework": "atlas", "id": "AML.M0015", "relation": "mitigated_by", "note": "adversarial input detection / engineering gate"},
+              {"framework": "atlas", "id": "AML.M0009", "relation": "mitigated_by", "note": "multi-modal accelerometer fusion"}]},
+    {"id": "attack:forge-fusion", "kind": "attack_step", "title": "Forge the second channel to defeat same-source fusion",
+     "refs": [{"framework": "atlas", "id": "AML.T0043.003", "relation": "is", "note": "manual modification of the corroborating channel"},
+              {"framework": "atlas", "id": "AML.M0009", "relation": "mitigated_by", "note": "residual risk: fusion needs an INDEPENDENT sensor"}]},
+    {"id": "attack:poison-training", "kind": "attack_step", "title": "Poison the online-learning baseline",
+     "refs": [{"framework": "atlas", "id": "AML.T0020", "relation": "is"},
+              {"framework": "atlas", "id": "AML.T0018.000", "relation": "enables", "note": "poison the model via accepted frames"},
+              {"framework": "atlas", "id": "AML.M0007", "relation": "mitigated_by", "note": "sanitize training data"},
+              {"framework": "atlas", "id": "AML.M0025", "relation": "mitigated_by", "note": "maintain dataset provenance"}]},
+    {"id": "attack:erode-online", "kind": "attack_step", "title": "Slow drift re-baselines an online-learning model",
+     "refs": [{"framework": "atlas", "id": "AML.T0031", "relation": "is"},
+              {"framework": "atlas", "id": "AML.M0019", "relation": "mitigated_by", "note": "frozen model; control access to models/data in production"}]},
+    {"id": "attack:unsafe-artifact", "kind": "attack_step", "title": "Malicious pickle model artifact runs attacker code on load",
+     "refs": [{"framework": "atlas", "id": "AML.T0011.000", "relation": "is", "note": "unsafe AI artifacts"},
+              {"framework": "atlas", "id": "AML.M0013", "relation": "mitigated_by", "note": "code signing of the artifact"},
+              {"framework": "atlas", "id": "AML.M0014", "relation": "mitigated_by", "note": "verify AI artifacts (hash-pinned)"},
+              {"framework": "atlas", "id": "AML.M0011", "relation": "mitigated_by", "note": "restrict library loading / non-executable load path"}]},
+    {"id": "attack:oracle-queries", "kind": "attack_step", "title": "Query the raw anomaly score as an oracle",
+     "refs": [{"framework": "atlas", "id": "AML.T0040", "relation": "is", "note": "AI model inference API access"},
+              {"framework": "atlas", "id": "AML.T0010.003", "relation": "enables", "note": "model access"},
+              {"framework": "atlas", "id": "AML.M0004", "relation": "mitigated_by", "note": "restrict number of model queries (budget)"},
+              {"framework": "atlas", "id": "AML.M0002", "relation": "mitigated_by", "note": "verdict-only output, oracle off (passive output obfuscation)"}]}
+  ]
+}
