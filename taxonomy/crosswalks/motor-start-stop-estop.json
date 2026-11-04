@@ -131,6 +131,17 @@
           "framework": "attack-ics",
           "id": "T1694.002",
           "relation": "enables"
+        },
+        {
+          "framework": "d3fend",
+          "id": "D3-SPP",
+          "relation": "mitigated_by",
+          "note": "Strong Password Policy"
+        },
+        {
+          "framework": "nist-csf-2.0",
+          "id": "PR.AA-01",
+          "relation": "conforms_to"
         }
       ]
     },
@@ -158,6 +169,30 @@
           "framework": "attack-ics",
           "id": "M0813",
           "relation": "mitigated_by"
+        },
+        {
+          "framework": "d3fend",
+          "id": "D3-MFA",
+          "relation": "mitigated_by",
+          "note": "Multi-factor Authentication"
+        },
+        {
+          "framework": "d3fend",
+          "id": "D3-UAP",
+          "relation": "mitigated_by",
+          "note": "User Account Permissions"
+        },
+        {
+          "framework": "nist-csf-2.0",
+          "id": "PR.AA-01",
+          "relation": "conforms_to",
+          "note": "identities & credentials managed"
+        },
+        {
+          "framework": "nist-csf-2.0",
+          "id": "PR.AA-05",
+          "relation": "conforms_to",
+          "note": "access permissions enforced"
         }
       ]
     },
@@ -170,6 +205,18 @@
           "framework": "cwe",
           "id": "CWE-319",
           "relation": "is"
+        },
+        {
+          "framework": "d3fend",
+          "id": "D3-MH",
+          "relation": "mitigated_by",
+          "note": "Message Hardening (encryption/authenticity)"
+        },
+        {
+          "framework": "nist-csf-2.0",
+          "id": "PR.DS-01",
+          "relation": "conforms_to",
+          "note": "data confidentiality/integrity"
         }
       ]
     },
@@ -182,6 +229,17 @@
           "framework": "cwe",
           "id": "CWE-494",
           "relation": "is"
+        },
+        {
+          "framework": "d3fend",
+          "id": "D3-FV",
+          "relation": "mitigated_by",
+          "note": "Firmware Verification"
+        },
+        {
+          "framework": "nist-csf-2.0",
+          "id": "PR.DS-01",
+          "relation": "conforms_to"
         }
       ]
     },
@@ -242,6 +300,12 @@
           "framework": "attack-ics",
           "id": "T0847",
           "relation": "is"
+        },
+        {
+          "framework": "capec",
+          "id": "CAPEC-452",
+          "relation": "realizes",
+          "note": "Infected Hardware (USB drop)"
         }
       ]
     },
@@ -254,6 +318,12 @@
           "framework": "attack-ics",
           "id": "T0865",
           "relation": "is"
+        },
+        {
+          "framework": "capec",
+          "id": "CAPEC-163",
+          "relation": "realizes",
+          "note": "Spear Phishing"
         }
       ]
     },

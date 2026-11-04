@@ -20,6 +20,16 @@ curl -sSL "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/maste
 python3 "$HERE/tools/distill_attack.py" "$TMP/ent.json" --framework attack-enterprise --title "MITRE ATT&CK (Enterprise)" \
   --url "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json" \
   --repo mitre-attack/attack-stix-data --path enterprise-attack/enterprise-attack.json --out "$HERE/vendor/attack-enterprise.json"
+echo "==> MITRE CAPEC"
+curl -sSL "https://capec.mitre.org/data/xml/capec_latest.xml" -o "$TMP/capec.xml"
+python3 "$HERE/tools/distill_capec.py" "$TMP/capec.xml" "$HERE/vendor/capec.json"
+echo "==> MITRE D3FEND"
+curl -sSL "https://d3fend.mitre.org/ontologies/d3fend.json" -o "$TMP/d3fend.json"
+python3 "$HERE/tools/distill_d3fend.py" "$TMP/d3fend.json" "$HERE/vendor/d3fend.json"
+echo "==> NIST CSF 2.0"
+pip install -q --break-system-packages openpyxl 2>/dev/null || pip install -q openpyxl 2>/dev/null || true
+curl -sSL "https://csrc.nist.gov/extensions/nudp/services/json/csf/download?olirids=all" -o "$TMP/csf.xlsx"
+python3 "$HERE/tools/distill_csf.py" "$TMP/csf.xlsx" "$HERE/vendor/nist-csf-2.0.json"
 echo "==> CWE"
 curl -sSL "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip" -o "$TMP/cwe.zip"
 XML="$(unzip -Z1 "$TMP/cwe.zip" | head -1)"
