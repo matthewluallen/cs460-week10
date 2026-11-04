@@ -38,8 +38,10 @@ jobs:
           OUT=qemu/twin/qemu-twin-linux-arm64
           mkdir -p "$OUT/pc-bios"
           cp "$QEMU_DIR/build/qemu-system-xtensa" "$OUT/qemu-system-xtensa"
-          cp -r "$QEMU_DIR/pc-bios/." "$OUT/pc-bios/" 2>/dev/null || true
-          cp -r "$QEMU_DIR/build/pc-bios/." "$OUT/pc-bios/" 2>/dev/null || true
+          # Copy ONLY the ESP ROMs the xtensa/esp32s3 machine loads. espressif/qemu's source
+          # pc-bios/ also carries the committed upstream QEMU BIOS blobs (~18MB, unused here),
+          # so a wholesale copy bloats the package; the esp32*.bin set matches the lean x86_64.
+          cp "$QEMU_DIR"/pc-bios/esp32*.bin "$OUT/pc-bios/"
           echo "=== built binary ==="
           ls -la "$OUT/qemu-system-xtensa"
           echo "=== ldd (must be slim) ==="
