@@ -45,6 +45,11 @@ if ls qemu/twin/qemu-twin-*/qemu-system-xtensa >/dev/null 2>&1 && [ -f qemu/twin
 else
   echo "  twin        : not fetched (./start.sh will fetch it)"
 fi
+if [ -x .devcontainer/prefetch.sh ]; then
+  echo
+  bash .devcontainer/prefetch.sh --status 2>/dev/null
+  echo "  (heavy later-part tools load in the background, in the open — see .devcontainer/ENVIRONMENT.md)"
+fi
 echo
 
 if [ "$MODE" = info ]; then
