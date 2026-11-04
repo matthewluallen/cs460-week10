@@ -2,14 +2,17 @@
 #
 # Prebuilt CS460 "Inside the Stack" devcontainer image.
 #
-# Bakes every heavy postCreate.sh step into image layers so a student's Codespace
-# OR local VS Code Dev Container is ready after a *pull* instead of a ~10-minute build:
+# Bakes the heavy postCreate.sh steps into image layers so a student's Codespace OR local
+# VS Code Dev Container is ready shortly after a *pull* instead of a ~10-minute build. The two
+# largest, least-urgent downloads (the ESP32-S3 toolchain and the Playwright browser) are NOT
+# baked -- prefetch.sh backloads them in the background so the image pulls faster and the
+# student can start the early parts immediately:
 #   - bus/network + SAST tooling (sigrok-cli, tshark, cppcheck, flawfinder)
 #   - SBOM / CVE scanners (syft, grype, trivy, cve-bin-tool, gsutil)
 #   - Node 20, Python 3.12, GitHub CLI
 #   - Z3 / pymodbus / pyserial
-#   - PlatformIO + the ESP32-S3 toolchain, warmed by one teaching build (~/.platformio)
-#   - Playwright headless Chromium (baked at /ms-playwright, shared read path)
+#   - PlatformIO CORE (the ESP32-S3 Xtensa toolchain is backloaded at runtime, not baked)
+#   - Playwright OS deps for headless Chromium (the browser binary is backloaded, not baked)
 #   - the v2 QEMU twin (+ flash images), staged at /opt/cs460/twin (out of the mount)
 #
 # Built and pushed to GHCR by .github/workflows/devcontainer-image.yml. The twin assets
@@ -63,14 +66,12 @@ RUN pip3 install --break-system-packages --no-cache-dir z3-solver pymodbus pyser
 RUN pip3 install --break-system-packages --no-cache-dir flawfinder gsutil cve-bin-tool \
  || echo "optional scanners (flawfinder/gsutil/cve-bin-tool) partially skipped"
 
-# 5) Playwright headless Chromium for the Part-2 ladder regression (verify-lab.py P2).
-#    Browser baked at a shared, world-readable path; OS deps installed here (needs root).
-#    Pinned so the runtime `npm i playwright@${PLAYWRIGHT_VERSION}` matches and does NOT
-#    re-download the browser.
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+# 5) Playwright OS deps ONLY (needed to LAUNCH headless chromium for verify-lab.py P2).
+#    The browser BINARY is deliberately NOT baked -- prefetch.sh backloads it at runtime into
+#    the user cache (~/.cache/ms-playwright) while the student starts earlier parts, keeping the
+#    image lean. First use of the optional Part-2 self-check downloads the browser then.
 ENV PLAYWRIGHT_VERSION=1.48.2
-RUN npx --yes "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium \
- && chmod -R a+rX /ms-playwright
+RUN npx --yes "playwright@${PLAYWRIGHT_VERSION}" install-deps chromium
 
 # 6) The v2 QEMU twin, staged OUT of the workspace mount at /opt/cs460/twin.
 #    (qemu/twin/ is overmounted by the repo at runtime, so the baked copy lives here and
@@ -96,16 +97,16 @@ RUN set -eux; \
     chown -R vscode:vscode /opt/cs460; \
     rm -rf /tmp/twin-assets
 
-# 7) PlatformIO core + ESP32-S3 toolchain, warmed by one teaching build (caches
-#    ~/.platformio: platform, Xtensa toolchain, and libraries that both envs share).
+# 7) PlatformIO CORE only (pip-sized). The ESP32-S3 Xtensa toolchain is the single biggest
+#    layer, so it is deliberately NOT baked or warm-built here -- prefetch.sh backloads it
+#    (`pio pkg install -e m5stamplc_secure`) in the background while the student works through
+#    the earlier parts, and Part 9 (secure build) downloads it on first use if the backload has
+#    not finished. pio is on PATH so both paths resolve.
 USER vscode
 RUN curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -o /tmp/get-platformio.py \
  && python3 /tmp/get-platformio.py \
  && rm /tmp/get-platformio.py
 ENV PATH=/home/vscode/.platformio/penv/bin:${PATH}
-COPY --chown=vscode:vscode sbom/firmware /tmp/fw
-RUN pio run -d /tmp/fw -e m5stamplc \
- && rm -rf /tmp/fw
 
 # 7b) The PlatformIO penv is now first on PATH (ENV above), so it is the python3/pip3 the lab
 #     uses at runtime. The assessment libraries were installed into the SYSTEM python in step 4,
@@ -115,5 +116,5 @@ RUN pip install --no-cache-dir z3-solver pymodbus pyserial
 USER root
 
 LABEL org.opencontainers.image.title="CS460 Inside the Stack devcontainer" \
-      org.opencontainers.image.description="Prebuilt lab environment (tools, PlatformIO+ESP32-S3 toolchain, Playwright Chromium, QEMU twin)." \
+      org.opencontainers.image.description="Prebuilt lab environment (tools, scanners, PlatformIO core, QEMU twin; ESP32-S3 toolchain + Playwright browser backloaded at runtime by prefetch.sh)." \
       org.opencontainers.image.source="https://github.com/matthewluallen/cs460-week10"
