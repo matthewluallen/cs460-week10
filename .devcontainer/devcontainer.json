@@ -1,6 +1,6 @@
 {
   "name": "CS460 Week 10 — StampLC: SBOM/HBOM + Bus & Firmware Analysis",
-  "//image": "Prebuilt, multi-arch (linux/amd64 + linux/arm64). Built from .devcontainer/Dockerfile and pushed to GHCR by .github/workflows/devcontainer-image.yml. It bakes the tools, scanners, PlatformIO + ESP32-S3 toolchain, Playwright Chromium, and the QEMU twin, so startup is a pull — not a ~10-minute build. node/python/gh are baked in the image, so only docker-in-docker + sshd remain as features.",
+  "//image": "Prebuilt, multi-arch (linux/amd64 + linux/arm64). Built from .devcontainer/Dockerfile and pushed to GHCR by .github/workflows/devcontainer-image.yml. It bakes the tools, scanners, PlatformIO core, and the QEMU twin, so startup is a pull — not a ~10-minute build; the ESP32-S3 toolchain and Playwright browser are backloaded at runtime by prefetch.sh. node/python/gh are baked in the image, so only docker-in-docker + sshd remain as features.",
   "image": "ghcr.io/matthewluallen/cs460-week10-devcontainer:latest",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
