@@ -49,7 +49,7 @@
       "kind": "vendored",
       "license": "CAPEC\u2122 \u2014 \u00a9 The MITRE Corporation, used with attribution.",
       "snapshot": "vendor/capec.json",
-      "status": "pending-vendor",
+      "status": "vendored",
       "id_pattern": "^CAPEC-\\d+$",
       "home": "https://capec.mitre.org/"
     },
@@ -59,8 +59,8 @@
       "kind": "vendored",
       "license": "D3FEND\u2122 \u2014 \u00a9 The MITRE Corporation, used with attribution.",
       "snapshot": "vendor/d3fend.json",
-      "status": "pending-vendor",
-      "id_pattern": "^D3-[A-Za-z]+$",
+      "status": "vendored",
+      "id_pattern": "^D3[A-Z]?-[A-Za-z0-9]+$",
       "home": "https://d3fend.mitre.org/"
     },
     "nist-csf-2.0": {
@@ -69,8 +69,8 @@
       "kind": "vendored",
       "license": "NIST \u2014 U.S. Government work, public domain.",
       "snapshot": "vendor/nist-csf-2.0.json",
-      "status": "pending-vendor",
-      "id_pattern": "^(GV|ID|PR|DE|RS|RC)\\.[A-Z]{2}-\\d{2}$",
+      "status": "vendored",
+      "id_pattern": "^(GV|ID|PR|DE|RS|RC)(\\.[A-Z]{2}(-\\d{2})?)?$",
       "home": "https://www.nist.gov/cyberframework"
     },
     "nist-sp-800-82": {

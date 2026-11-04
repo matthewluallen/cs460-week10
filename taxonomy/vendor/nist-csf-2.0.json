@@ -1,0 +1,696 @@
+{
+ "categories": {
+  "DE.AE": {
+   "name": "Adverse Event Analysis"
+  },
+  "DE.CM": {
+   "name": "Continuous Monitoring"
+  },
+  "DE.DP": {
+   "name": "Detection Processes"
+  },
+  "GV.OC": {
+   "name": "Organizational Context"
+  },
+  "GV.OV": {
+   "name": "Oversight"
+  },
+  "GV.PO": {
+   "name": "Policy"
+  },
+  "GV.RM": {
+   "name": "Risk Management Strategy"
+  },
+  "GV.RR": {
+   "name": "Roles, Responsibilities, and Authorities"
+  },
+  "GV.SC": {
+   "name": "Cybersecurity Supply Chain Risk Management"
+  },
+  "ID.AM": {
+   "name": "Asset Management"
+  },
+  "ID.BE": {
+   "name": "Business Environment"
+  },
+  "ID.GV": {
+   "name": "Governance"
+  },
+  "ID.IM": {
+   "name": "Improvement"
+  },
+  "ID.RA": {
+   "name": "Risk Assessment"
+  },
+  "ID.RM": {
+   "name": "Risk Management Strategy"
+  },
+  "ID.SC": {
+   "name": "Supply Chain Risk Management"
+  },
+  "PR.AA": {
+   "name": "Identity Management, Authentication, and Access Control"
+  },
+  "PR.AC": {
+   "name": "Identity Management, Authentication and Access Control"
+  },
+  "PR.AT": {
+   "name": "Awareness and Training"
+  },
+  "PR.DS": {
+   "name": "Data Security"
+  },
+  "PR.IP": {
+   "name": "Information Protection Processes and Procedures"
+  },
+  "PR.IR": {
+   "name": "Technology Infrastructure Resilience"
+  },
+  "PR.MA": {
+   "name": "Maintenance"
+  },
+  "PR.PS": {
+   "name": "Platform Security"
+  },
+  "PR.PT": {
+   "name": "Protective Technology"
+  },
+  "RC.CO": {
+   "name": "Incident Recovery Communication"
+  },
+  "RC.IM": {
+   "name": "Improvements"
+  },
+  "RC.RP": {
+   "name": "Incident Recovery Plan Execution"
+  },
+  "RS.AN": {
+   "name": "Incident Analysis"
+  },
+  "RS.CO": {
+   "name": "Incident Response Reporting and Communication"
+  },
+  "RS.IM": {
+   "name": "Improvements"
+  },
+  "RS.MA": {
+   "name": "Incident Management"
+  },
+  "RS.MI": {
+   "name": "Incident Mitigation"
+  },
+  "RS.RP": {
+   "name": "Response Planning"
+  }
+ },
+ "counts": {
+  "categories": 34,
+  "functions": 6,
+  "subcategories": 185
+ },
+ "distilled_at": "2026-11-04T06:02:08Z",
+ "framework": "nist-csf-2.0",
+ "functions": {
+  "DE": {
+   "name": "DETECT"
+  },
+  "GV": {
+   "name": "GOVERN"
+  },
+  "ID": {
+   "name": "IDENTIFY"
+  },
+  "PR": {
+   "name": "PROTECT"
+  },
+  "RC": {
+   "name": "RECOVER"
+  },
+  "RS": {
+   "name": "RESPOND"
+  }
+ },
+ "source": {
+  "note": "CPRT xlsx export",
+  "sha256": "d48676a5c9179da4cd5656fcd673cc01b01eb0770cf73253d65345cfc9088ac1",
+  "url": "https://csrc.nist.gov/extensions/nudp/services/json/csf/download?olirids=all"
+ },
+ "subcategories": {
+  "DE.AE-01": {
+   "text": "[Withdrawn: Incorporated into ID.AM-03]"
+  },
+  "DE.AE-02": {
+   "text": "Potentially adverse events are analyzed to better understand associated activities"
+  },
+  "DE.AE-03": {
+   "text": "Information is correlated from multiple sources"
+  },
+  "DE.AE-04": {
+   "text": "The estimated impact and scope of adverse events are understood"
+  },
+  "DE.AE-05": {
+   "text": "[Withdrawn: Moved to DE.AE-08]"
+  },
+  "DE.AE-06": {
+   "text": "Information on adverse events is provided to authorized staff and tools"
+  },
+  "DE.AE-07": {
+   "text": "Cyber threat intelligence and other contextual information are integrated into the analysis"
+  },
+  "DE.AE-08": {
+   "text": "Incidents are declared when adverse events meet the defined incident criteria"
+  },
+  "DE.CM-01": {
+   "text": "Networks and network services are monitored to find potentially adverse events"
+  },
+  "DE.CM-02": {
+   "text": "The physical environment is monitored to find potentially adverse events"
+  },
+  "DE.CM-03": {
+   "text": "Personnel activity and technology usage are monitored to find potentially adverse events"
+  },
+  "DE.CM-04": {
+   "text": "[Withdrawn: Incorporated into DE.CM-01, DE.CM-09]"
+  },
+  "DE.CM-05": {
+   "text": "[Withdrawn: Incorporated into DE.CM-01, DE.CM-09]"
+  },
+  "DE.CM-06": {
+   "text": "External service provider activities and services are monitored to find potentially adverse events"
+  },
+  "DE.CM-07": {
+   "text": "[Withdrawn: Incorporated into DE.CM-01, DE.CM-03, DE.CM-06, DE.CM-09]"
+  },
+  "DE.CM-08": {
+   "text": "[Withdrawn: Incorporated into ID.RA-01]"
+  },
+  "DE.CM-09": {
+   "text": "Computing hardware and software, runtime environments, and their data are monitored to find potentially adverse events"
+  },
+  "DE.DP-01": {
+   "text": "[Withdrawn: Incorporated into GV.RR-02]"
+  },
+  "DE.DP-02": {
+   "text": "[Withdrawn: Incorporated into DE.AE]"
+  },
+  "DE.DP-03": {
+   "text": "[Withdrawn: Incorporated into ID.IM-02]"
+  },
+  "DE.DP-04": {
+   "text": "[Withdrawn: Incorporated into DE.AE-06]"
+  },
+  "DE.DP-05": {
+   "text": "[Withdrawn: Incorporated into ID.IM, ID.IM-03]"
+  },
+  "GV.OC-01": {
+   "text": "The organizational mission is understood and informs cybersecurity risk management"
+  },
+  "GV.OC-02": {
+   "text": "Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk management are understood and considered"
+  },
+  "GV.OC-03": {
+   "text": "Legal, regulatory, and contractual requirements regarding cybersecurity - including privacy and civil liberties obligations - are understood and managed"
+  },
+  "GV.OC-04": {
+   "text": "Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization are understood and communicated"
+  },
+  "GV.OC-05": {
+   "text": "Outcomes, capabilities, and services that the organization depends on are understood and communicated"
+  },
+  "GV.OV-01": {
+   "text": "Cybersecurity risk management strategy outcomes are reviewed to inform and adjust strategy and direction"
+  },
+  "GV.OV-02": {
+   "text": "The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks"
+  },
+  "GV.OV-03": {
+   "text": "Organizational cybersecurity risk management performance is evaluated and reviewed for adjustments needed"
+  },
+  "GV.PO-01": {
+   "text": "Policy for managing cybersecurity risks is established based on organizational context, cybersecurity strategy, and priorities and is communicated and enforced"
+  },
+  "GV.PO-02": {
+   "text": "Policy for managing cybersecurity risks is reviewed, updated, communicated, and enforced to reflect changes in requirements, threats, technology, and organizational mission"
+  },
+  "GV.RM-01": {
+   "text": "Risk management objectives are established and agreed to by organizational stakeholders"
+  },
+  "GV.RM-02": {
+   "text": "Risk appetite and risk tolerance statements are established, communicated, and maintained"
+  },
+  "GV.RM-03": {
+   "text": "Cybersecurity risk management activities and outcomes are included in enterprise risk management processes"
+  },
+  "GV.RM-04": {
+   "text": "Strategic direction that describes appropriate risk response options is established and communicated"
+  },
+  "GV.RM-05": {
+   "text": "Lines of communication across the organization are established for cybersecurity risks, including risks from suppliers and other third parties"
+  },
+  "GV.RM-06": {
+   "text": "A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established and communicated"
+  },
+  "GV.RM-07": {
+   "text": "Strategic opportunities (i.e., positive risks) are characterized and are included in organizational cybersecurity risk discussions"
+  },
+  "GV.RR-01": {
+   "text": "Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is risk-aware, ethical, and continually improving"
+  },
+  "GV.RR-02": {
+   "text": "Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced"
+  },
+  "GV.RR-03": {
+   "text": "Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, responsibilities, and policies"
+  },
+  "GV.RR-04": {
+   "text": "Cybersecurity is included in human resources practices"
+  },
+  "GV.SC-01": {
+   "text": "A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established and agreed to by organizational stakeholders"
+  },
+  "GV.SC-02": {
+   "text": "Cybersecurity roles and responsibilities for suppliers, customers, and partners are established, communicated, and coordinated internally and externally"
+  },
+  "GV.SC-03": {
+   "text": "Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management, risk assessment, and improvement processes"
+  },
+  "GV.SC-04": {
+   "text": "Suppliers are known and prioritized by criticality"
+  },
+  "GV.SC-05": {
+   "text": "Requirements to address cybersecurity risks in supply chains are established, prioritized, and integrated into contracts and other types of agreements with suppliers and other relevant third parties"
+  },
+  "GV.SC-06": {
+   "text": "Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party relationships"
+  },
+  "GV.SC-07": {
+   "text": "The risks posed by a supplier, their products and services, and other third parties are understood, recorded, prioritized, assessed, responded to, and monitored over the course of the relationship"
+  },
+  "GV.SC-08": {
+   "text": "Relevant suppliers and other third parties are included in incident planning, response, and recovery activities"
+  },
+  "GV.SC-09": {
+   "text": "Supply chain security practices are integrated into cybersecurity and enterprise risk management programs, and their performance is monitored throughout the technology product and service life cycle"
+  },
+  "GV.SC-10": {
+   "text": "Cybersecurity supply chain risk management plans include provisions for activities that occur after the conclusion of a partnership or service agreement"
+  },
+  "ID.AM-01": {
+   "text": "Inventories of hardware managed by the organization are maintained"
+  },
+  "ID.AM-02": {
+   "text": "Inventories of software, services, and systems managed by the organization are maintained"
+  },
+  "ID.AM-03": {
+   "text": "Representations of the organization's authorized network communication and internal and external network data flows are maintained"
+  },
+  "ID.AM-04": {
+   "text": "Inventories of services provided by suppliers are maintained"
+  },
+  "ID.AM-05": {
+   "text": "Assets are prioritized based on classification, criticality, resources, and impact on the mission"
+  },
+  "ID.AM-06": {
+   "text": "[Withdrawn: Incorporated into GV.RR-02, GV.SC-02]"
+  },
+  "ID.AM-07": {
+   "text": "Inventories of data and corresponding metadata for designated data types are maintained"
+  },
+  "ID.AM-08": {
+   "text": "Systems, hardware, software, services, and data are managed throughout their life cycles"
+  },
+  "ID.BE-01": {
+   "text": "[Withdrawn: Incorporated into GV.OC-05]"
+  },
+  "ID.BE-02": {
+   "text": "[Withdrawn: Incorporated into GV.OC-01]"
+  },
+  "ID.BE-03": {
+   "text": "[Withdrawn: Incorporated into GV.OC-01]"
+  },
+  "ID.BE-04": {
+   "text": "[Withdrawn: Incorporated into GV.OC-04, GV.OC-05]"
+  },
+  "ID.BE-05": {
+   "text": "[Withdrawn: Incorporated into GV.OC-04]"
+  },
+  "ID.GV-01": {
+   "text": "[Withdrawn: Incorporated into GV.PO, GV.PO-01, GV.PO-02]"
+  },
+  "ID.GV-02": {
+   "text": "[Withdrawn: Incorporated into GV.OC-02, GV.RR, GV.RR-02]"
+  },
+  "ID.GV-03": {
+   "text": "[Withdrawn: Moved to GV.OC-03]"
+  },
+  "ID.GV-04": {
+   "text": "[Withdrawn: Moved to GV.RM-04]"
+  },
+  "ID.IM-01": {
+   "text": "Improvements are identified from evaluations"
+  },
+  "ID.IM-02": {
+   "text": "Improvements are identified from security tests and exercises, including those done in coordination with suppliers and relevant third parties"
+  },
+  "ID.IM-03": {
+   "text": "Improvements are identified from execution of operational processes, procedures, and activities"
+  },
+  "ID.IM-04": {
+   "text": "Incident response plans and other cybersecurity plans that affect operations are established, communicated, maintained, and improved"
+  },
+  "ID.RA-01": {
+   "text": "Vulnerabilities in assets are identified, validated, and recorded"
+  },
+  "ID.RA-02": {
+   "text": "Cyber threat intelligence is received from information sharing forums and sources"
+  },
+  "ID.RA-03": {
+   "text": "Internal and external threats to the organization are identified and recorded"
+  },
+  "ID.RA-04": {
+   "text": "Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded"
+  },
+  "ID.RA-05": {
+   "text": "Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization"
+  },
+  "ID.RA-06": {
+   "text": "Risk responses are chosen, prioritized, planned, tracked, and communicated"
+  },
+  "ID.RA-07": {
+   "text": "Changes and exceptions are managed, assessed for risk impact, recorded, and tracked"
+  },
+  "ID.RA-08": {
+   "text": "Processes for receiving, analyzing, and responding to vulnerability disclosures are established"
+  },
+  "ID.RA-09": {
+   "text": "The authenticity and integrity of hardware and software are assessed prior to acquisition and use"
+  },
+  "ID.RA-10": {
+   "text": "Critical suppliers are assessed prior to acquisition"
+  },
+  "ID.RM-01": {
+   "text": "[Withdrawn: Incorporated into GV.RM-01, GV.RM-06, GV.RR-03]"
+  },
+  "ID.RM-02": {
+   "text": "[Withdrawn: Incorporated into GV.RM-02, GV.RM-04]"
+  },
+  "ID.RM-03": {
+   "text": "[Withdrawn: Moved into GV.RM-02]"
+  },
+  "ID.SC-01": {
+   "text": "[Withdrawn: Incorporated into GV.RM-05, GV.SC-01, GV.SC-06, GV.SC-09, GV.SC-10]"
+  },
+  "ID.SC-02": {
+   "text": "[Withdrawn: Incorporated into GV.OC-02, GV.SC-03, GV.SC-04, GV.SC-07, ID.RA-10]"
+  },
+  "ID.SC-03": {
+   "text": "[Withdrawn: Moved to GV.SC-05]"
+  },
+  "ID.SC-04": {
+   "text": "[Withdrawn: Incorporated into GV.SC-07, ID.RA-10]"
+  },
+  "ID.SC-05": {
+   "text": "[Withdrawn: Incorporated into GV.SC-08, ID.IM-02]"
+  },
+  "PR.AA-01": {
+   "text": "Identities and credentials for authorized users, services, and hardware are managed by the organization"
+  },
+  "PR.AA-02": {
+   "text": "Identities are proofed and bound to credentials based on the context of interactions"
+  },
+  "PR.AA-03": {
+   "text": "Users, services, and hardware are authenticated"
+  },
+  "PR.AA-04": {
+   "text": "Identity assertions are protected, conveyed, and verified"
+  },
+  "PR.AA-05": {
+   "text": "Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and incorporate the principles of least privilege and separation of duties"
+  },
+  "PR.AA-06": {
+   "text": "Physical access to assets is managed, monitored, and enforced commensurate with risk"
+  },
+  "PR.AC-01": {
+   "text": "[Withdrawn: Incorporated into PR.AA-01, PR.AA-05]"
+  },
+  "PR.AC-02": {
+   "text": "[Withdrawn: Moved to PR.AA-06]"
+  },
+  "PR.AC-03": {
+   "text": "[Withdrawn: Incorporated into PR.AA-03, PR.AA-05, PR.IR-01]"
+  },
+  "PR.AC-04": {
+   "text": "[Withdrawn: Moved to PR.AA-05]"
+  },
+  "PR.AC-05": {
+   "text": "[Withdrawn: Incorporated into PR.IR-01]"
+  },
+  "PR.AC-06": {
+   "text": "[Withdrawn: Moved to PR.AA-02]"
+  },
+  "PR.AC-07": {
+   "text": "[Withdrawn: Moved to PR.AA-03]"
+  },
+  "PR.AT-01": {
+   "text": "Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind"
+  },
+  "PR.AT-02": {
+   "text": "Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind"
+  },
+  "PR.AT-03": {
+   "text": "[Withdrawn: Incorporated into PR.AT-01, PR.AT-02]"
+  },
+  "PR.AT-04": {
+   "text": "[Withdrawn: Incorporated into PR.AT-02]"
+  },
+  "PR.AT-05": {
+   "text": "[Withdrawn: Incorporated into PR.AT-02]"
+  },
+  "PR.DS-01": {
+   "text": "The confidentiality, integrity, and availability of data-at-rest are protected"
+  },
+  "PR.DS-02": {
+   "text": "The confidentiality, integrity, and availability of data-in-transit are protected"
+  },
+  "PR.DS-03": {
+   "text": "[Withdrawn: Incorporated into ID.AM-08, PR.PS-03]"
+  },
+  "PR.DS-04": {
+   "text": "[Withdrawn: Moved to PR.IR-04]"
+  },
+  "PR.DS-05": {
+   "text": "[Withdrawn: Incorporated into PR.DS-01, PR.DS-02, PR.DS-10]"
+  },
+  "PR.DS-06": {
+   "text": "[Withdrawn: Incorporated into PR.DS-01, DE.CM-09]"
+  },
+  "PR.DS-07": {
+   "text": "[Withdrawn: Incorporated into PR.IR-01]"
+  },
+  "PR.DS-08": {
+   "text": "[Withdrawn: Incorporated into ID.RA-09, DE.CM-09]"
+  },
+  "PR.DS-10": {
+   "text": "The confidentiality, integrity, and availability of data-in-use are protected"
+  },
+  "PR.DS-11": {
+   "text": "Backups of data are created, protected, maintained, and tested"
+  },
+  "PR.IP-01": {
+   "text": "[Withdrawn: Incorporated into PR.PS-01]"
+  },
+  "PR.IP-02": {
+   "text": "[Withdrawn: Incorporated into ID.AM-08, PR.PS-06]"
+  },
+  "PR.IP-03": {
+   "text": "[Withdrawn: Incorporated into PR.PS-01, ID.RA-07]"
+  },
+  "PR.IP-04": {
+   "text": "[Withdrawn: Moved to PR.DS-11]"
+  },
+  "PR.IP-05": {
+   "text": "[Withdrawn: Moved to PR.IR-02]"
+  },
+  "PR.IP-06": {
+   "text": "[Withdrawn: Incorporated into ID.AM-08]"
+  },
+  "PR.IP-07": {
+   "text": "[Withdrawn: Incorporated into ID.IM, ID.IM-03]"
+  },
+  "PR.IP-08": {
+   "text": "[Withdrawn: Moved to ID.IM-03]"
+  },
+  "PR.IP-09": {
+   "text": "[Withdrawn: Moved to ID.IM-04]"
+  },
+  "PR.IP-10": {
+   "text": "[Withdrawn: Incorporated into ID.IM-02, ID.IM-04]"
+  },
+  "PR.IP-11": {
+   "text": "[Withdrawn: Moved to GV.RR-04]"
+  },
+  "PR.IP-12": {
+   "text": "[Withdrawn: Incorporated into ID.RA-01, PR.PS-02]"
+  },
+  "PR.IR-01": {
+   "text": "Networks and environments are protected from unauthorized logical access and usage"
+  },
+  "PR.IR-02": {
+   "text": "The organization's technology assets are protected from environmental threats"
+  },
+  "PR.IR-03": {
+   "text": "Mechanisms are implemented to achieve resilience requirements in normal and adverse situations"
+  },
+  "PR.IR-04": {
+   "text": "Adequate resource capacity to ensure availability is maintained"
+  },
+  "PR.MA-01": {
+   "text": "[Withdrawn: Incorporated into ID.AM-08, PR.PS-03]"
+  },
+  "PR.MA-02": {
+   "text": "[Withdrawn: Incorporated into ID.AM-08, PR.PS-02]"
+  },
+  "PR.PS-01": {
+   "text": "Configuration management practices are established and applied"
+  },
+  "PR.PS-02": {
+   "text": "Software is maintained, replaced, and removed commensurate with risk"
+  },
+  "PR.PS-03": {
+   "text": "Hardware is maintained, replaced, and removed commensurate with risk"
+  },
+  "PR.PS-04": {
+   "text": "Log records are generated and made available for continuous monitoring"
+  },
+  "PR.PS-05": {
+   "text": "Installation and execution of unauthorized software are prevented"
+  },
+  "PR.PS-06": {
+   "text": "Secure software development practices are integrated, and their performance is monitored throughout the software development life cycle"
+  },
+  "PR.PT-01": {
+   "text": "[Withdrawn: Incorporated into PR.PS-04]"
+  },
+  "PR.PT-02": {
+   "text": "[Withdrawn: Incorporated into PR.DS-01, PR.PS-01]"
+  },
+  "PR.PT-03": {
+   "text": "[Withdrawn: Incorporated into PR.PS-01]"
+  },
+  "PR.PT-04": {
+   "text": "[Withdrawn: Incorporated into PR.AA-06, PR.IR-01]"
+  },
+  "PR.PT-05": {
+   "text": "[Withdrawn: Moved to PR.IR-03]"
+  },
+  "RC.CO-01": {
+   "text": "[Withdrawn: Incorporated into RC.CO-04]"
+  },
+  "RC.CO-02": {
+   "text": "[Withdrawn: Incorporated into RC.CO-04]"
+  },
+  "RC.CO-03": {
+   "text": "Recovery activities and progress in restoring operational capabilities are communicated to designated internal and external stakeholders"
+  },
+  "RC.CO-04": {
+   "text": "Public updates on incident recovery are shared using approved methods and messaging"
+  },
+  "RC.IM-01": {
+   "text": "[Withdrawn: Incorporated into ID.IM-03, ID.IM-04]"
+  },
+  "RC.IM-02": {
+   "text": "[Withdrawn: Incorporated into ID.IM-03]"
+  },
+  "RC.RP-01": {
+   "text": "The recovery portion of the incident response plan is executed once initiated from the incident response process"
+  },
+  "RC.RP-02": {
+   "text": "Recovery actions are selected, scoped, prioritized, and performed"
+  },
+  "RC.RP-03": {
+   "text": "The integrity of backups and other restoration assets is verified before using them for restoration"
+  },
+  "RC.RP-04": {
+   "text": "Critical mission functions and cybersecurity risk management are considered to establish post-incident operational norms"
+  },
+  "RC.RP-05": {
+   "text": "The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed"
+  },
+  "RC.RP-06": {
+   "text": "The end of incident recovery is declared based on criteria, and incident-related documentation is completed"
+  },
+  "RS.AN-01": {
+   "text": "[Withdrawn: Incorporated into RS.MA-02]"
+  },
+  "RS.AN-02": {
+   "text": "[Withdrawn: Incorporated into RS.MA-02, RS.MA-03, RS.MA-04]"
+  },
+  "RS.AN-03": {
+   "text": "Analysis is performed to establish what has taken place during an incident and the root cause of the incident"
+  },
+  "RS.AN-04": {
+   "text": "[Withdrawn: Moved to RS.MA-03]"
+  },
+  "RS.AN-05": {
+   "text": "[Withdrawn: Moved to ID.RA-08]"
+  },
+  "RS.AN-06": {
+   "text": "Actions performed during an investigation are recorded, and the records' integrity and provenance are preserved"
+  },
+  "RS.AN-07": {
+   "text": "Incident data and metadata are collected, and their integrity and provenance are preserved"
+  },
+  "RS.AN-08": {
+   "text": "An incident's magnitude is estimated and validated"
+  },
+  "RS.CO-01": {
+   "text": "[Withdrawn: Incorporated into PR.AT-01]"
+  },
+  "RS.CO-02": {
+   "text": "Internal and external stakeholders are notified of incidents"
+  },
+  "RS.CO-03": {
+   "text": "Information is shared with designated internal and external stakeholders"
+  },
+  "RS.CO-04": {
+   "text": "[Withdrawn: Incorporated into RS.MA-01, RS.MA-04]"
+  },
+  "RS.CO-05": {
+   "text": "[Withdrawn: Incorporated into RS.CO-03]"
+  },
+  "RS.IM-01": {
+   "text": "[Withdrawn: Incorporated into ID.IM-03, ID.IM-04]"
+  },
+  "RS.IM-02": {
+   "text": "[Withdrawn: Incorporated into ID.IM-03]"
+  },
+  "RS.MA-01": {
+   "text": "The incident response plan is executed in coordination with relevant third parties once an incident is declared"
+  },
+  "RS.MA-02": {
+   "text": "Incident reports are triaged and validated"
+  },
+  "RS.MA-03": {
+   "text": "Incidents are categorized and prioritized"
+  },
+  "RS.MA-04": {
+   "text": "Incidents are escalated or elevated as needed"
+  },
+  "RS.MA-05": {
+   "text": "The criteria for initiating incident recovery are applied"
+  },
+  "RS.MI-01": {
+   "text": "Incidents are contained"
+  },
+  "RS.MI-02": {
+   "text": "Incidents are eradicated"
+  },
+  "RS.MI-03": {
+   "text": "[Withdrawn: Incorporated into ID.RA-06]"
+  },
+  "RS.RP-01": {
+   "text": "[Withdrawn: Incorporated into RS.MA-01]"
+  }
+ },
+ "title": "NIST Cybersecurity Framework 2.0"
+}

@@ -34,6 +34,9 @@ def main():
             for tid, t in s.get("techniques", {}).items(): ids[tid] = t
             for mid, m in s.get("mitigations", {}).items(): ids[mid] = {"status": "active", "name": m.get("name")}
             for tid, t in s.get("weaknesses", {}).items(): ids[tid] = {"status": (t.get("status") or "active"), "name": t.get("name")}
+            for tid, t in s.get("attack_patterns", {}).items(): ids[tid] = {"status": (t.get("status") or "active"), "name": t.get("name")}
+            for grp in ("functions", "categories", "subcategories"):
+                for tid, t in s.get(grp, {}).items(): ids[tid] = {"status": "active", "name": t.get("name") or t.get("text")}
             snap[k] = ids
     errors, warns, checked = [], [], 0
     files = a.crosswalks or sorted(glob.glob(os.path.join(root, "crosswalks", "*.json")))
@@ -74,10 +77,10 @@ def main():
                 entry = snap.get(fw, {}).get(rid)
                 if entry is None:
                     errors.append(f"{base} {oid}: {fw} '{rid}' not found in pinned snapshot")
-                elif entry.get("status") == "revoked":
+                elif str(entry.get("status") or "").lower() == "revoked":
                     rb = entry.get("revoked_by")
                     errors.append(f"{base} {oid}: {fw} '{rid}' is REVOKED — use {rb or 'its replacement'}")
-                elif entry.get("status") == "deprecated":
+                elif str(entry.get("status") or "").lower() in ("deprecated","obsolete"):
                     errors.append(f"{base} {oid}: {fw} '{rid}' is DEPRECATED")
     print(f"taxonomy-validate: {len(files)} crosswalk(s), {checked} refs checked")
     for w in warns: print("  WARN ", w)
