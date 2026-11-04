@@ -143,3 +143,16 @@ jobs:
         run: pip install -r ai-detector/requirements.txt
       - name: Verify the AI detector (ATLAS E4)
         run: python -I ai-detector/verify.py
+
+  taxonomy-validate:
+    # Bind content to authoritative frameworks with integrity: every ATT&CK/ATLAS/CWE id in
+    # taxonomy/crosswalks/ is checked against the pinned vendored snapshots; a revoked or unknown
+    # id fails the build. See taxonomy/SCHEMA.md.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate taxonomy crosswalks against pinned snapshots
+        run: python3 taxonomy/tools/validate.py
