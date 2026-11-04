@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cs460/taxonomy/association.schema.json",
+  "title": "TBD taxonomy association",
+  "description": "Binds a platform content artifact's objects (points, weaknesses, attack steps, safety functions) to canonical, authoritative framework identifiers. Validated by taxonomy/tools/validate.py against the registry + pinned vendored snapshots.",
+  "type": "object",
+  "required": ["schema_version", "content", "objects"],
+  "properties": {
+    "schema_version": {"const": "tbd.taxonomy-association/v1"},
+    "content": {"type": "string", "description": "the content artifact this crosswalk annotates"},
+    "title": {"type": "string"},
+    "objects": {"type": "array", "items": {"$ref": "#/$defs/object"}}
+  },
+  "$defs": {
+    "object": {
+      "type": "object",
+      "required": ["id", "kind", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z_]+:[A-Za-z0-9_.:-]+$"},
+        "kind": {"enum": ["point", "weakness", "attack_step", "safety_function", "mitigation", "control"]},
+        "title": {"type": "string"},
+        "automation": {"$ref": "#/$defs/automation"},
+        "refs": {"type": "array", "items": {"$ref": "#/$defs/ref"}},
+        "notes": {"type": "string"}
+      }
+    },
+    "automation": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "iec_61131_3_address": {"type": "string"},
+        "iec_81346_2_designation": {"type": "string"},
+        "iec_81346_2_class": {"type": "string"},
+        "engineering_unit": {"type": ["string", "null"]}
+      }
+    },
+    "ref": {
+      "type": "object", "required": ["framework"], "additionalProperties": false,
+      "properties": {
+        "framework": {"type": "string"},
+        "id": {"type": "string", "description": "for vendored frameworks: a canonical ID checked against the pinned snapshot"},
+        "relation": {"enum": ["is", "exploits", "enables", "mitigated_by", "detected_by", "realizes", "conforms_to"]},
+        "part": {"type": "string"}, "clause": {"type": "string"}, "section": {"type": "string"},
+        "requirement": {"type": "string"}, "title": {"type": "string"}, "note": {"type": "string"}
+      }
+    }
+  }
+}
