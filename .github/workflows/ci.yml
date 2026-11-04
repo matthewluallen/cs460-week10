@@ -99,8 +99,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./qemu/fetch-qemu.sh
+      - name: Generate the sample SBOM (syft) so Part 5 can verify
+        # P5 only needs an SPDX + a CycloneDX doc from the same tree (syft); grype's CVE DB
+        # (hundreds of MB) is the slow part of run_sbom.sh and isn't needed for this check.
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b "$HOME/.local/bin"
+          ( cd sbom && mkdir -p out && "$HOME/.local/bin/syft" dir:vuln-sample -o spdx-json=out/sbom.spdx.json -o cyclonedx-json=out/sbom.cdx.json -q )
       - name: Verify lab parts on the twin
-        run: python assessment/verify-lab.py --boot-twin P1 P3 P4 P6 P8
+        # P2 is covered by studio-regression; P7 is a manual detonation; P9 has its own
+        # (firmware-gated) secure-build workflow. Everything else runs here.
+        run: python assessment/verify-lab.py --boot-twin P1 P3 P4 P5 P6 P8
       - name: Already-running twin is reused, not re-booted
         run: ./qemu/test-twin-status.sh
       - name: Studio server only obeys its own page (bind, Origin, no GET writes, /field)
