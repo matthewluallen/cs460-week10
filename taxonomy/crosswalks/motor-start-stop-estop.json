@@ -1,0 +1,324 @@
+{
+  "schema_version": "tbd.taxonomy-association/v1",
+  "content": "web/public/projects/motor-start-stop-estop.csco",
+  "title": "Factory default control program \u2014 taxonomy associations",
+  "objects": [
+    {
+      "id": "point:start_pb",
+      "kind": "point",
+      "title": "Start push button (N.O. momentary)",
+      "automation": {
+        "iec_61131_3_address": "%IX0.0",
+        "iec_81346_2_designation": "-S1",
+        "iec_81346_2_class": "S",
+        "engineering_unit": null
+      }
+    },
+    {
+      "id": "point:stop_pb",
+      "kind": "point",
+      "title": "Stop push button (N.O.; kit has no N.C. button)",
+      "automation": {
+        "iec_61131_3_address": "%IX0.1",
+        "iec_81346_2_designation": "-S2",
+        "iec_81346_2_class": "S",
+        "engineering_unit": null
+      }
+    },
+    {
+      "id": "safety:estop_ok",
+      "kind": "safety_function",
+      "title": "Emergency-stop slide switch, wired N.C. (1 = healthy, 0 = tripped or wire cut)",
+      "automation": {
+        "iec_61131_3_address": "%IX0.2",
+        "iec_81346_2_designation": "-S3",
+        "iec_81346_2_class": "S",
+        "engineering_unit": null
+      },
+      "refs": [
+        {
+          "framework": "iso-13850",
+          "relation": "conforms_to",
+          "clause": "4.1.1",
+          "title": "Emergency stop function"
+        },
+        {
+          "framework": "iec-60204-1",
+          "relation": "conforms_to",
+          "clause": "9.2.3.4",
+          "title": "Emergency stop"
+        }
+      ],
+      "notes": "N.C. so a cut wire de-energizes (fail-safe); the fault latches with no automatic restart."
+    },
+    {
+      "id": "point:reset_pb",
+      "kind": "point",
+      "title": "Fault-reset push button (N.O. momentary)",
+      "automation": {
+        "iec_61131_3_address": "%IX0.3",
+        "iec_81346_2_designation": "-S4",
+        "iec_81346_2_class": "S",
+        "engineering_unit": null
+      }
+    },
+    {
+      "id": "point:motor",
+      "kind": "point",
+      "title": "Motor interposing relay coil (seals in)",
+      "automation": {
+        "iec_61131_3_address": "%QX0.0",
+        "iec_81346_2_designation": "-K1",
+        "iec_81346_2_class": "K",
+        "engineering_unit": null
+      }
+    },
+    {
+      "id": "point:run_light",
+      "kind": "point",
+      "title": "Green run light (follows motor)",
+      "automation": {
+        "iec_61131_3_address": "%QX0.1",
+        "iec_81346_2_designation": "-P1",
+        "iec_81346_2_class": "P",
+        "engineering_unit": null
+      }
+    },
+    {
+      "id": "point:fault_lamp",
+      "kind": "point",
+      "title": "Red fault lamp (the latched E-stop fault)",
+      "automation": {
+        "iec_61131_3_address": "%QX0.3",
+        "iec_81346_2_designation": "-P2",
+        "iec_81346_2_class": "P",
+        "engineering_unit": null
+      }
+    },
+    {
+      "id": "point:reset_edge",
+      "kind": "point",
+      "title": "One-scan pulse on a new reset press (internal)",
+      "automation": {
+        "iec_61131_3_address": "%MX0.0",
+        "iec_81346_2_designation": null,
+        "iec_81346_2_class": null,
+        "engineering_unit": null
+      }
+    },
+    {
+      "id": "point:start_released",
+      "kind": "point",
+      "title": "Start-released seal-in helper (internal)",
+      "automation": {
+        "iec_61131_3_address": "%MX0.1",
+        "iec_81346_2_designation": null,
+        "iec_81346_2_class": null,
+        "engineering_unit": null
+      }
+    },
+    {
+      "id": "weakness:hardcoded-creds",
+      "kind": "weakness",
+      "title": "Hard-coded credentials",
+      "refs": [
+        {
+          "framework": "cwe",
+          "id": "CWE-798",
+          "relation": "is"
+        },
+        {
+          "framework": "attack-ics",
+          "id": "T1694.002",
+          "relation": "enables"
+        }
+      ]
+    },
+    {
+      "id": "weakness:missing-auth",
+      "kind": "weakness",
+      "title": "Missing authentication for control/OTA/debug",
+      "refs": [
+        {
+          "framework": "cwe",
+          "id": "CWE-306",
+          "relation": "is"
+        },
+        {
+          "framework": "attack-ics",
+          "id": "T1692.001",
+          "relation": "enables"
+        },
+        {
+          "framework": "attack-ics",
+          "id": "M0802",
+          "relation": "mitigated_by"
+        },
+        {
+          "framework": "attack-ics",
+          "id": "M0813",
+          "relation": "mitigated_by"
+        }
+      ]
+    },
+    {
+      "id": "weakness:cleartext",
+      "kind": "weakness",
+      "title": "Cleartext transmission of sensitive information",
+      "refs": [
+        {
+          "framework": "cwe",
+          "id": "CWE-319",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "weakness:ota-unsigned",
+      "kind": "weakness",
+      "title": "OTA firmware download without integrity check",
+      "refs": [
+        {
+          "framework": "cwe",
+          "id": "CWE-494",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "weakness:os-command",
+      "kind": "weakness",
+      "title": "OS command injection",
+      "refs": [
+        {
+          "framework": "cwe",
+          "id": "CWE-78",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "weakness:active-debug",
+      "kind": "weakness",
+      "title": "Active debug code (debug telnet)",
+      "refs": [
+        {
+          "framework": "cwe",
+          "id": "CWE-489",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "weakness:weak-random",
+      "kind": "weakness",
+      "title": "Insufficiently random values",
+      "refs": [
+        {
+          "framework": "cwe",
+          "id": "CWE-330",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "weakness:path-traversal",
+      "kind": "weakness",
+      "title": "Path traversal",
+      "refs": [
+        {
+          "framework": "cwe",
+          "id": "CWE-22",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "attack:initial-access-usb",
+      "kind": "attack_step",
+      "title": "Emulated USB dropper onto the engineer station",
+      "refs": [
+        {
+          "framework": "attack-ics",
+          "id": "T0847",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "attack:initial-access-phish",
+      "kind": "attack_step",
+      "title": "Emulated phishing-attachment delivery",
+      "refs": [
+        {
+          "framework": "attack-ics",
+          "id": "T0865",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "attack:user-execution",
+      "kind": "attack_step",
+      "title": "User executes the dropped agent",
+      "refs": [
+        {
+          "framework": "attack-ics",
+          "id": "T0863",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "attack:discover-broker",
+      "kind": "attack_step",
+      "title": "Discover the phone MQTT broker on the plant net",
+      "refs": [
+        {
+          "framework": "attack-ics",
+          "id": "T0846",
+          "relation": "is"
+        }
+      ]
+    },
+    {
+      "id": "attack:spoof-reporting",
+      "kind": "attack_step",
+      "title": "Spoof phone sensor reading (forged reporting message)",
+      "refs": [
+        {
+          "framework": "attack-ics",
+          "id": "T1692.002",
+          "relation": "is"
+        },
+        {
+          "framework": "attack-ics",
+          "id": "M0802",
+          "relation": "mitigated_by"
+        }
+      ]
+    },
+    {
+      "id": "attack:spoof-command",
+      "kind": "attack_step",
+      "title": "Spoof phone button (forged command message)",
+      "refs": [
+        {
+          "framework": "attack-ics",
+          "id": "T1692.001",
+          "relation": "is"
+        },
+        {
+          "framework": "attack-ics",
+          "id": "M0802",
+          "relation": "mitigated_by"
+        },
+        {
+          "framework": "attack-ics",
+          "id": "M0813",
+          "relation": "mitigated_by"
+        }
+      ]
+    }
+  ]
+}
