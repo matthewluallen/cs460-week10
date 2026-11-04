@@ -196,8 +196,12 @@ const out = (ok, msg) => console.log((ok === null ? 'SKIP ' : ok ? 'PASS ' : 'FA
 
     p = await b.newPage(); errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/logic_studio.html'); await p.waitForTimeout(1500);
-    await p.evaluate(() => recordTwinBus(3)); await p.waitForTimeout(25000);
-    const note = await p.$eval('#busTapNote', e => e.textContent), summ = await p.$eval('#busSummary', e => e.textContent);
+    await p.evaluate(() => recordTwinBus(3));
+    // arm64 headless chromium can be slow to import the recording through the validator;
+    // poll for the bus summary to resolve (up to ~40s) instead of a single fixed wait.
+    let summ = '';
+    for (let i = 0; i < 40; i++) { await p.waitForTimeout(1000); summ = await p.$eval('#busSummary', e => e.textContent); if (/QEMU/.test(summ)) break; }
+    const note = await p.$eval('#busTapNote', e => e.textContent);
     out(/LIVE TAP of your twin/.test(note), 'Studio "Record twin bus" button: ' + note.slice(0, 120));
     out(/QEMU/.test(summ), 'Studio Bus monitor imported the live capture through its own validator: ' + summ.slice(0, 90));
     out(errs.length === 0, 'Logic Studio: no page errors ' + (errs[0] || ''));
