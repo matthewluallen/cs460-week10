@@ -18,6 +18,7 @@ void plc_tags_install(const project::Definition& d) {
         case project::Space::MX: tag.kind = TK_MX; break;
         case project::Space::IW: tag.kind = TK_IW; tag.signed_value = true; tag.writable = d.word_inputs[t.index] == project::WordSource::Parameter; break;
         }
+        tag.designation = t.designation; tag.cls = t.cls; tag.address = t.address;
         ++PLC_TAG_COUNT;
     }
 }

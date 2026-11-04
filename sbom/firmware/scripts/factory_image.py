@@ -52,8 +52,8 @@ def project_payload(path=DEFAULT_PROJECT):
     if len(data) > PAYLOAD_CAPACITY:
         sys.exit(f'{path}: {len(data)} bytes exceeds the 4096-byte project capacity')
     doc = json.loads(data)
-    if doc.get('magic') != 'TBD-PROJECT' or doc.get('schema') != 1:
-        sys.exit(f'{path}: not a TBD-PROJECT schema 1 payload')
+    if doc.get('magic') != 'TBD-PROJECT' or doc.get('schema') not in (1, 2):
+        sys.exit(f'{path}: not a TBD-PROJECT schema 1 or 2 payload')
     if 'startup' in doc:
         sys.exit(f'{path}: the factory default must boot in PROGRAM (no startup declaration)')
     return data

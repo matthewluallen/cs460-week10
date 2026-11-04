@@ -16,6 +16,7 @@ struct TagDef {
     bool        forceable; // may it be forced (coils and DI only)
     const char* desc;
     bool        signed_value;
+    const char* designation = ""; const char* cls = ""; const char* address = ""; // schema 2 IEC metadata
 };
 
 inline int32_t plc_tag_decode(const TagDef* t, uint16_t value) {
