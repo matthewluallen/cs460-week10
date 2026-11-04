@@ -99,7 +99,7 @@ echo "[tbd] configure + build (this takes ~10-15 min on a fresh tree)"
 cd "$QEMU_DIR"
 ./configure \
   --target-list=xtensa-softmmu --enable-gcrypt --enable-slirp \
-  --disable-werror \
+  --disable-werror --extra-cflags=-Wno-error \
   --disable-docs --disable-tools --disable-curl --disable-gnutls --disable-curses --disable-vnc --disable-gtk --disable-sdl --disable-png --disable-brlapi --disable-vte --disable-opengl --disable-spice
 ninja -C build qemu-system-xtensa && strip build/qemu-system-xtensa
 
