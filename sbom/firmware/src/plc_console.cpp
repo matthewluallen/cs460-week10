@@ -745,7 +745,9 @@ static void process(char* line) {
     else if (!strcmp(cmd, "points")) cmd_points();
     else if (!strcmp(cmd, "project")) { if(a1 && !strcmp(a1,"json") && !a2)console_emit_json(plc_project_json()); else Serial.println("usage: project json"); }
     else if (!strcmp(cmd, "execution")) { if(a1 && !strcmp(a1,"json") && !a2)console_emit_json(plc_execution_json()); else Serial.println("usage: execution json"); }
-    else if (!strcmp(cmd, "show") && a1) { const TagDef* t = plc_tag_find(a1); if (t) { print_point(t); Serial.printf("    %s\n", t->desc); } else Serial.println("? unknown tag"); }
+    else if (!strcmp(cmd, "show") && a1) { const TagDef* t = plc_tag_find(a1); if (t) { print_point(t);
+        if (t->designation[0] || t->address[0]) Serial.printf("    IEC 61131-3 %s | IEC 81346-2 %s (class %s)\n", t->address[0]?t->address:"-", t->designation[0]?t->designation:"-", t->cls[0]?t->cls:"-");
+        Serial.printf("    %s\n", t->desc); } else Serial.println("? unknown tag"); }
     else if (!strcmp(cmd, "io")) cmd_io();
     else if (!strcmp(cmd, "program")) {
         Serial.printf("[PROGRAM] instr=%d mode=%s validation=%s scan_ms=%u\n",

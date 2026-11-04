@@ -2335,10 +2335,10 @@ function validateProject(project){
  object(project.symbols,[],Object.keys(project.symbols||{}),'Symbols');need(Object.keys(project.symbols).length<=24,'At most 24 named operands are supported.');
  const names=new Set();
  for(const [key,symbol] of Object.entries(project.symbols)){
-  operand(key);object(symbol,['name'],['comment','unit'],'Symbol');
+  operand(key);object(symbol,['name'],['comment','unit','designation','class','address'],'Symbol');
   need(typeof symbol.name==='string'&&/^[A-Za-z_][A-Za-z0-9_]{0,23}$/.test(symbol.name),'Symbol names need 1–24 ASCII identifier characters.');
   need(!names.has(symbol.name.toLowerCase()),'Symbol names must be unique, ignoring case.');names.add(symbol.name.toLowerCase());
-  if(Object.hasOwn(symbol,'comment'))ascii(symbol.comment,80,'Symbol comment');if(Object.hasOwn(symbol,'unit'))ascii(symbol.unit,12,'Symbol unit');
+  if(Object.hasOwn(symbol,'comment'))ascii(symbol.comment,80,'Symbol comment');if(Object.hasOwn(symbol,'unit'))ascii(symbol.unit,12,'Symbol unit');if(Object.hasOwn(symbol,'designation'))ascii(symbol.designation,7,'Symbol designation');if(Object.hasOwn(symbol,'class'))ascii(symbol.class,3,'Symbol class');if(Object.hasOwn(symbol,'address'))ascii(symbol.address,7,'Symbol address');
  }
  object(project.settings,['bindings','parameters'],['process_bindings','io_expansion','host_acl'],'Settings');object(project.settings.bindings,['digital_inputs','digital_outputs','word_inputs'],[],'Bindings');
  if(Object.hasOwn(project.settings,'host_acl'))validateHostACL(project.settings.host_acl);
@@ -2396,7 +2396,7 @@ function deploymentPayload(project){
  need(p.program.nets.length>0&&p.program.nets.every(n=>n.expr!==null),'Add input logic to every network before loading.');
  const {code}=compileProgram(p.program);need(code.length<=32,'This runtime admits at most 32 instructions; simplify the program.');
  const tags=Object.keys(p.symbols).sort().map(operand=>({operand,...p.symbols[operand]}));
- const payload={magic:'TBD-PROJECT',schema:1,project_id:p.id,project_name:p.name,project_revision:p.revision,scan_ms:p.program.scan_ms,code,tags,bindings:p.settings.bindings,parameters:p.settings.parameters};
+ const payload={magic:'TBD-PROJECT',schema:(tags.some(t=>t.designation||t.class||t.address)?2:1),project_id:p.id,project_name:p.name,project_revision:p.revision,scan_ms:p.program.scan_ms,code,tags,bindings:p.settings.bindings,parameters:p.settings.parameters};
  if(p.settings.process_bindings)payload.process_bindings=p.settings.process_bindings;
  if(p.settings.io_expansion)payload.io_expansion=p.settings.io_expansion;
  if(p.program.startup)payload.startup=p.program.startup;

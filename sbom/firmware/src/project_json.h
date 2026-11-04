@@ -50,7 +50,7 @@ inline const char* decode(const uint8_t* data, size_t size, Definition& out) {
     const unsigned root_keys = 10 + unsigned(root.containsKey("process_bindings")) + unsigned(root.containsKey("io_expansion")) +
                                unsigned(root.containsKey("startup")) + unsigned(root.containsKey("host_acl"));
     if (root.size() != root_keys || !root["magic"].is<const char*>() || root["magic"].as<JsonString>().size() != 11 ||
-        root["magic"] != "TBD-PROJECT" || !root["schema"].is<unsigned>() || root["schema"].as<unsigned>() != 1) return "TBD-PROJECT schema 1 required (unknown fields refused)";
+        root["magic"] != "TBD-PROJECT" || !root["schema"].is<unsigned>() || (root["schema"].as<unsigned>() != 1 && root["schema"].as<unsigned>() != 2)) return "TBD-PROJECT schema 1 or 2 required (unknown fields refused)";
     if (!root["project_revision"].is<uint32_t>() || !root["scan_ms"].is<uint32_t>()) return "project revision/scan type";
     // This decoder is deliberately single-owner (USB loop). Keep the large
     // candidate and nested-codec wire buffer off the 16KiB loop stack.
@@ -135,13 +135,17 @@ inline const char* decode(const uint8_t* data, size_t size, Definition& out) {
     for (JsonVariantConst value : root["tags"].as<JsonArrayConst>()) {
         if (!value.is<JsonObjectConst>() || staged.tag_count >= TagCapacity) return "tag object/capacity";
         auto tag = value.as<JsonObjectConst>();
-        const unsigned count = 2 + unsigned(tag.containsKey("comment")) + unsigned(tag.containsKey("unit"));
+        const unsigned count = 2 + unsigned(tag.containsKey("comment")) + unsigned(tag.containsKey("unit"))
+                             + unsigned(tag.containsKey("designation")) + unsigned(tag.containsKey("class")) + unsigned(tag.containsKey("address"));
         if (tag.size() != count) return "unknown tag field";
         expected_keys += count;
         auto& dest = staged.tags[staged.tag_count++]; char address[5];
         if (!text(tag["operand"], address) || !operand(address, dest.space, dest.index) || !text(tag["name"], dest.name) ||
             !text(tag["comment"], dest.comment, !tag.containsKey("comment") ? false : true) ||
-            !text(tag["unit"], dest.unit, !tag.containsKey("unit") ? false : true)) return "tag field type/length/operand";
+            !text(tag["unit"], dest.unit, !tag.containsKey("unit") ? false : true) ||
+            !text(tag["designation"], dest.designation, !tag.containsKey("designation") ? false : true) ||
+            !text(tag["class"], dest.cls, !tag.containsKey("class") ? false : true) ||
+            !text(tag["address"], dest.address, !tag.containsKey("address") ? false : true)) return "tag field type/length/operand";
     }
     if (keys != expected_keys) return "duplicate/unknown JSON key";
     if (const char* error = validate(staged)) return error;

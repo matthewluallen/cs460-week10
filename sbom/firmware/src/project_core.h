@@ -46,6 +46,8 @@ struct Tag {
     Space space = Space::IX;
     uint8_t index = 0;
     char name[25]{}, comment[81]{}, unit[13]{};
+    // schema 2: IEC 81346-2 reference designation (-K1), object class (K), IEC 61131-3 address (%QX0.0).
+    char designation[8]{}, cls[4]{}, address[8]{};
 };
 struct Definition {
     char id[33]{}, name[49]{};
