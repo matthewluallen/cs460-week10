@@ -14,6 +14,13 @@ hardware"), never as something you need to own or connect to.
 
 ## Open the lab
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/matthewluallen/cs460-week10?quickstart=1)
+[![Open in Dev Containers](https://img.shields.io/static/v1?label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode%3A%2F%2Fms-vscode-remote.remote-containers%2FcloneInVolume%3Furl%3Dhttps%3A%2F%2Fgithub.com%2Fmatthewluallen%2Fcs460-week10)
+
+**Quick launch:** click a badge above (Codespaces in your browser, or a local VS Code Dev
+Container), and when the terminal is ready run **`./start.sh`** — it fetches the twin, boots
+it, and opens the Logic Studio in one step. (`./start.sh --info` just prints the lab map.)
+
 **New here? Do [`docs/SETUP.md`](docs/SETUP.md) once** to get your environment running — it
 needs only a GitHub account and a browser (nothing to install). In short: **Code → Codespaces
 → Create codespace on main**, wait for the `CS460 Weeks 10–12 lab ready.` banner, then come

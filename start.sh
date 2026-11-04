@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+# Quick launch — one command from an open Codespace / Dev Container to a running lab:
+#   ./start.sh            fetch the twin if needed, boot it, open the Logic Studio (+ console)
+#   ./start.sh secure     same, but the hardened Part-9 build (vuln is the default)
+#   ./start.sh --info     just print the lab map + environment check; launch nothing
+set -uo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"; cd "$HERE"
+
+MODE=launch; PROFILE=vuln
+case "${1:-}" in
+  --info|--no-launch|-n) MODE=info ;;
+  secure|malicious|vuln) PROFILE="$1" ;;
+esac
+
 cat <<'EOF'
 CS460 Week 10 — StampLC: SBOM/HBOM + Bus & Firmware Analysis
 
@@ -28,9 +41,34 @@ command -v syft  >/dev/null && echo "  syft        : OK" || echo "  syft        
 command -v grype >/dev/null && echo "  grype       : OK" || echo "  grype       : not found (runs in the devcontainer)"
 command -v pio   >/dev/null && echo "  platformio  : OK" || echo "  platformio  : not found (runs in the devcontainer; Part 9)"
 if ls qemu/twin/qemu-twin-*/qemu-system-xtensa >/dev/null 2>&1 && [ -f qemu/twin/stamplc-flash-8MB.bin ]; then
-  echo "  twin        : ready  ->  ./qemu/studio.sh   (twin + Studio + console, one command)"
+  echo "  twin        : ready"
 else
-  echo "  twin        : not fetched ->  ./qemu/fetch-qemu.sh   (needed for Part 1 + Parts 6-9)"
+  echo "  twin        : not fetched (./start.sh will fetch it)"
 fi
 echo
-echo "Open README.md and work the parts in order."
+
+if [ "$MODE" = info ]; then
+  echo "Open README.md and work the parts in order.  Run ./start.sh (no args) to launch the twin + Studio."
+  exit 0
+fi
+
+# ── quick launch ─────────────────────────────────────────────────────────────
+# Always fetch: this guarantees the live released twin, not a stale copy that a
+# prebuilt devcontainer image may have baked in. fetch-qemu is quick and idempotent.
+echo "Fetching the current twin + firmware (so you run the live release, not a stale baked copy)…"
+if ! ./qemu/fetch-qemu.sh; then
+  if ls qemu/twin/qemu-twin-*/qemu-system-xtensa >/dev/null 2>&1 && [ -f qemu/twin/stamplc-flash-8MB.bin ]; then
+    echo "  fetch failed (offline?) — continuing with the twin already present."
+  else
+    echo "  fetch failed and no twin is present — fix connectivity, then re-run ./start.sh"; exit 1
+  fi
+fi
+echo
+echo "Launching the twin + Logic Studio ($PROFILE build)…"
+echo "  Open the Studio:  Codespaces → the auto-forwarded port 8088 (popup / Ports tab)"
+echo "                    local VS Code → http://localhost:8088"
+echo "  Text console (optional, another terminal):  ./qemu/console.sh"
+echo "  Phone-sensor part (later):  bash mqtt/share.sh        (local Dev Container: add --tunnel)"
+echo "  Ctrl-C stops the Studio server; the twin keeps running (./qemu/twin-status.sh)."
+echo
+exec ./qemu/studio.sh "$PROFILE"
